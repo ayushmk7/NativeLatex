@@ -1,5 +1,6 @@
 import AppKit
 import NativeLatexDesign
+import NativeLatexMarkdownObjects
 import SwiftUI
 
 extension NSAttributedString.Key {
@@ -25,6 +26,12 @@ enum MarkdownDecoration: String {
 final class MarkdownLayoutManager: NSLayoutManager {
     /// Read: `blockquote { border-left: 3px; padding-left: 1em }`, so each level indents 18 pt.
     static let quoteIndent: CGFloat = 18, quoteBar: CGFloat = 3
+
+    /// Table rules and local images (`MarkdownObjects`) over the text.
+    override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
+        super.drawGlyphs(forGlyphRange: glyphsToShow, at: origin)
+        MarkdownObjects.draw(self, glyphRange: glyphsToShow, at: origin)
+    }
 
     override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
         super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
@@ -993,7 +1000,10 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
             defer { props.deallocate() }
             for i in 0..<range.length {
                 props[i] = properties[i]
-                if characterIndexes[i] < storage.length, storage.attribute(.markdownHidden, at: characterIndexes[i], effectiveRange: nil) != nil {
+                if let object = MarkdownObjects.glyphProperty(at: characterIndexes[i], in: storage, proposed: props[i]) {
+                    props[i] = object
+                    changed = true
+                } else if characterIndexes[i] < storage.length, storage.attribute(.markdownHidden, at: characterIndexes[i], effectiveRange: nil) != nil {
                     props[i].insert(.null)
                     changed = true
                 }
@@ -1002,6 +1012,17 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
             layoutManager.setGlyphs(glyphs, properties: props, characterIndexes: characterIndexes, font: font, forGlyphRange: range)
             return range.length
         }
+    }
+
+    /// Object glyphs (table separators, images) are whitespace sized by `MarkdownObjects`.
+    nonisolated func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction,
+                                   forControlCharacterAt index: Int) -> NSLayoutManager.ControlCharacterAction {
+        layoutManager.textStorage.flatMap { MarkdownObjects.controlCharacterAction(at: index, in: $0) } ?? action
+    }
+
+    nonisolated func layoutManager(_ layoutManager: NSLayoutManager, boundingBoxForControlGlyphAt glyphIndex: Int, for container: NSTextContainer,
+                                   proposedLineFragment rect: NSRect, glyphPosition position: NSPoint, characterIndex index: Int) -> NSRect {
+        layoutManager.textStorage.flatMap { MarkdownObjects.boundingBox(at: index, in: $0, glyphPosition: position) } ?? NSRect(origin: position, size: .zero)
     }
 }
 

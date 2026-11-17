@@ -277,7 +277,7 @@ struct EditorView: View {
                     MarkdownFormatBar(target: formatTarget)
                         .background(Theme.surface)
                     HandleTextView(text: $document.text, handle: writer, label: "Write") { line = $0; column = $1 }
-                        // Tables, local images and TeX math drawn in place; the Markdown text is untouched.
+                        // Tables and local images drawn in place (text untouched; math stays source).
                         .task(id: fileURL) { MarkdownObjects.attach(to: writer.view, folder: fileURL?.deletingLastPathComponent()) }
                 }
                 .background(Theme.background)
