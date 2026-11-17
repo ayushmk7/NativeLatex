@@ -41,7 +41,7 @@ code { font-family: var(--mono); font-size: .9em; }
 /* one column width for everything */
 .site-header, main, .site-footer { width: min(1120px, 100% - 2 * var(--s5)); margin-inline: auto; }
 
-.site-header { display: flex; align-items: center; gap: var(--s5); min-height: 72px; border-bottom: 1px solid var(--line); }
+.site-header { display: flex; align-items: center; gap: var(--s5); min-height: 72px; }
 .brand { display: inline-flex; align-items: center; gap: var(--s2); font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
 .brand img { display: block; }
 .site-nav { display: flex; gap: var(--s5); margin-left: auto; font-size: 14px; color: var(--muted); }
@@ -66,10 +66,10 @@ h1 { margin: 0 0 var(--s5); font-size: clamp(42px, 7.5vw, 88px); font-weight: 80
 .preview { margin-top: 88px; text-align: left; }
 .preview figcaption { margin-top: var(--s4); font-size: 13px; color: var(--muted); text-align: center; }
 /* the video sits on a quiet surface "stage" so the white app frame never reads as a hole in the page */
-.preview-player { position: relative; padding: clamp(8px, 1.6vw, 20px); border: 1px solid var(--line); border-radius: 24px; background: var(--solid); }
+.preview-player { position: relative; padding: clamp(8px, 1.6vw, 20px); border-radius: 24px; background: var(--solid); }
 .preview video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 14px; background: #fff;
-  box-shadow: 0 0 0 1px var(--line), 0 24px 64px -16px rgba(0, 0, 0, .22); }
-html[data-theme="dark"] .preview video { box-shadow: 0 0 0 1px var(--line), 0 24px 64px -16px rgba(0, 0, 0, .9); }
+  box-shadow: 0 24px 64px -16px rgba(0, 0, 0, .22); }
+html[data-theme="dark"] .preview video { box-shadow: 0 24px 64px -16px rgba(0, 0, 0, .9); }
 /* clean poster until it plays: hide the native control bar while the Play button shows (script.js hides it on play) */
 .preview-player:has(.preview-play:not([hidden])) video::-webkit-media-controls { display: none !important; }
 .preview-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px 0 20px; border: 0; border-radius: 999px; background: var(--fill); color: #fff; font: 600 15px var(--font); white-space: nowrap; cursor: pointer;
@@ -78,18 +78,18 @@ html[data-theme="dark"] .preview video { box-shadow: 0 0 0 1px var(--line), 0 24
 .preview-play:active { transform: translate(-50%, -50%) scale(.98); }
 .preview-play[hidden] { display: none; }
 
-.section { padding: var(--s8) 0; border-top: 1px solid var(--line); }
+.section { padding: var(--s8) 0; }
 h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 52px); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; }
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s6); margin-top: var(--s7); padding: 0; list-style: none; }
-.steps li { padding-top: var(--s4); border-top: 2px solid var(--fg); }
+.steps li { padding-top: var(--s4); }
 .step-number { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); }
 .steps h3 { margin: var(--s3) 0 var(--s2); font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .steps p, .principle-list dd { color: var(--muted); font-size: 15px; }
-.principle-list { margin-top: var(--s7); border-top: 1px solid var(--line); }
-.principle-list div { display: grid; grid-template-columns: 220px 1fr; gap: var(--s4); padding: var(--s5) 0; border-bottom: 1px solid var(--line); }
+.principle-list { margin-top: var(--s7); }
+.principle-list div { display: grid; grid-template-columns: 220px 1fr; gap: var(--s4); padding: var(--s5) 0; }
 .principle-list dt { font-weight: 700; font-size: 17px; }
 
-.site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s3); padding: var(--s6) 0 var(--s7); border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+.site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s3); padding: var(--s6) 0 var(--s7); font-size: 14px; color: var(--muted); }
 
 @media (max-width: 800px) {
   .steps { grid-template-columns: 1fr; gap: var(--s5); }

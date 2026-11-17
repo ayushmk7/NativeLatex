@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const video = document.querySelector(".preview video");
   const play = document.querySelector(".preview-play");
   if (!video || !play) return;
-  play.addEventListener("click", () => { video.play().catch(() => {}); });
+  play.addEventListener("click", () => { video.muted = false; video.play().catch(() => {}); });
   video.addEventListener("play", () => { play.hidden = true; });
+  if (!video.paused) play.hidden = true;
 });
