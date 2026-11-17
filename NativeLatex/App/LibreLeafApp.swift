@@ -170,7 +170,7 @@ struct EditorView: View {
 
     @ViewBuilder private var preview: some View {
         Group {
-            if isMarkdown { MarkdownPreview(text: document.text) } else { texPreview }
+            if isMarkdown { MarkdownPreview(text: document.text, fileURL: fileURL) } else { texPreview }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -294,101 +294,5 @@ struct PDFPreview: NSViewRepresentable {
             if !autoScales { view.scaleFactor = scale }
             if let restored = view.document?.page(at: page) { view.go(to: restored) }
         }
-    }
-}
-
-/// Native Markdown preview: headings, fences, lists, quotes and inline styles. Code is displayed, never run.
-struct MarkdownPreview: View {
-    let text: String
-
-    enum Block: Equatable {
-        case heading(Int, String), paragraph(String), code(String)
-        /// `marker` is "•" or the original number ("2."), so ordered lists keep their numbering.
-        case listItem(depth: Int, marker: String, text: String)
-        case quote(String)
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
-                Label(Self.limitations, systemImage: "info.circle")
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Theme.secondary)
-                    .padding(.bottom, Theme.s2)
-                ForEach(Array(Self.blocks(text).enumerated()), id: \.offset) { _, block in render(block) }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Theme.s4)
-            .textSelection(.enabled)
-        }
-        .background(Theme.background)
-        .tint(Theme.accentText)
-        .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
-    }
-
-    static let limitations = "Basic preview: tables, images, math and footnotes may appear as source or simplified text."
-
-    // ponytail: line-based parser; tables/images/math/nested quotes need Pandoc later.
-    static func blocks(_ text: String) -> [Block] {
-        // Lone CR (classic Mac) and CRLF both end lines.
-        let lines = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
-            .split(separator: "\n", omittingEmptySubsequences: false)
-        var result: [Block] = []
-        var fence: [Substring]?
-        for line in lines {
-            let trimmed = line.drop { $0 == " " || $0 == "\t" }
-            let indent = line.count - trimmed.count
-            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                if let code = fence { result.append(.code(code.joined(separator: "\n"))); fence = nil } else { fence = [] }
-            } else if fence != nil {
-                fence?.append(line)
-            } else if let match = trimmed.wholeMatch(of: /(#{1,6}) +(.*)/), indent < 4 {
-                result.append(.heading(match.1.count, String(match.2)))
-            } else if let match = trimmed.wholeMatch(of: /> ?(.*)/) {
-                result.append(.quote(String(match.1)))
-            } else if let match = trimmed.wholeMatch(of: /([-*+]|\d{1,9}[.)]) +(.*)/) {
-                let marker = match.1.first!.isNumber ? String(match.1) : "•"
-                result.append(.listItem(depth: indent / 2, marker: marker, text: String(match.2)))
-            } else if !trimmed.isEmpty {
-                result.append(.paragraph(String(line)))
-            }
-        }
-        if let code = fence { result.append(.code(code.joined(separator: "\n"))) }
-        return result
-    }
-
-    @ViewBuilder private func render(_ block: Block) -> some View {
-        switch block {
-        case let .heading(level, text):
-            inline(text).font([.largeTitle, .title, .title2, .title3, .headline, .headline][level - 1]).bold()
-        case let .paragraph(text):
-            inline(text)
-        case let .code(text):
-            Text(text).font(Theme.editorFont)
-        case let .listItem(depth, marker, text):
-            HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
-                Text(marker).foregroundStyle(Theme.secondary).monospacedDigit()
-                inline(text)
-            }
-            .padding(.leading, CGFloat(depth) * Theme.s5)
-        case let .quote(text):
-            inline(text)
-                .foregroundStyle(Theme.secondary)
-                .padding(.leading, Theme.s3)
-                .overlay(alignment: .leading) { Rectangle().fill(Theme.accent).frame(width: 3) }
-                .accessibilityLabel("Quote: \(text)")
-        }
-    }
-
-    private func inline(_ line: String) -> Text { Text(Self.inline(line)) }
-
-    /// Inline Markdown; links in the brand blue-text token and underlined, so color isn't the only cue.
-    static func inline(_ line: String) -> AttributedString {
-        var text = (try? AttributedString(markdown: line)) ?? AttributedString(line)
-        for run in text.runs where run.link != nil {
-            text[run.range].foregroundColor = Theme.accentText
-            text[run.range].underlineStyle = .single
-        }
-        return text
     }
 }

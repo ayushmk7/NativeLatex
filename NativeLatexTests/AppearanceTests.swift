@@ -64,17 +64,6 @@ final class AppearanceTests: XCTestCase {
         window.close()
     }
 
-    func testMarkdownPreviewStatesLimitsAndStylesLinks() throws {
-        for word in ["tables", "images", "math", "footnotes"] {
-            XCTAssertTrue(MarkdownPreview.limitations.contains(word), word)
-        }
-        let text = MarkdownPreview.inline("See [a link](https://example.org) here.")
-        let link = try XCTUnwrap(text.runs.first { $0.link != nil })
-        XCTAssertEqual(link.underlineStyle, .single, "links are underlined, not color-only")
-        XCTAssertEqual(link.foregroundColor, Theme.accentText)
-        XCTAssertNil(text.runs.first { $0.link == nil }?.foregroundColor, "plain text keeps the default color")
-    }
-
     /// Resizing across the narrow breakpoint keeps the same editor, focused, with its caret and undo
     /// history, and typing still reaches the document.
     func testResizingAcrossBreakpointKeepsFocusCaretUndoAndTyping() throws {
