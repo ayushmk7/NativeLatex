@@ -23,3 +23,11 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
 });
 
 sync();
+
+document.addEventListener("DOMContentLoaded", () => {
+  const video = document.querySelector(".preview video");
+  const play = document.querySelector(".preview-play");
+  if (!video || !play) return;
+  play.addEventListener("click", () => { video.play().catch(() => {}); });
+  video.addEventListener("play", () => { play.hidden = true; });
+});

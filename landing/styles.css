@@ -65,7 +65,11 @@ h1 { margin: var(--s5) 0; font-size: clamp(40px, 7vw, 80px); font-weight: 800; l
 
 .preview { margin-top: var(--s8); text-align: left; }
 .preview figcaption { margin-top: var(--s3); font-size: 13px; color: var(--muted); text-align: center; }
+.preview-player { position: relative; }
 .preview video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .08); }
+.preview-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 22px; border: 0; border-radius: 999px; background: #0a0a0a; color: #fff; font: 600 15px var(--font); white-space: nowrap; cursor: pointer; box-shadow: 0 8px 28px rgba(0, 0, 0, .2); }
+.preview-play:hover { background: var(--fill); }
+.preview-play[hidden] { display: none; }
 
 .section { padding: var(--s8) 0; border-top: 1px solid var(--line); }
 h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 48px); font-weight: 800; line-height: 1.08; letter-spacing: -.03em; }
