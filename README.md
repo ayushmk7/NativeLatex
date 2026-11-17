@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="../landing/icon.svg" width="96" height="96" alt="LibreWeave app icon">
+  <img src="landing/icon.svg" width="96" height="96" alt="LibreWeave app icon">
 </p>
 
 <h1 align="center">LibreWeave</h1>
@@ -8,11 +8,11 @@
 A native Mac editor for LaTeX and Markdown that keeps the rendered page beside your words.</p>
 
 <p align="center">
-  <img src="../landing/media/libreweave-hero.png" width="880" alt="LibreWeave in dark appearance: LaTeX source on the left, the built PDF on the right">
+  <img src="landing/media/libreweave-hero.png" width="880" alt="LibreWeave in dark appearance: LaTeX source on the left, the built PDF on the right">
 </p>
 
 <p align="center">
-  <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><img src="../landing/media/libreweave-demo-poster.jpg" width="640" alt="Play the 18-second LibreWeave demo"></a><br>
+  <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><img src="landing/media/libreweave-demo-poster.jpg" width="640" alt="Play the 18-second LibreWeave demo"></a><br>
   <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><b>▶ Watch the 18-second demo</b></a> · <a href="https://libreweave.ayushmadhav.com/">libreweave.ayushmadhav.com</a>
 </p>
 
@@ -20,13 +20,13 @@ A native Mac editor for LaTeX and Markdown that keeps the rendered page beside y
 
 Open any `.md` file and its preview sits beside the source, updating from the unsaved text as you type. **Read** shows the full rendering: tables, footnotes, task lists and TeX math as native MathML, rendered by the [Pandoc](https://pandoc.org) on your Mac with JavaScript off and no network access. **Write** (<kbd>⌥⌘E</kbd>) lets you edit right in the preview pane. Read and Write sit in the toolbar of every Markdown window, even in Source Only and narrow windows. Headings, emphasis, links, lists and quotes look formatted, and their markup shows only on the line you're editing. The file underneath stays plain Markdown, character for character.
 
-<p align="center"><img src="../landing/media/libreweave-markdown.png" width="760" alt="A Markdown note in Write mode: formatted text beside its source, with Read and Write in the toolbar"></p>
+<p align="center"><img src="landing/media/libreweave-markdown.png" width="760" alt="A Markdown note in Write mode: formatted text beside its source, with Read and Write in the toolbar"></p>
 
 ## LaTeX, built on your Mac
 
 Press <kbd>⌘B</kbd> and LibreWeave builds with the TeX already installed on your Mac: `latexmk` when you have it, otherwise one pass of `pdflatex`, `xelatex` or `lualatex`. The PDF opens beside the source. Errors show up in a Problems list that jumps to the line, and the full log is one click away. If a build fails, the last good PDF stays on screen, and the toolbar says it is out of date.
 
-<p align="center"><img src="../landing/media/libreweave-latex-light.png" width="760" alt="A LaTeX article and its built PDF in light appearance, build status Built"></p>
+<p align="center"><img src="landing/media/libreweave-latex-light.png" width="760" alt="A LaTeX article and its built PDF in light appearance, build status Built"></p>
 
 ## Your files stay yours
 
@@ -70,4 +70,4 @@ Copy `LibreWeave.app` into `/Applications` to keep it. LibreWeave then appears u
 - The Markdown preview runs Pandoc with `--sandbox`, shows raw HTML and TeX as text, and caps input, render time, memory and output size. Past a cap, it stops the preview and editing carries on.
 - Repository and Xcode project are named **NativeLatex**; the app is **LibreWeave**. Design tokens live in the `NativeLatex/Design` package and converters in `NativeLatex/Integrations`, both local Swift packages with their own tests.
 
-Status, plans and verified details: [docs/status.md](status.md).
+Status, plans and verified details: [docs/status.md](docs/status.md).
