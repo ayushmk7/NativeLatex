@@ -35,14 +35,14 @@ The first concept (a brace over a page on a black field) read as a box inside a 
 
 | Appearance | Sheet | Lines | Threads |
 | --- | --- | --- | --- |
-| Light | `#FFFFFF` | `#0A0A0A` | `#2563EB` |
-| Dark | `#0A0A0A` | `#FFFFFF` | `#2563EB` |
+| Light | `#0A0A0A` | `#FFFFFF` | `#2563EB` |
+| Dark | `#FFFFFF` | `#0A0A0A` | `#2563EB` |
 | Clear light / dark | System glass (replaces our fill) | White | Mid gray, derived from `#2563EB` |
 | Tinted light / dark | User's tint | White / tint | Tint, lighter / darker |
 
 macOS picks Clear and Tinted from the user's icon-style setting and composites Clear's backdrop translucency live in the Dock. In static renders, Clear is the same opaque neutral glass for our icon and for Apple's own icons. The app forces no alpha and needs no setting. There is no Mono (`tinted`) override: `#2563EB` already greys between the Clear sheet and lines; measurements are in art/README. Tinted dark remains the lowest-contrast mode, readable at 32 px and up.
 
-The landing favicon follows the same rule through `prefers-color-scheme`: white sheet on light pages, black sheet on dark pages.
+The landing favicon follows the same rule through `prefers-color-scheme`: black sheet on light pages, white sheet on dark pages.
 
 - **Grid:** Apple's macOS icon template: one 824 px silhouette, 100 px inset, 185 px corner radius on a 1024 canvas.
 - **One geometry for every size:** macOS draws the `.icon` at every size from a single vector, so the mark uses the 2×2 weave that stays legible at 16 px. Coordinates are multiples of 64: 2 px strands and 1 px gaps at 16 px. An earlier 3-line weave looked richer at 512 px but blurred into a clump at 16 px, so it was removed.
@@ -54,8 +54,8 @@ The landing favicon follows the same rule through `prefers-color-scheme`: white 
 - The Icon Composer document `NativeLatex/AppIcon.icon` gives real variants:
   - `fill-specializations` sets the sheet colour per appearance.
   - `image-name-specializations` swaps the lines layer between white and black.
-- In the built app, `Assets.car` holds `IconImageStack` renditions for `NSAppearanceNameAqua`, `NSAppearanceNameDarkAqua` and `ISAppearanceTintable`. The last drives both Clear and Tinted. `icon.json` has one `tinted` (Mono) specialization: the lines layer uses `lines-white.svg`, since the default black lines would vanish on the Clear and Tinted glass.
-- From the same `.icon`, actool also generates the legacy `AppIcon.icns` (white sheet) for macOS 14–25 and the flat `Icon Image` renditions.
+- In the built app, `Assets.car` holds `IconImageStack` renditions for `NSAppearanceNameAqua`, `NSAppearanceNameDarkAqua` and `ISAppearanceTintable`. The last drives both Clear and Tinted. `icon.json` has no `tinted` (Mono) specialization, so actool derives the tintable stack from the default layers.
+- From the same `.icon`, actool also generates the legacy `AppIcon.icns` (black sheet) for macOS 14–25 and the flat `Icon Image` renditions.
 - When `AppIcon.icon` exists, actool ignores a same-named `.appiconset`: removing it left `AppIcon.icns` byte-identical. The project's `.appiconset` was deleted.
 
 ## Appearance switch: the Website BB-8 (intentional palette exception)
