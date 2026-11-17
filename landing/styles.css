@@ -63,9 +63,9 @@ h1 { margin: 0 0 var(--s5); font-size: clamp(42px, 7.5vw, 88px); font-weight: 80
 
 .preview { margin-top: 88px; text-align: left; }
 .preview figcaption { margin-top: var(--s4); font-size: 13px; color: var(--muted); text-align: center; }
-/* the video sits on a quiet surface "stage" so the white app frame never reads as a hole in the page */
+/* the video sits on a quiet surface "stage"; black fill matches the dark demo footage, so nothing flashes white before the poster loads */
 .preview-player { position: relative; padding: clamp(8px, 1.6vw, 20px); border-radius: 24px; background: var(--solid); }
-.preview video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 14px; background: #fff;
+.preview video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 14px; background: #000;
   box-shadow: 0 24px 64px -16px rgba(0, 0, 0, .22); }
 html[data-theme="dark"] .preview video { box-shadow: 0 24px 64px -16px rgba(0, 0, 0, .9); }
 /* clean poster until it plays: hide the native control bar while the Play button shows (script.js hides it on play) */
