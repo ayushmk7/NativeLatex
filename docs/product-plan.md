@@ -1,6 +1,6 @@
 # NativeLatex Mac product plan
 
-Status: plan, with a first implementation on main · revised 2026-11-17 · Mac only. **LibreWeave** is the working app name; NativeLatex remains the repository and project path. What is built today is listed under [Implemented on main](README.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
+Status: plan, with a first implementation on main · revised 2026-11-17 · Mac only. **LibreWeave** is the working app name; NativeLatex remains the repository and project path. What is built today is listed under [Implemented on main](status.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
 
 ## Product promise
 

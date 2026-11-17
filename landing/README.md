@@ -1,6 +1,6 @@
 # LibreWeave landing page
 
-Static, dependency-free landing page for the LibreWeave Mac app (repository and paths still use the NativeLatex name). The app builds and runs locally but is not Developer ID signed or notarized, so there is no public download: the single Explore action links to the repository, and the app window is labeled as a concept illustration. Copy only describes what `main` does today (one file per window, local TeX builds, Pandoc-based Markdown preview); see the facts table in [docs/README.md](../docs/README.md). Replace the Explore action with a download only after a signed and notarized build passes the [deployment gate](../docs/deployment-plan.md).
+Static, dependency-free landing page for the LibreWeave Mac app (repository and paths still use the NativeLatex name). The app builds and runs locally but is not Developer ID signed or notarized, so there is no public download: the single Explore action links to the repository. The hero shows an 18-second video of the real app (`media/`; how it was made: [Brag workspace](../docs/workspaces/brag/README.md)). It is click-to-play with sound, `preload="none"`, so page load fetches only the poster. Copy only describes what `main` does today (one file per window, local TeX builds, Pandoc-based Markdown preview); see the facts table in [docs/status.md](../docs/status.md). Replace the Explore action with a download only after a signed and notarized build passes the [deployment gate](../docs/deployment-plan.md).
 
 ## Look
 
