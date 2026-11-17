@@ -9,6 +9,8 @@ extension NSAttributedString.Key {
     /// Block markup kept as (clear) glyphs and drawn over by `MarkdownLayoutManager` (bullets, task boxes,
     /// rules). The caret treats it like hidden markup: one stop after it, Delete removes it whole.
     static let markdownAtomic = NSAttributedString.Key("LibreWeaveMarkdownAtomic")
+    /// A fenced code block (fence lines included): `MarkdownLayoutManager` draws Read's rounded `pre` box behind it.
+    static let markdownCodeBlock = NSAttributedString.Key("LibreWeaveMarkdownCodeBlock")
     /// What `MarkdownLayoutManager` draws for a range: a `MarkdownDecoration` raw value.
     static let markdownDecoration = NSAttributedString.Key("LibreWeaveMarkdownDecoration")
     /// Quote depth of a line (Int): that many accent bars at its left edge.
@@ -33,10 +35,30 @@ final class MarkdownLayoutManager: NSLayoutManager {
         MarkdownObjects.draw(self, glyphRange: glyphsToShow, at: origin)
     }
 
+    /// Read: `pre { background: var(--code); border-radius: 4px; padding: 12px }`.
+    static let codeRadius: CGFloat = 4, codePadding: CGFloat = 12
+
     override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
-        super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
-        guard let storage = textStorage, let container = textContainers.first else { return }
+        guard let storage = textStorage, let container = textContainers.first else {
+            return super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
+        }
         let chars = characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil)
+        // Code boxes first, so the selection highlight (drawn by super) stays visible on top.
+        NSColor(Theme.surface).setFill()
+        storage.enumerateAttribute(.markdownCodeBlock, in: chars) { value, run, _ in
+            guard value != nil else { return }
+            var block = NSRange()
+            _ = storage.attribute(.markdownCodeBlock, at: run.location, longestEffectiveRange: &block, in: NSRange(location: 0, length: storage.length))
+            let glyphs = glyphRange(forCharacterRange: block, actualCharacterRange: nil)
+            guard glyphs.length > 0 else { return }
+            let top = lineFragmentRect(forGlyphAt: glyphs.location, effectiveRange: nil)
+            let bottom = lineFragmentRect(forGlyphAt: NSMaxRange(glyphs) - 1, effectiveRange: nil)
+            let padding = container.lineFragmentPadding
+            let box = NSRect(x: origin.x + top.minX + padding, y: origin.y + top.minY,
+                             width: top.width - 2 * padding, height: bottom.maxY - top.minY)
+            NSBezierPath(roundedRect: box, xRadius: Self.codeRadius, yRadius: Self.codeRadius).fill()
+        }
+        super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
         let accent = NSColor(Theme.accent), secondary = NSColor(Theme.secondary), line = NSColor(Theme.line)
         let padding = container.lineFragmentPadding
         storage.enumerateAttribute(.markdownQuote, in: chars) { value, range, _ in
@@ -197,6 +219,20 @@ enum MarkdownStyler {
     /// Pandoc needs a blank line (or a block boundary) before a list: `- x` right under paragraph text is
     /// more of that paragraph. A marker line starts or continues a list after a blank line, another item,
     /// an indented line (item content), a heading, or at the top. Quote markers are ignored on both lines.
+    /// Pandoc starts a new list when the marker kind changes between adjacent items at the same indentation:
+    /// `-`, `*`, `+`, or a number with `.` or `)`. Read shows the two lists a block gap apart.
+    // ponytail: only the line directly above is compared; an item after a wrapped continuation line gets no gap.
+    static func startsNewList(_ m: NSTextCheckingResult, in text: NSString) -> Bool {
+        let line = text.lineRange(for: m.range)
+        guard line.location > 0 else { return false }
+        let above = text.lineRange(for: NSRange(location: line.location - 1, length: 0))
+        guard let prev = list.firstMatch(in: text as String, range: above),
+              text.substring(with: prev.range(at: 1)) == text.substring(with: m.range(at: 1)),
+              text.substring(with: prev.range(at: 2)) == text.substring(with: m.range(at: 2)) else { return false }
+        func kind(_ marker: String) -> String { marker.last.map(String.init) ?? "" } // `-`/`*`/`+`, or `.`/`)` after digits
+        return kind(text.substring(with: prev.range(at: 3))) != kind(text.substring(with: m.range(at: 3)))
+    }
+
     static func startsList(_ m: NSTextCheckingResult, in text: NSString) -> Bool {
         let line = m.range.location
         guard line > 0 else { return true }
@@ -294,8 +330,19 @@ enum MarkdownStyler {
             protect(range)
         }
 
+        // Read's `pre`: monospaced at normal line height, 12 pt inside a rounded neutral box. The fence lines are that
+        // box's top and bottom padding (a fixed 12 pt line), not an extra blank line.
+        let fenceFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
+        let codeStyle = NSMutableParagraphStyle(), fenceStyle = NSMutableParagraphStyle()
+        codeStyle.firstLineHeadIndent = MarkdownLayoutManager.codePadding; codeStyle.headIndent = MarkdownLayoutManager.codePadding
+        codeStyle.tailIndent = -MarkdownLayoutManager.codePadding
+        fenceStyle.setParagraphStyle(codeStyle)
+        fenceStyle.minimumLineHeight = MarkdownLayoutManager.codePadding; fenceStyle.maximumLineHeight = MarkdownLayoutManager.codePadding
         for block in blocks where NSIntersectionRange(block.range, target).length > 0 {
-            storage.addAttribute(.font, value: mono, range: block.range)
+            storage.addAttributes([.font: mono, .paragraphStyle: codeStyle, .markdownCodeBlock: true], range: block.range)
+            for marker in block.markers {
+                storage.addAttributes([.font: fenceFont, .paragraphStyle: fenceStyle], range: text.lineRange(for: marker))
+            }
             protect(block.range)
             for marker in block.markers {
                 if isRevealed(marker) {
@@ -305,12 +352,6 @@ enum MarkdownStyler {
                     // caret arrives only changes colour and never shifts the text below.
                     storage.addAttribute(.foregroundColor, value: NSColor.clear, range: marker)
                 }
-            }
-            // Shade only the code lines between the fences.
-            let first = text.lineRange(for: block.markers[0])
-            let bodyEnd = block.markers.count > 1 ? text.lineRange(for: block.markers[1]).location : NSMaxRange(block.range)
-            if bodyEnd > NSMaxRange(first) {
-                storage.addAttribute(.backgroundColor, value: codeBackground, range: NSRange(location: NSMaxRange(first), length: bodyEnd - NSMaxRange(first)))
             }
         }
         // Front matter at the very top stays literal.
@@ -394,6 +435,7 @@ enum MarkdownStyler {
             let quoted = (storage.attribute(.paragraphStyle, at: line.location, effectiveRange: nil) as? NSParagraphStyle)?.headIndent ?? 0
             let width = (visible as NSString).size(withAttributes: [.font: body]).width
             let style = paragraph.mutableCopy() as! NSMutableParagraphStyle
+            if startsNewList(m, in: text) { style.paragraphSpacingBefore = blockGap } // Read: a new <ul>/<ol>, with its margin
             if task.location != NSNotFound {
                 // Read: `ul.task-list { padding-left: 1.2em }`, the box inline before the text.
                 style.firstLineHeadIndent = max(quoted, quoted + CGFloat(depth + 1) * 18 - width)

@@ -1,4 +1,5 @@
 import AppKit
+import NativeLatexDesign
 import SwiftUI
 import WebKit
 import XCTest
@@ -615,8 +616,62 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertEqual(storage.attribute(.foregroundColor, at: fence.location, effectiveRange: nil) as? NSColor, .clear, "fence hidden")
         let fenceFont = try XCTUnwrap(storage.attribute(.font, at: fence.location, effectiveRange: nil) as? NSFont)
         XCTAssertGreaterThan(fenceFont.pointSize, 1, "hidden fence line keeps its height")
-        XCTAssertNil(storage.attribute(.backgroundColor, at: fence.location, effectiveRange: nil), "no grey band on the fence line")
-        XCTAssertNotNil(storage.attribute(.backgroundColor, at: ns.range(of: "code\n").location, effectiveRange: nil), "code lines shaded")
+        XCTAssertNotNil(storage.attribute(.markdownCodeBlock, at: fence.location, effectiveRange: nil), "fence line is the box's padding")
+        XCTAssertNotNil(storage.attribute(.markdownCodeBlock, at: ns.range(of: "code\n").location, effectiveRange: nil), "code lines in the box")
+    }
+
+    /// Write draws fenced code like Read's `pre` (rounded neutral box, 12 pt padding from the fence lines, no extra
+    /// blank line, code inset 12 pt at normal line height), and a list whose marker kind changes starts a new list a
+    /// block gap below, as Pandoc and Read do. Attributes only: the bytes never change. No app window shown.
+    func testCodeBlocksAndListKindChangesMatchRead() throws {
+        let text = "Intro.\n\n```swift\nlet x = 1\nprint(x)\n```\n\nAfter.\n\n- apple\n- banana\n1. one\n2. two\n* star\n+ plus\n3) paren\n\nEnd.\n"
+        let ns = text as NSString
+        let handle = WritingHandle()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 560), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = handle.scrollView(text: text, label: "Write") // never ordered in
+        defer { window.close() }
+        settle(0.3)
+        let view = try XCTUnwrap(handle.view), storage = try XCTUnwrap(view.textStorage)
+        XCTAssertEqual(view.string, text, "styling never changes the bytes")
+        func style(_ needle: String) -> NSParagraphStyle? { storage.attribute(.paragraphStyle, at: ns.range(of: needle).location, effectiveRange: nil) as? NSParagraphStyle }
+
+        // Code: one box from the opening to the closing fence, fence lines a fixed 12 pt, code inset 12 pt, no band.
+        var box = NSRange()
+        XCTAssertNotNil(storage.attribute(.markdownCodeBlock, at: ns.range(of: "```swift").location, longestEffectiveRange: &box, in: NSRange(location: 0, length: ns.length)))
+        XCTAssertEqual(ns.substring(with: box), "```swift\nlet x = 1\nprint(x)\n```")
+        XCTAssertEqual(style("```swift")?.maximumLineHeight, MarkdownLayoutManager.codePadding, "opening fence is the top padding")
+        XCTAssertEqual(style("```\n\nAfter")?.maximumLineHeight, MarkdownLayoutManager.codePadding, "closing fence is the bottom padding")
+        XCTAssertEqual(style("let x")?.headIndent, MarkdownLayoutManager.codePadding)
+        XCTAssertEqual(style("let x")?.lineSpacing, 0, "pre: normal line height")
+        XCTAssertNil(storage.attribute(.backgroundColor, at: ns.range(of: "let x").location, effectiveRange: nil), "no per-line band")
+        XCTAssertNil(storage.attribute(.markdownCodeBlock, at: ns.range(of: "After").location, effectiveRange: nil))
+
+        // Lists: a gap where the marker kind changes, none within a list.
+        for (needle, gap) in [("- apple", false), ("- banana", false), ("1. one", true), ("2. two", false), ("* star", true), ("+ plus", true), ("3) paren", true)] {
+            XCTAssertEqual(style(needle)?.paragraphSpacingBefore, gap ? MarkdownStyler.blockGap : 0, needle)
+        }
+
+        // Pixels: the box is drawn in the surface colour with its padding, and a selection inside it stays visible.
+        func pixel(_ x: CGFloat, _ y: CGFloat) -> NSColor {
+            let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+            view.cacheDisplay(in: view.bounds, to: rep)
+            return rep.colorAt(x: Int(x * CGFloat(rep.pixelsWide) / view.bounds.width), y: Int(y * CGFloat(rep.pixelsHigh) / view.bounds.height))!.usingColorSpace(.sRGB)!
+        }
+        let layout = try XCTUnwrap(view.layoutManager)
+        let top = layout.lineFragmentRect(forGlyphAt: layout.glyphIndexForCharacter(at: box.location), effectiveRange: nil)
+        let inset = view.textContainerOrigin
+        let inside = pixel(inset.x + top.minX + 8, inset.y + top.minY + 4) // in the fence line's padding, left of any text
+        let surface = NSColor(Theme.surface).usingColorSpace(.sRGB)!
+        XCTAssertEqual(inside.redComponent, surface.redComponent, accuracy: 0.02, "padding is inside the box: \(inside)")
+        let above = pixel(inset.x + top.minX + 8, inset.y + top.minY - 6)
+        XCTAssertGreaterThan(above.redComponent, surface.redComponent + 0.01, "the box starts at the opening fence (white above)")
+        view.setSelectedRange(ns.range(of: "let x = 1"))
+        let code = layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: ns.range(of: "let x").location), effectiveRange: nil)
+        let selected = pixel(inset.x + code.minX + MarkdownLayoutManager.codePadding + 30, inset.y + code.midY)
+        XCTAssertGreaterThan(abs(selected.redComponent - surface.redComponent) + abs(selected.blueComponent - surface.blueComponent), 0.05,
+                             "selection drawn over the box: \(selected)")
+        XCTAssertEqual(view.string, text)
     }
 
     // MARK: Headless pair: Source and Write in one bare window that is never shown or made key.
@@ -763,7 +818,7 @@ final class MarkdownWriteTests: XCTestCase {
             var out: [String] = []
             s.enumerateAttributes(in: NSRange(location: 0, length: s.length)) { a, r, _ in
                 let font = a[.font] as? NSFont, p = a[.paragraphStyle] as? NSParagraphStyle
-                out.append("\(r.location),\(r.length) \(font?.fontName ?? "-") \(font?.pointSize ?? 0) h\(a[.markdownHidden] != nil) b\(a[.backgroundColor] != nil) s\(a[.strikethroughStyle] != nil) u\(a[.underlineStyle] != nil) fg\((a[.foregroundColor] as? NSColor)?.description ?? "-") p\(p?.lineSpacing ?? -1),\(p?.headIndent ?? -1),\(p?.minimumLineHeight ?? -1)")
+                out.append("\(r.location),\(r.length) \(font?.fontName ?? "-") \(font?.pointSize ?? 0) h\(a[.markdownHidden] != nil) b\(a[.backgroundColor] != nil) s\(a[.strikethroughStyle] != nil) u\(a[.underlineStyle] != nil) fg\((a[.foregroundColor] as? NSColor)?.description ?? "-") p\(p?.lineSpacing ?? -1),\(p?.headIndent ?? -1),\(p?.minimumLineHeight ?? -1),\(p?.paragraphSpacingBefore ?? -1) c\(a[.markdownCodeBlock] != nil)")
             }
             return out
         }
