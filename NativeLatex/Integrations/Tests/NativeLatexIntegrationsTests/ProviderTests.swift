@@ -35,7 +35,7 @@ final class GoogleDocsTests: XCTestCase {
         do { _ = try await noLive.exportCopy(of: fixtures.appendingPathComponent("notes.md")); XCTFail() }
         catch {
             XCTAssertEqual(error as? GoogleDocsError, .liveNotConfigured)
-            XCTAssertTrue(error.localizedDescription.contains("not available in this LibreLeaf build"))
+            XCTAssertTrue(error.localizedDescription.contains("not available in this LibreWeave build"))
         }
     }
 

@@ -1,6 +1,6 @@
 # NativeLatexDesign
 
-SwiftUI design system for the LibreLeaf Mac app (code paths keep the `NativeLatex` name). macOS 14+, Swift 6, no dependencies.
+SwiftUI design system for the LibreWeave Mac app (code paths keep the `NativeLatex` name). macOS 14+, Swift 6, no dependencies.
 
 Sources of the look: the Internship tracker (`~/Downloads/Internship/frontend/src/style.css`: white/black, hairlines, pill controls, one blue) and the website's BB-8 switch (`~/Downloads/Website/src/components/pro/opt4/bb8.css`). Rules come from `docs/workspaces/ux/ux-plan.md` → *Appearance and BB-8 control*.
 
@@ -17,7 +17,7 @@ Add `NativeLatex/Design` as a local package (Xcode → File → Add Package Depe
 import NativeLatexDesign
 
 @main
-struct LibreLeafApp: App {
+struct LibreWeaveApp: App {
     var body: some Scene {
         WindowGroup {
             WorkspaceShell(
@@ -56,7 +56,7 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 | `BB8Toggle(store:em:)` | Day/night switch. Shows the effective appearance and stays in sync across windows through `colorScheme`. Tab-focusable; the focus ring is a 2pt capsule in `accentText` drawn 4pt outside the pill, inside space the control always reserves, so focus never shifts or clips the toolbar item (about 51×34pt). Space toggles. VoiceOver: "Dark appearance, On/Off", hint "Use System is in Settings". Tooltip: "Switch to Light/Dark Appearance". Reduce Motion: the scene changes with no animation. Pressing tilts the head ±25°, as `:active` does in the CSS. |
 | `BB8Artwork(night:pressed:em:)` | Stateless art for previews and tests. |
 | `Theme` | Dynamic colors (`background`, `surface`, `foreground`, `secondary`, `line`, `accent`, `accentText`, `onAccent`, `error`, `warning`, `success`), spacing `s1…s6` (4–32), `controlHeight`, `editorFont`, `titleFont`, `captionFont`. Each color resolves per window appearance, with Increase Contrast variants. |
-| `View.libreLeafTheme()` | Root modifier: accent tint, foreground, background. |
+| `View.libreWeaveTheme()` | Root modifier: accent tint, foreground, background. |
 | `PillButtonStyle(prominent:)` | Capsule button: hairline outline, or filled royal blue. |
 | `WorkspaceShell` | Toolbar (sidebar · title/root · Build · status · preview · BB-8), sidebar, editor/preview `HSplitView`, resizable problems panel, status bar. Under 760 pt wide, the preview toggle swaps the preview in for the editor instead of squeezing two columns. |
 | `BuildStatusBadge`, `StatusBar`, `SourceTabBar`, `ProblemList` | Usable on their own. State always appears as symbol plus text, never color alone. |
@@ -82,7 +82,7 @@ These match the shared tokens in Art's `AccentColor` and Landing. Increase Contr
 cd NativeLatex/Design
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 swift test                                                  # 4 XCTest cases
-swift run NativeLatexDesignDemo                             # LibreLeaf sample window
+swift run NativeLatexDesignDemo                             # LibreWeave sample window
 swift run NativeLatexDesignDemo --snapshot "$PWD/Screenshots"  # regenerate the PNGs above
 ```
 

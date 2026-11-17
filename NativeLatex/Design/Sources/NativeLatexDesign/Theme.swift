@@ -90,11 +90,15 @@ extension NSColor {
 
 public extension View {
     /// Apply once at the window root: brand tint, background, and foreground.
-    func libreLeafTheme() -> some View {
+    func libreWeaveTheme() -> some View {
         tint(Theme.accent)
             .foregroundStyle(Theme.foreground)
             .background(Theme.background)
     }
+
+    /// Old brand name, kept so app code builds until it moves to `libreWeaveTheme()`.
+    @available(*, deprecated, renamed: "libreWeaveTheme()")
+    func libreLeafTheme() -> some View { libreWeaveTheme() }
 }
 
 /// Capsule button matching the web tracker: hairline outline, or filled royal blue when `prominent`.

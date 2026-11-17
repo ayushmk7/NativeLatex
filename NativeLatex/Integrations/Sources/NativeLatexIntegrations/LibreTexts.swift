@@ -21,13 +21,13 @@ public enum LibreTextsError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case let .notLibreTextsURL(s):
-            return "LibreLeaf imports only https://*.libretexts.org page links; \"\(s)\" is not one."
+            return "LibreWeave imports only https://*.libretexts.org page links; \"\(s)\" is not one."
         case let .httpStatus(code, url):
             return "LibreTexts returned HTTP \(code) for \(url.absoluteString). Check the page link or try again later."
         case let .unexpectedResponse(url):
-            return "LibreTexts sent a response LibreLeaf could not read from \(url.absoluteString)."
+            return "LibreTexts sent a response LibreWeave could not read from \(url.absoluteString)."
         case let .licenseNotReusable(license):
-            return "This LibreTexts page is \(license.map { "licensed \"\($0)\"" } ?? "missing a license tag"), so LibreLeaf will not copy it. Choose openly licensed content."
+            return "This LibreTexts page is \(license.map { "licensed \"\($0)\"" } ?? "missing a license tag"), so LibreWeave will not copy it. Choose openly licensed content."
         }
     }
 }
@@ -43,7 +43,7 @@ public struct LibreTextsClient: Sendable {
 
     public static let urlSessionFetch: Fetch = { url in
         var request = URLRequest(url: url, timeoutInterval: 30)
-        request.setValue("LibreLeaf/0.1 (local import)", forHTTPHeaderField: "User-Agent")
+        request.setValue("LibreWeave/0.1 (local import)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }

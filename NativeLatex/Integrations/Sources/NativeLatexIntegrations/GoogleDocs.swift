@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Drive operations LibreLeaf needs: export a Doc as DOCX, create a *new* Doc
+/// The Drive operations LibreWeave needs: export a Doc as DOCX, create a *new* Doc
 /// from an uploaded file. No update-in-place: Drive conversion on update replaces
 /// the whole document.
 ///
@@ -28,9 +28,9 @@ public enum GoogleDocsError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .disabled:
-            return "Google Docs is turned off in LibreLeaf. Export a DOCX copy and upload it yourself, or turn the integration on."
+            return "Google Docs is turned off in LibreWeave. Export a DOCX copy and upload it yourself, or turn the integration on."
         case .liveNotConfigured:
-            return "Google sign-in is not available in this LibreLeaf build yet. Export a DOCX copy and upload it to Google Docs yourself."
+            return "Google sign-in is not available in this LibreWeave build yet. Export a DOCX copy and upload it to Google Docs yourself."
         case let .invalidDocumentID(id):
             return "\"\(id)\" is not a Google Docs document ID."
         }

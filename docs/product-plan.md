@@ -1,10 +1,10 @@
 # NativeLatex Mac product plan
 
-Status: plan, with a first implementation on main · revised 2026-11-17 · Mac only. **LibreLeaf** is the working app name; NativeLatex remains the repository and project path. What is built today is listed under [Implemented on main](README.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
+Status: plan, with a first implementation on main · revised 2026-11-17 · Mac only. **LibreWeave** is the working app name; NativeLatex remains the repository and project path. What is built today is listed under [Implemented on main](README.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
 
 ## Product promise
 
-LibreLeaf (repository: NativeLatex) is planned as a native Mac app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
+LibreWeave (repository: NativeLatex) is planned as a native Mac app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
 
 The app is for authors who want a faster local editing loop than switching among a text editor, terminal, PDF viewer and Finder. It should handle a single article quickly and remain dependable on multi-file projects with images and bibliographies.
 

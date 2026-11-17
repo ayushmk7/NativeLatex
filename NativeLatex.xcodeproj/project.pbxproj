@@ -18,14 +18,14 @@
 			containerPortal = A10000000000000000000001 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A10000000000000000000005;
-			remoteInfo = LibreLeaf;
+			remoteInfo = LibreWeave;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A10000000000000000000006 /* LibreLeaf.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LibreLeaf.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000007 /* LibreLeafTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LibreLeafTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000014 /* LibreLeaf-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "LibreLeaf-Info.plist"; sourceTree = "<group>"; };
+		A10000000000000000000006 /* LibreWeave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LibreWeave.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000007 /* LibreWeaveTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LibreWeaveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000014 /* LibreWeave-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "LibreWeave-Info.plist"; sourceTree = "<group>"; };
 		A10000000000000000000020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = NativeLatex/Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -43,7 +43,7 @@
 		A10000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000014 /* LibreLeaf-Info.plist */,
+				A10000000000000000000014 /* LibreWeave-Info.plist */,
 				A10000000000000000000020 /* Assets.xcassets */,
 				A10000000000000000000003 /* App */,
 				A10000000000000000000004 /* NativeLatexTests */,
@@ -54,8 +54,8 @@
 		A10000000000000000000013 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000006 /* LibreLeaf.app */,
-				A10000000000000000000007 /* LibreLeafTests.xctest */,
+				A10000000000000000000006 /* LibreWeave.app */,
+				A10000000000000000000007 /* LibreWeaveTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -63,7 +63,7 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A10000000000000000000005 /* LibreLeaf */ = {
+		A10000000000000000000005 /* LibreWeave */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A10000000000000000000016;
 			buildPhases = (
@@ -74,13 +74,13 @@
 			buildRules = ();
 			dependencies = ();
 			fileSystemSynchronizedGroups = (A10000000000000000000003 /* App */);
-			name = LibreLeaf;
+			name = LibreWeave;
 			packageProductDependencies = (A10000000000000000000025 /* NativeLatexDesign */, A10000000000000000000026 /* NativeLatexIntegrations */);
-			productName = LibreLeaf;
-			productReference = A10000000000000000000006 /* LibreLeaf.app */;
+			productName = LibreWeave;
+			productReference = A10000000000000000000006 /* LibreWeave.app */;
 			productType = "com.apple.product-type.application";
 		};
-		A1000000000000000000000E /* LibreLeafTests */ = {
+		A1000000000000000000000E /* LibreWeaveTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A10000000000000000000019;
 			buildPhases = (
@@ -90,9 +90,9 @@
 			buildRules = ();
 			dependencies = (A1000000000000000000000F /* PBXTargetDependency */);
 			fileSystemSynchronizedGroups = (A10000000000000000000004 /* NativeLatexTests */);
-			name = LibreLeafTests;
-			productName = LibreLeafTests;
-			productReference = A10000000000000000000007 /* LibreLeafTests.xctest */;
+			name = LibreWeaveTests;
+			productName = LibreWeaveTests;
+			productReference = A10000000000000000000007 /* LibreWeaveTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -120,8 +120,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A10000000000000000000005 /* LibreLeaf */,
-				A1000000000000000000000E /* LibreLeafTests */,
+				A10000000000000000000005 /* LibreWeave */,
+				A1000000000000000000000E /* LibreWeaveTests */,
 			);
 		};
 /* End PBXProject section */
@@ -138,7 +138,7 @@
 /* Begin PBXTargetDependency section */
 		A1000000000000000000000F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A10000000000000000000005 /* LibreLeaf */;
+			target = A10000000000000000000005 /* LibreWeave */;
 			targetProxy = A1000000000000000000000D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -182,16 +182,17 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "LibreLeaf-Info.plist";
+				INFOPLIST_FILE = "LibreWeave-Info.plist";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				INFOPLIST_KEY_CFBundleDisplayName = LibreLeaf;
+				INFOPLIST_KEY_CFBundleDisplayName = LibreWeave;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = app.libreleaf.LibreLeaf;
-				PRODUCT_NAME = LibreLeaf;
+				PRODUCT_BUNDLE_IDENTIFIER = app.libreweave.LibreWeave;
+				PRODUCT_MODULE_NAME = LibreLeaf;
+				PRODUCT_NAME = LibreWeave;
 			};
 			name = Debug;
 		};
@@ -201,16 +202,17 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "LibreLeaf-Info.plist";
+				INFOPLIST_FILE = "LibreWeave-Info.plist";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				INFOPLIST_KEY_CFBundleDisplayName = LibreLeaf;
+				INFOPLIST_KEY_CFBundleDisplayName = LibreWeave;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = app.libreleaf.LibreLeaf;
-				PRODUCT_NAME = LibreLeaf;
+				PRODUCT_BUNDLE_IDENTIFIER = app.libreweave.LibreWeave;
+				PRODUCT_MODULE_NAME = LibreLeaf;
+				PRODUCT_NAME = LibreWeave;
 			};
 			name = Release;
 		};
@@ -219,9 +221,9 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = app.libreleaf.LibreLeafTests;
-				PRODUCT_NAME = LibreLeafTests;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LibreLeaf.app/Contents/MacOS/LibreLeaf";
+				PRODUCT_BUNDLE_IDENTIFIER = app.libreweave.LibreWeaveTests;
+				PRODUCT_NAME = LibreWeaveTests;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LibreWeave.app/Contents/MacOS/LibreWeave";
 			};
 			name = Debug;
 		};
@@ -230,9 +232,9 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = app.libreleaf.LibreLeafTests;
-				PRODUCT_NAME = LibreLeafTests;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LibreLeaf.app/Contents/MacOS/LibreLeaf";
+				PRODUCT_BUNDLE_IDENTIFIER = app.libreweave.LibreWeaveTests;
+				PRODUCT_NAME = LibreWeaveTests;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LibreWeave.app/Contents/MacOS/LibreWeave";
 			};
 			name = Release;
 		};

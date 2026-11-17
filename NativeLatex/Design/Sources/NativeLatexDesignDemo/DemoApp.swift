@@ -2,14 +2,14 @@ import AppKit
 import NativeLatexDesign
 import SwiftUI
 
-/// LibreLeaf sample window built only from NativeLatexDesign components.
+/// LibreWeave sample window built only from NativeLatexDesign components.
 /// `swift run NativeLatexDesignDemo` opens it; `--snapshot <dir>` writes light/dark PNGs and quits.
 @main
 struct DemoApp: App {
     @NSApplicationDelegateAdaptor(SnapshotDelegate.self) private var delegate
 
     var body: some Scene {
-        WindowGroup("LibreLeaf") {
+        WindowGroup("LibreWeave") {
             SampleWorkspace()
                 .frame(minWidth: 640, minHeight: 420)
         }
@@ -35,7 +35,7 @@ struct SampleWorkspace: View {
 
     var body: some View {
         WorkspaceShell(
-            title: "LibreLeaf — thesis",
+            title: "LibreWeave — thesis",
             subtitle: "main.tex",
             buildState: state,
             status: ShellStatus(errors: 1, warnings: 1, line: 12, column: 4, lastBuild: .milliseconds(1240)),
@@ -65,7 +65,7 @@ struct SampleWorkspace: View {
                 // PDF pages keep their real white paper and dark ink in both appearances.
                 let ink = Color(red: 0.07, green: 0.07, blue: 0.07)
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("LibreLeaf: A Thesis").font(.system(size: 18, weight: .bold, design: .serif)).foregroundColor(ink)
+                    Text("LibreWeave: A Thesis").font(.system(size: 18, weight: .bold, design: .serif)).foregroundColor(ink)
                     Text("1  Introduction").font(.system(size: 13, weight: .semibold, design: .serif)).foregroundColor(ink)
                     Text("Writing in ordinary folders, compiled with the local TeX installation.").font(.system(size: 11, design: .serif)).foregroundColor(ink)
                     Spacer()
@@ -85,7 +85,7 @@ struct SampleWorkspace: View {
     \\documentclass{article}
     \\usepackage{amsmath}
 
-    \\title{LibreLeaf: A Thesis}
+    \\title{LibreWeave: A Thesis}
     \\begin{document}
     \\maketitle
 

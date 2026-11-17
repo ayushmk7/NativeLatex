@@ -39,7 +39,7 @@ public enum ProcessRunError: Error, LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case let .launchFailed(tool, reason): return "LibreLeaf could not start \(tool): \(reason)"
+        case let .launchFailed(tool, reason): return "LibreWeave could not start \(tool): \(reason)"
         case let .timedOut(tool, seconds): return "\(tool) did not finish within \(Int(seconds)) seconds and was stopped."
         }
     }

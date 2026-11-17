@@ -1,4 +1,4 @@
-# LibreLeaf Mac release and deployment plan
+# LibreWeave Mac release and deployment plan
 
 Status: planning and readiness checks · 2026-11-17. The landing page is live on GitHub Pages at <https://ayushmk7.github.io/NativeLatex/>. A local, ad-hoc-signed Debug app builds from `NativeLatex.xcodeproj`; no signed or notarized release artifact, download, or AWS resource exists.
 
@@ -17,7 +17,7 @@ Vercel documents the [Hobby restriction](https://vercel.com/docs/plans/hobby). C
 
 ## Release sequence
 
-Every distributable app must come from **Xcode Archive** (Product ▸ Archive, or `xcodebuild -project NativeLatex.xcodeproj -scheme LibreLeaf -configuration Release -destination 'generic/platform=macOS' -archivePath LibreLeaf.xcarchive archive`) and then Organizer's Direct Distribution export. Never ship the `.app` from a plain `xcodebuild … build` or the Products folder: a non-archive Release build carries the `com.apple.security.get-task-allow` debugging entitlement, which notarization rejects; the archive strips it (verified: archived app entitlements `{}`, Hardened Runtime on).
+Every distributable app must come from **Xcode Archive** (Product ▸ Archive, or `xcodebuild -project NativeLatex.xcodeproj -scheme LibreWeave -configuration Release -destination 'generic/platform=macOS' -archivePath LibreWeave.xcarchive archive`) and then Organizer's Direct Distribution export. Never ship the `.app` from a plain `xcodebuild … build` or the Products folder: a non-archive Release build carries the `com.apple.security.get-task-allow` debugging entitlement, which notarization rejects; the archive strips it (verified: archived app entitlements `{}`, Hardened Runtime on).
 
 Signing, notarization and AWS hosting need the owner's **real** Apple Developer and AWS credentials, used in their own Xcode account and AWS session. They are not in this repository, its workspaces, or any `.env`, and test doubles cannot prove them.
 
@@ -36,6 +36,6 @@ Signing, notarization and AWS hosting need the owner's **real** Apple Developer 
 | Apple signing | `notarytool` and `stapler` are available, but the current keychain reports **0 valid code-signing identities**. Real Developer ID credentials are required. |
 | AWS | CLI is installed, but the default profile did not have a valid `sts get-caller-identity` session during this check. Real AWS credentials are required; none are stored in the repo. |
 | Landing hosting | Live on GitHub Pages at <https://ayushmk7.github.io/NativeLatex/>; the `Deploy landing page` workflow succeeded and the URL returns HTTP 200. Vercel is not connected and its CLI is not installed. |
-| App artifact | `xcodebuild … archive` produces an **unsigned-for-distribution** `LibreLeaf.app` (bundle `app.libreleaf.LibreLeaf`, version 0.1 build 1, macOS 14.0+, universal `x86_64 arm64`): ad-hoc signature, Hardened Runtime, empty entitlements, `codesign --verify --deep --strict` passes, `spctl` rejects it. Intel slice untested. No Developer ID signature, notarization, ZIP, or download exists. |
+| App artifact | `xcodebuild … archive` produces an **unsigned-for-distribution** `LibreWeave.app` (bundle `app.libreweave.LibreWeave`, version 0.1 build 1, macOS 14.0+, universal `x86_64 arm64`): ad-hoc signature, Hardened Runtime, empty entitlements, `codesign --verify --deep --strict` passes, `spctl` rejects it. Intel slice untested. No Developer ID signature, notarization, ZIP, or download exists. |
 
 Local Debug, Release and Archive builds succeed. The next milestones are the rest of the local app gate (folder workspaces, Finder default-app check, two windows, TeX-absent Mac, Intel decision), then the signing gate with real credentials. Do not create a download URL for a nonexistent release.
