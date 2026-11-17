@@ -210,6 +210,29 @@ final class MarkdownPreviewTests: XCTestCase {
         try assertNoPandocChildren()
     }
 
+    /// A successful run whose warnings quote "Heap exhausted" from the document is not an out-of-memory failure.
+    func testWarningMentioningHeapExhaustionStillRenders() async throws {
+        let pandoc = try pandocOrSkip()
+        let text = #"Hello $\notamacro{Heap exhausted}$ world"#
+        // Confirm the premise: real Pandoc warns with the phrase yet exits 0.
+        let probe = Process()
+        probe.executableURL = pandoc
+        probe.arguments = MarkdownRenderer.arguments + ["--output=/dev/null"]
+        let stdin = Pipe(), stderr = Pipe()
+        probe.standardInput = stdin
+        probe.standardError = stderr
+        try probe.run()
+        stdin.fileHandleForWriting.write(Data(text.utf8))
+        try stdin.fileHandleForWriting.close()
+        let warning = String(decoding: stderr.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        probe.waitUntilExit()
+        XCTAssertEqual(probe.terminationStatus, 0)
+        XCTAssertTrue(warning.contains("Heap exhausted"), warning)
+
+        let html = try await MarkdownRenderer.render(text)
+        XCTAssertTrue(html.contains("Hello") && html.contains("world"), html)
+    }
+
     /// The caps keep ordinary previews working: a dense 1 MiB mix still renders.
     func testOrdinaryDenseOneMiBDocumentStillRenders() async throws {
         _ = try pandocOrSkip()
