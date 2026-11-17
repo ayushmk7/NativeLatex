@@ -330,12 +330,15 @@ final class MarkdownWriteTests: XCTestCase {
         try show(.preview, in: window); await check(.preview, write: false, "Preview Only (Read)")
         try setWrite(true, in: window); await check(.preview, write: true, "Read → Write")
         try setWrite(false, in: window); await check(.preview, write: false, "Write → Read keeps Preview Only")
-        // A quick Read → Write: the pending Read focus hand-off never takes focus from Write.
-        mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
-        mode.selectedSegment = 0; mode.sendAction(mode.action, to: mode.target)
-        mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
-        settle(1.5)
-        XCTAssertIdentical(window.firstResponder, textView("Write", in: window), "Write keeps focus after a quick Read → Write")
+        // A quick Write → Read → Write, with run-loop turns between so each switch is laid out and the Read
+        // hand-off is requested, then a wait past the render: Write keeps focus.
+        func choose(_ segment: Int) { mode.selectedSegment = segment; mode.sendAction(mode.action, to: mode.target); settle(0.05) }
+        choose(1); choose(0)
+        XCTAssertNil(textView("Write", in: window), "Read was really shown between the switches")
+        choose(1)
+        let rewriter = try XCTUnwrap(textView("Write", in: window))
+        settle(2)
+        XCTAssertIdentical(window.firstResponder, rewriter, "Write keeps focus after a quick Read → Write")
         try setWrite(false, in: window)
         let page = try XCTUnwrap(webView(in: window))
         for _ in 0..<20 where !((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false) { settle(0.1) }
@@ -360,6 +363,58 @@ final class MarkdownWriteTests: XCTestCase {
         window.setContentSize(NSSize(width: 1100, height: 640)); settle()
 
         XCTAssertEqual(PaneState.selfCheck(), [], "every transition, including narrow windows")
+    }
+
+    /// Read takes focus when its render settles, however long that takes: the page on success, Try Again on
+    /// failure, and never from a view focused meanwhile. Uses injected renderers (no Pandoc, no timing window).
+    func testReadTakesFocusWhenItsRenderSettles() async throws {
+        final class Box: @unchecked Sendable { var request = true }
+        func host(_ render: @escaping @Sendable (String) async throws -> String, field: Bool = false) -> (NSWindow, Box, NSTextField?) {
+            let box = Box()
+            let binding = Binding(get: { box.request }, set: { box.request = $0 })
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            let root = NSView(frame: window.contentRect(forFrameRect: window.frame))
+            let preview = NSHostingView(rootView: MarkdownPreview(text: "# Hi", fileURL: nil, focusRequest: binding, render: render))
+            preview.frame = NSRect(x: 0, y: 40, width: 600, height: 360)
+            root.addSubview(preview)
+            var other: NSTextField?
+            if field { let f = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24)); root.addSubview(f); other = f }
+            window.contentView = root // never ordered in
+            return (window, box, other)
+        }
+        func wait(_ seconds: TimeInterval, until done: () -> Bool) {
+            let end = Date().addingTimeInterval(seconds)
+            while !done(), Date() < end { settle(0.05) }
+        }
+
+        // Slow success (4 s, past the old 3 s retry window): the page gets focus.
+        let (slow, slowBox, _) = host({ _ in try await Task.sleep(for: .seconds(4)); return "<h1>Hi</h1>" })
+        defer { slow.close() }
+        wait(8) { !slowBox.request }
+        let page = try XCTUnwrap(webView(in: slow), "page rendered")
+        XCTAssertFalse(slowBox.request, "request cleared once handled")
+        XCTAssertTrue((slow.firstResponder as? NSView)?.isDescendant(of: page) ?? false, "page focused: \(String(describing: slow.firstResponder))")
+
+        // Something focused before the render settles keeps focus.
+        let (busy, busyBox, field) = host({ _ in try await Task.sleep(for: .milliseconds(600)); return "<p>x</p>" }, field: true)
+        defer { busy.close() }
+        settle(0.1)
+        busy.makeFirstResponder(field)
+        let editor = busy.firstResponder
+        wait(5) { !busyBox.request }
+        XCTAssertNotNil(webView(in: busy))
+        XCTAssertFalse(busyBox.request)
+        XCTAssertIdentical(busy.firstResponder, editor, "a view focused meanwhile keeps focus")
+
+        // Failure (e.g. no Pandoc): no page, Try Again takes the keys.
+        let (failed, failedBox, _) = host({ _ in throw MarkdownRenderer.Failure.missingPandoc })
+        defer { failed.close() }
+        wait(5) { !failedBox.request }
+        XCTAssertNil(webView(in: failed))
+        XCTAssertFalse(failedBox.request)
+        let responder = try XCTUnwrap(failed.firstResponder as? NSView, "something in the banner has focus, not the bare window")
+        XCTAssertTrue(responder.window === failed && !(responder is WKWebView))
     }
 
     /// ⌥⌘P (View ▸ Toggle Preview) hides the preview, then brings it back beside the source, or alone when narrow.

@@ -2,7 +2,6 @@ import AppKit
 import NativeLatexDesign
 import PDFKit
 import SwiftUI
-import WebKit
 
 @main
 struct LibreWeaveApp: App {
@@ -53,6 +52,8 @@ struct EditorView: View {
     /// Per window: source only, both side by side, or preview only.
     /// Per window: Source / Both / Preview, and Read or Write for Markdown (see PaneState).
     @State private var panes = PaneState()
+    /// Read should take keyboard focus when its render settles (see MarkdownPreview.focusRequest).
+    @State private var readFocus = false
     /// Below `narrowWidth` the window shows source *or* preview, never two squeezed columns.
     @State private var isNarrow = false
     @State private var showProblems = false
@@ -147,6 +148,7 @@ struct EditorView: View {
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in checkDisk() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in checkDisk() }
         .onChange(of: shown) { old, new in
+            if new != .preview { readFocus = false }
             // Focus follows the pane that just appeared in place of the one holding it.
             if old == .preview, new != .preview { DispatchQueue.main.async { editor.focus() } }
             if new == .preview, isMarkdown, markdownWrite { DispatchQueue.main.async { writer.focus() } }
@@ -154,6 +156,7 @@ struct EditorView: View {
         .onChange(of: markdownWrite) {
             // Write replaces the source (and back): the caret and scroll position carry over. Focus first, so
             // Write reveals the markup on the caret's line.
+            if markdownWrite { readFocus = false } // Write owns focus now; a pending Read hand-off is void
             if markdownWrite, shown != .source { DispatchQueue.main.async { writer.focus(); writer.takeSelection(from: editor) } }
             // Leaving Write removes the focused editor; keep the keyboard in the window.
             if !markdownWrite { DispatchQueue.main.async { editor.takeSelection(from: writer); focusAfterRead() } }
@@ -228,25 +231,11 @@ struct EditorView: View {
 
     /// After Read: the source if it is on screen, else the Read page (scroll keys work there). The page
     /// appears once Pandoc has rendered, so this retries briefly.
-    /// Only fills a focus gap: a quick switch back to Write, or anything focused meanwhile, wins. If Pandoc
-    /// fails there is no page; the window keeps the keys and the banner's Try Again stays reachable by Tab.
-    private func focusAfterRead(attempt: Int = 0) {
-        guard !markdownWrite, let window = writer.window ?? editor.window else { return }
-        let responder = window.firstResponder
-        guard responder == nil || responder === window || (responder as? NSView)?.window !== window else { return }
-        if shown != .preview { editor.focus(); return }
-        if let page = Self.webView(in: window.contentView) {
-            window.makeFirstResponder(page)
-        } else if attempt < 30 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { focusAfterRead(attempt: attempt + 1) }
-        } else {
-            window.makeFirstResponder(nil)
-        }
-    }
-
-    static func webView(in view: NSView?) -> WKWebView? {
-        guard let view else { return nil }
-        return (view as? WKWebView) ?? view.subviews.lazy.compactMap { webView(in: $0) }.first
+    /// After leaving Write, fill the focus gap: the source if visible, else ask Read to take focus when its
+    /// render settles (page, or Try Again on failure). Write coming back, or any focus meanwhile, wins.
+    private func focusAfterRead() {
+        guard !markdownWrite, MarkdownPreview.hasFocusGap(writer.window ?? editor.window) else { return }
+        if shown != .preview { editor.focus() } else { readFocus = true }
     }
 
     private var texPreview: some View {
@@ -282,7 +271,7 @@ struct EditorView: View {
                 .background(Theme.surface)
                 HandleTextView(text: $document.text, handle: writer, label: "Write") { line = $0; column = $1 }
             } else {
-                MarkdownPreview(text: document.text, fileURL: fileURL)
+                MarkdownPreview(text: document.text, fileURL: fileURL, focusRequest: $readFocus)
             }
         }
         .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }

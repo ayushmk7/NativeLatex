@@ -180,6 +180,8 @@ final class LocalAssetHandler: NSObject, WKURLSchemeHandler {
 struct MarkdownWebView: NSViewRepresentable {
     let html: String
     let folder: URL?
+    /// While true, the page takes keyboard focus once it is in a window (only into a focus gap); then cleared.
+    var focus: Binding<Bool> = .constant(false)
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -190,19 +192,32 @@ struct MarkdownWebView: NSViewRepresentable {
         config.defaultWebpagePreferences.allowsContentJavaScript = false
         config.websiteDataStore = .nonPersistent()
         config.setURLSchemeHandler(coordinator.assets, forURLScheme: LocalAssetHandler.scheme)
-        let view = WKWebView(frame: .zero, configuration: config)
+        let view = PreviewWebView(frame: .zero, configuration: config)
+        view.onWindow = { [weak coordinator, weak view] in if let view { coordinator?.takeFocusIfRequested(view) } }
         view.navigationDelegate = coordinator
         view.setAccessibilityLabel("Markdown preview")
         return view
     }
 
-    func updateNSView(_ view: WKWebView, context: Context) { context.coordinator.show(html, folder: folder, in: view) }
+    func updateNSView(_ view: WKWebView, context: Context) {
+        context.coordinator.show(html, folder: folder, in: view)
+        context.coordinator.focus = focus
+        context.coordinator.takeFocusIfRequested(view)
+    }
 
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate {
         let assets = LocalAssetHandler()
         private(set) var shown: String?
         private var loadedFolder: URL?
+        var focus: Binding<Bool>?
+
+        /// Focuses the page if asked and nothing else has focus; a page not yet in a window waits for `onWindow`.
+        func takeFocusIfRequested(_ view: WKWebView) {
+            guard focus?.wrappedValue == true, let window = view.window else { return }
+            if MarkdownPreview.hasFocusGap(window) { window.makeFirstResponder(view) }
+            DispatchQueue.main.async { self.focus?.wrappedValue = false } // not during a view update
+        }
 
         func show(_ html: String, folder: URL?, in view: WKWebView) {
             guard html != shown || folder != loadedFolder else { return }
@@ -229,13 +244,37 @@ struct MarkdownWebView: NSViewRepresentable {
     }
 }
 
+/// Reports when it joins a window, so a focus request made before that is not lost.
+final class PreviewWebView: WKWebView {
+    var onWindow: (() -> Void)?
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil { onWindow?() }
+    }
+}
+
 /// Rich, local Markdown preview of the live (unsaved) buffer, debounced while typing.
 struct MarkdownPreview: View {
     let text: String
     let fileURL: URL?
+    /// Set by the window when Read should take keyboard focus once this render settles, however long Pandoc
+    /// takes: the page on success, Try Again on failure. Cleared when handled. Never taken from a view that
+    /// has focus (the window clears it if the user switches back to Write).
+    var focusRequest: Binding<Bool> = .constant(false)
+    /// Pandoc by default; tests substitute slow or failing renderers.
+    var render: @Sendable (String) async throws -> String = { try await MarkdownRenderer.render($0) }
     @State private var html: String?
     @State private var failure: String?
     @State private var attempt = 0
+    @State private var anchor = WindowAnchor()
+    @FocusState private var retryFocused: Bool
+
+    /// Nothing in `window` holds focus (first responder is the window itself, or a view that has left it).
+    static func hasFocusGap(_ window: NSWindow?) -> Bool {
+        guard let window else { return false }
+        let responder = window.firstResponder
+        return responder == nil || responder === window || (responder as? NSView)?.window !== window
+    }
 
     static let debounce: Duration = .milliseconds(250)
 
@@ -244,7 +283,7 @@ struct MarkdownPreview: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let html {
-                MarkdownWebView(html: html, folder: fileURL?.deletingLastPathComponent())
+                MarkdownWebView(html: html, folder: fileURL?.deletingLastPathComponent(), focus: focusRequest)
             } else if failure == nil {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -255,7 +294,11 @@ struct MarkdownPreview: View {
                     Label(failure, systemImage: "exclamationmark.triangle.fill").font(Theme.captionFont)
                         .textSelection(.enabled)
                     Spacer()
+                    // Focusable without Full Keyboard Access, so a failed Read can take the keys; Return or Space retries.
                     Button("Try Again") { attempt += 1 }
+                        .focusable()
+                        .focused($retryFocused)
+                        .onKeyPress(keys: [.return, .space]) { _ in attempt += 1; return .handled }
                 }
                 .padding(Theme.s2)
                 .background(Theme.surface)
@@ -263,20 +306,39 @@ struct MarkdownPreview: View {
             }
         }
         .background(Theme.background)
+        .background(WindowAnchorView(anchor: anchor))
         .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
         // A new key cancels the previous task, which cancels its sleep or terminates its Pandoc run.
         .task(id: Key(text: text, folder: fileURL?.deletingLastPathComponent(), attempt: attempt)) {
             if html != nil { try? await Task.sleep(for: Self.debounce) }
             guard !Task.isCancelled else { return }
             do {
-                html = try await MarkdownRenderer.render(text)
+                let rendered = try await render(text)
+                guard !Task.isCancelled else { return }
+                html = rendered // the page takes a pending focus request once it is in the window
                 failure = nil
             } catch is CancellationError {
             } catch {
                 failure = error.localizedDescription // last good preview stays visible underneath
+                if html == nil, focusRequest.wrappedValue {
+                    // No page: Try Again takes the keys, unless something got focus meanwhile.
+                    DispatchQueue.main.async {
+                        if Self.hasFocusGap(anchor.view?.window) { retryFocused = true }
+                        focusRequest.wrappedValue = false
+                    }
+                }
             }
         }
     }
+}
+
+/// Gives SwiftUI views access to their window.
+final class WindowAnchor { weak var view: NSView? }
+
+struct WindowAnchorView: NSViewRepresentable {
+    let anchor: WindowAnchor
+    func makeNSView(context: Context) -> NSView { let view = NSView(); anchor.view = view; return view }
+    func updateNSView(_ view: NSView, context: Context) { anchor.view = view }
 }
 
 /// SIGTERM, then SIGKILL after a second, so a child that ignores SIGTERM can't hang the preview.
