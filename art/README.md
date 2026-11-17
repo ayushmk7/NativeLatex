@@ -9,7 +9,16 @@ The icon is a woven sheet. The macOS silhouette is the paper, with no inner box 
 | Light | black | white |
 | Dark | white | black |
 
-The threads are royal blue in both. macOS generates the tinted and clear variants.
+The threads are royal blue in both.
+
+**Clear and Tinted** are chosen by the user in macOS (icon & widget style), not by the app, and there is no in-app setting. The system builds them from the same `.icon`, using the Tintable (Mono) stack:
+- **Clear:** the system replaces our fill with its own glass sheet. Lines go white, threads go mid-gray, so the weave stays three-toned (sheet < threads < lines).
+- **Tinted:** the user's tint colour drives the sheet and threads.
+
+We force no alpha, and the `.icon` has no Clear-specific settings. Evidence, 2026-11-17 (Xcode 27.2, macOS 27.3):
+- **Fill, glass and translucency:** `tinted` fill specializations, layer `glass` and group `translucency` never changed the Clear sheet in `ictool` or IconServices. It stays 128 gray in Clear light and 44 in Clear dark.
+- **Native comparison:** in static renders Clear is opaque for Apple's own Safari, Calculator, Maps and Notes icons too. The Dock adds live backdrop translucency itself.
+- **Mono thread opacity:** lowering it under `tinted` would raise Tinted-dark contrast, but it fades the Clear threads into the sheet, so it was not applied.
 
 | Path | What |
 | --- | --- |
@@ -23,18 +32,18 @@ The threads are royal blue in both. macOS generates the tinted and clear variant
 | `exports/built-app-icons.png`, `built-app-evidence.txt` | Evidence from a real `xcodebuild` of LibreWeave.app: `Assets.car` renditions and IconServices renders at 16, 32 and 256 px |
 
 `exports/review.png` rows:
-1. Light appearance as macOS 26+ draws it (IconServices): 16 and 32 px zoomed, then 256 px
-2. The same for dark appearance
-3. Icon Composer renditions from `ictool`: Default, Dark, TintedLight, TintedDark, ClearLight, ClearDark
-4. Legacy `AppIcon.icns` for macOS 14–25
+One row per mode, each at 16 and 32 px (zoomed), then 256 px on a light and on a dark backdrop:
+- light, dark, clear-light, clear-dark: IconServices renders of the compiled bundle
+- tinted-light, tinted-dark: `ictool`
+- legacy: `AppIcon.icns` for macOS 14–25
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 art/tools/build.sh      # gen.py → SVGs + .icon layers; PNG previews in exports/
-art/tools/validate.sh   # actool compiles catalog + .icon with no warnings; Aqua and DarkAqua stacks exist
+art/tools/validate.sh   # actool compiles catalog + .icon with no warnings; Aqua, DarkAqua and Tintable stacks exist
 art/tools/review.sh     # actool into a throwaway bundle → IconServices + ictool + .icns → exports/review.png
 clang -fobjc-arc -framework AppKit art/tools/appearance-check.m -o /tmp/appearance-check
-/tmp/appearance-check path/to/LibreWeave.app /tmp/icon   # light/dark renders of a built app, no system toggle
+/tmp/appearance-check path/to/LibreWeave.app /tmp/icon   # light/dark/clear renders of a built app, no system toggle
 ```
 
 **No `.appiconset`:** when `AppIcon.icon` exists, actool builds the Dock icon, the macOS 14–25 `.icns`, and the flat `AppIcon` renditions from it. Removing the old set left `AppIcon.icns` byte-identical. `Assets.car` changed only in those 7 flat renditions, which are now drawn from `.icon` instead, and no app code reads them.

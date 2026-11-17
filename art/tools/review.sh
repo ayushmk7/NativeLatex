@@ -1,9 +1,11 @@
 #!/bin/sh
-# Compiles the real catalog + AppIcon.icon with actool into a throwaway LibreWeave bundle, then writes
-# art/exports/review.png:
-#   rows 1-2: what macOS 26+ shows (IconServices), light and dark appearance: 16 and 32 px zoomed, 256 px
-#   row 3:    Icon Composer renditions (ictool): Default, Dark, TintedLight, TintedDark, ClearLight, ClearDark
-#   row 4:    legacy AppIcon.icns for macOS 14-25: 16 and 32 px zoomed, 128, 256 px
+# Compiles the real catalog + AppIcon.icon with actool into a throwaway LibreWeave bundle and writes
+# art/exports/review.png. One row per macOS icon mode; columns: 16 and 32 px (nearest-neighbour zoom),
+# then 256 px on a light backdrop and on a dark backdrop.
+#   Light, Dark, Clear light, Clear dark: what macOS draws for the bundle (IconServices, appearance-check.m)
+#   Tinted light, Tinted dark:            Icon Composer renditions (ictool)
+#   Legacy:                               AppIcon.icns for macOS 14-25
+# Clear is flattened onto the system's neutral glass here; the Dock composites live translucency itself.
 set -eu
 cd "$(dirname "$0")/../.."
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
@@ -15,24 +17,27 @@ plutil -insert CFBundleIdentifier -string app.libreweave.review "$B/Info.plist"
 plutil -insert CFBundleIconName -string AppIcon "$B/Info.plist"
 plutil -insert CFBundleIconFile -string AppIcon "$B/Info.plist"
 clang -fobjc-arc -framework AppKit art/tools/appearance-check.m -o "$W/check"
-"$W/check" "$W/LibreWeave.app" "$W/is"
-z() { magick "$1" -background "$2" -flatten -filter point -resize 128x128 -bordercolor "$2" -border 16 "$3"; }
-f() { magick "$1" -background "$2" -flatten -resize "$4" -bordercolor "$2" -border 16 "$3"; }
-for t in light:E6E6E6 dark:1E1E1E; do
-  a=${t%%:*}; bg="#${t#*:}"
-  z "$W/is-$a-16.png" "$bg" "$W/$a-a.png"; z "$W/is-$a-32.png" "$bg" "$W/$a-b.png"; f "$W/is-$a-256.png" "$bg" "$W/$a-c.png" 128x128
-  magick "$W/$a-a.png" "$W/$a-b.png" "$W/$a-c.png" +append "$W/row-$a.png"
-done
+"$W/check" "$W/LibreWeave.app" "$W/m"
 IC="$(xcode-select -p)/../Applications/Icon Composer.app/Contents/Executables/ictool"
-for r in Default Dark TintedLight TintedDark ClearLight ClearDark; do
-  "$IC" NativeLatex/AppIcon.icon --export-image --output-file "$W/ic-$r.png" --platform macOS --rendition $r --width 128 --height 128 --scale 1 >/dev/null
-  f "$W/ic-$r.png" "#8A8A8A" "$W/ic-$r-b.png" 128x128
+for r in TintedLight:tinted-light TintedDark:tinted-dark; do
+  for px in 16 32 256; do
+    "$IC" NativeLatex/AppIcon.icon --export-image --output-file "$W/m-${r#*:}-$px.png" --platform macOS \
+      --rendition "${r%%:*}" --width $px --height $px --scale 1 >/dev/null
+  done
 done
-magick "$W"/ic-Default-b.png "$W"/ic-Dark-b.png "$W"/ic-TintedLight-b.png "$W"/ic-TintedDark-b.png "$W"/ic-ClearLight-b.png "$W"/ic-ClearDark-b.png +append "$W/row-ic.png"
-iconutil -c iconset "$B/Resources/AppIcon.icns" -o "$W/legacy.iconset"
-L="$W/legacy.iconset"
-z "$L/icon_16x16.png" "#E6E6E6" "$W/l1.png"; z "$L/icon_16x16@2x.png" "#E6E6E6" "$W/l2.png"
-f "$L/icon_128x128.png" "#E6E6E6" "$W/l3.png" 128x128; f "$L/icon_128x128@2x.png" "#E6E6E6" "$W/l4.png" 128x128
-magick "$W/l1.png" "$W/l2.png" "$W/l3.png" "$W/l4.png" +append "$W/row-legacy.png"
-magick -background "#FFFFFF" "$W/row-light.png" "$W/row-dark.png" "$W/row-ic.png" "$W/row-legacy.png" -gravity west -append art/exports/review.png
+iconutil -c iconset "$B/Resources/AppIcon.icns" -o "$W/l.iconset"
+cp "$W/l.iconset/icon_16x16.png" "$W/m-legacy-16.png"; cp "$W/l.iconset/icon_16x16@2x.png" "$W/m-legacy-32.png"
+cp "$W/l.iconset/icon_128x128@2x.png" "$W/m-legacy-256.png"
+rows=""
+for m in light dark clear-light clear-dark tinted-light tinted-dark legacy; do
+  magick -background "#EDEDED" \
+    \( "$W/m-$m-16.png" -background "#EDEDED" -flatten -filter point -resize 96x96 \) \
+    \( "$W/m-$m-32.png" -background "#EDEDED" -flatten -filter point -resize 96x96 \) \
+    \( "$W/m-$m-256.png" -background "#EDEDED" -flatten -resize 96x96 \) \
+    \( "$W/m-$m-256.png" -background "#1E1E1E" -flatten -resize 96x96 \) \
+    -bordercolor "#EDEDED" -border 8 +append \
+    \( -size 110x112 xc:"#EDEDED" -font /System/Library/Fonts/Helvetica.ttc -fill "#333" -pointsize 15 -gravity west -annotate +8+0 "$m" \) +swap +append "$W/row-$m.png"
+  rows="$rows $W/row-$m.png"
+done
+magick $rows -append art/exports/review.png
 echo "wrote art/exports/review.png"
