@@ -1,5 +1,5 @@
-/* Black/white with one blue accent, the Internship tracker's values (Internship/frontend/src/style.css).
-   Contrast: #0066CC on white 5.6:1 (also white text on it); dark: #0A84FF text on black 5.6:1, white on #0071E3 4.7:1. */
+/* Black/white with one blue accent, #2563EB in every appearance.
+   White on blue is 5.17:1; blue on black is reserved for large text and focus rings. */
 :root {
   color-scheme: light;
   --bg: #ffffff;
@@ -7,8 +7,8 @@
   --muted: #6e6e73;
   --solid: #f5f5f7;
   --line: rgba(0, 0, 0, .10);
-  --accent: #0066cc;      /* blue as text, links, focus */
-  --fill: #0066cc;        /* filled button, white text */
+  --accent: #2563eb;
+  --fill: #2563eb;
   --ring: var(--accent);  /* own name: bb8.css redefines --accent (orange) inside the toggle */
   --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 96px;
   --h: 44px;
@@ -22,8 +22,8 @@ html[data-theme="dark"] {
   --muted: #98989d;
   --solid: #141416;
   --line: rgba(255, 255, 255, .14);
-  --accent: #0a84ff;
-  --fill: #0071e3;
+  --accent: #2563eb;
+  --fill: #2563eb;
 }
 
 * { box-sizing: border-box; }
@@ -46,6 +46,7 @@ code { font-family: var(--mono); font-size: .9em; }
 .brand img { display: block; }
 .site-nav { display: flex; gap: var(--s5); margin-left: auto; font-size: 14px; color: var(--muted); }
 .site-nav a:hover, .site-footer a:hover { color: var(--accent); }
+html[data-theme="dark"] .site-nav a:hover, html[data-theme="dark"] .site-footer a:hover { color: var(--fg); }
 
 /* BB-8: artwork untouched; just size, outline, and a focusable checkbox (bb8.css hides it with display:none) */
 .bb8-toggle { --toggle-size: 5.6px; flex: none; }
@@ -80,9 +81,11 @@ html[data-theme="dark"] .preview video { box-shadow: 0 24px 64px -16px rgba(0, 0
 
 .section { padding: var(--s8) 0; }
 h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 52px); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; }
+#workflow-title { max-width: none; }
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s6); margin-top: var(--s7); padding: 0; list-style: none; }
 .steps li { padding-top: var(--s4); }
 .step-number { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); }
+html[data-theme="dark"] .step-number { color: var(--fg); }
 .steps h3 { margin: var(--s3) 0 var(--s2); font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .steps p, .principle-list dd { color: var(--muted); font-size: 15px; }
 .principle-list { margin-top: var(--s7); }
@@ -116,8 +119,8 @@ h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 52px); font-weight: 800; lin
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
-/* Increase Contrast: stronger greys, dividers and blues */
+/* Increase Contrast keeps the same blue and strengthens neutral text. */
 @media (prefers-contrast: more) {
-  :root { --line: #8e8e93; --muted: #3a3a3c; --accent: #004c99; --fill: #004c99; }
-  html[data-theme="dark"] { --line: #8e8e93; --muted: #c7c7cc; --accent: #409cff; --fill: #0058b0; }
+  :root { --line: #8e8e93; --muted: #3a3a3c; }
+  html[data-theme="dark"] { --line: #8e8e93; --muted: #c7c7cc; }
 }

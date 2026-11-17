@@ -55,15 +55,14 @@ final class ThemeTests: XCTestCase {
         }
         func hex(_ v: UInt32) -> NSColor { NSColor.hex(v, 1).usingColorSpace(.sRGB)! }
 
-        // Internship UI palette.
-        XCTAssertEqual(color("accent", dark: false, hc: false), hex(0x0066CC))
-        XCTAssertEqual(color("accent", dark: true, hc: false), hex(0x0071E3))
-        XCTAssertEqual(color("accentText", dark: false, hc: false), hex(0x0066CC))
-        XCTAssertEqual(color("accentText", dark: true, hc: false), hex(0x0A84FF))
+        // One brand blue in both appearances; dark small text uses a neutral for contrast.
+        XCTAssertEqual(color("accentText", dark: false, hc: false), hex(0x2563EB))
+        XCTAssertEqual(color("accentText", dark: true, hc: false), hex(0xF5F5F7))
 
         for dark in [false, true] {
             for hc in [false, true] {
                 let bg = color("background", dark: dark, hc: hc), label = "dark=\(dark) hc=\(hc)"
+                XCTAssertEqual(color("accent", dark: dark, hc: hc), hex(0x2563EB), "one brand blue, \(label)")
                 for text in ["foreground", "secondary", "accentText", "error"] {
                     XCTAssertGreaterThanOrEqual(contrast(color(text, dark: dark, hc: hc), bg), 4.5, "\(text) on background, \(label)")
                 }
@@ -80,7 +79,7 @@ final class ThemeTests: XCTestCase {
         NSAppearance(named: .aqua)!.performAsCurrentDrawingAppearance { light = Theme.swatches["accentText"]!.nsColor.usingColorSpace(.sRGB)! }
         NSAppearance(named: .darkAqua)!.performAsCurrentDrawingAppearance { darkBG = Theme.swatches["background"]!.nsColor.usingColorSpace(.sRGB)! }
         if !NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast {
-            XCTAssertEqual(light, hex(0x0066CC))
+            XCTAssertEqual(light, hex(0x2563EB))
             XCTAssertEqual(darkBG, hex(0x000000))
         }
     }

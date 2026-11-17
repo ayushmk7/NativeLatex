@@ -55,9 +55,9 @@ struct BB8ButtonStyle: ButtonStyle {
         BB8Artwork(night: night, pressed: configuration.isPressed, em: em)
             .padding([.horizontal, .bottom], Self.ringInset)
             .overlay(alignment: .bottom) {
-                // Ring in the blue-text token, offset from the pill.
+                // Ring uses the one brand blue, offset from the pill.
                 Capsule()
-                    .strokeBorder(Theme.accentText, lineWidth: Self.ringWidth)
+                    .strokeBorder(Theme.accent, lineWidth: Self.ringWidth)
                     .frame(width: BB8Artwork.width * em + 2 * Self.ringInset,
                            height: BB8Artwork.height * em + 2 * Self.ringInset)
                     .opacity(focused ? 1 : 0)

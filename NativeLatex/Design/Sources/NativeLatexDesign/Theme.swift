@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Design tokens: paper-white / near-black with the Internship blue accent.
+/// Design tokens: paper-white / near-black with one #2563EB blue accent.
 /// Every color is a dynamic `NSColor`, so it follows the window's effective
 /// appearance (including Increase Contrast) without SwiftUI environment plumbing.
 public enum Theme {
@@ -44,9 +44,9 @@ public enum Theme {
         "secondary": Swatch(0x6E6E73, 0x98989D, hc: (0x3A3A3C, 0xC7C7CC)),
         // ponytail: alpha only for normal contrast; HC swaps to opaque greys.
         "line": Swatch(0x000000, 0xFFFFFF, hc: (0x8E8E93, 0x8E8E93), alpha: (0.10, 0.14)),
-        // Match the Internship UI: separate dark fill and text values preserve contrast.
-        "accent": Swatch(0x0066CC, 0x0071E3, hc: (0x004F9E, 0x005BB5)),
-        "accentText": Swatch(0x0066CC, 0x0A84FF, hc: (0x004F9E, 0x66B2FF)),
+        // Blue on black is below 4.5:1 for small text; use neutrals there.
+        "accent": Swatch(0x2563EB, 0x2563EB),
+        "accentText": Swatch(0x2563EB, 0xF5F5F7, hc: (0x0A0A0A, 0xFFFFFF)),
         "error": Swatch(0xD70015, 0xFF453A),
         "warning": Swatch(0xB25000, 0xFF9F0A),
         "success": Swatch(0x1A7F37, 0x30D158),
