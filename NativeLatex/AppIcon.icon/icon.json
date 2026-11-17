@@ -14,7 +14,15 @@
           ],
           "name" : "lines"
         },
-        { "glass" : false, "image-name" : "threads.svg", "name" : "threads" }
+        {
+          "glass" : false,
+          "image-name-specializations" : [
+            { "value" : "threads-on-black.svg" },
+            { "appearance" : "dark", "value" : "threads-on-white.svg" },
+            { "appearance" : "tinted", "value" : "threads-mono.svg" }
+          ],
+          "name" : "threads"
+        }
       ],
       "shadow" : { "kind" : "none", "opacity" : 0 },
       "specular" : false,
