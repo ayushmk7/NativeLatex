@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="LibreWeave is a native Mac app in development for writing LaTeX and Markdown beside a rendered preview, using your local files." />
+    <meta name="description" content="LibreWeave is a native Mac app for writing LaTeX and Markdown beside a rendered preview, using your local files. In development; no public download yet." />
     <title>LibreWeave — write the source, see the page</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <script>
@@ -58,7 +58,7 @@
 
     <main id="main">
       <section class="hero" id="top" aria-labelledby="hero-title">
-        <p class="status"><span class="status-dot" aria-hidden="true"></span> Mac app · in development · no download yet</p>
+        <p class="status"><span class="status-dot" aria-hidden="true"></span> Mac app · in development · no public download yet</p>
         <h1 id="hero-title">Write the source.<br /><span class="accent">See the page.</span></h1>
         <p class="lede">A focused desk for LaTeX and Markdown. Open the files you already have, edit in place, and keep the rendered result beside your words.</p>
         <div class="actions">
@@ -74,13 +74,6 @@
               <span class="build-chip">Build</span>
             </div>
             <div class="window-content">
-              <div class="file-rail">
-                <p>Project</p>
-                <span class="active-file">paper.tex</span>
-                <span>notes.md</span>
-                <span>sources.bib</span>
-                <span>figures/</span>
-              </div>
               <div class="source-pane">
                 <div class="code"><span>1</span><code>\documentclass{article}</code></div>
                 <div class="code"><span>2</span><code>\begin{document}</code></div>
@@ -101,17 +94,17 @@
               </div>
             </div>
           </div>
-          <figcaption>Concept illustration. The finished app may look different.</figcaption>
+          <figcaption>Concept illustration, not a screenshot of the app.</figcaption>
         </figure>
       </section>
 
       <section class="section" id="workflow" aria-labelledby="workflow-title">
-        <p class="eyebrow">Planned workflow</p>
+        <p class="eyebrow">How it works</p>
         <h2 id="workflow-title">A shorter path from draft to page.</h2>
         <ol class="steps">
-          <li><span class="step-number">01</span><h3>Open your folder</h3><p>Work with ordinary <code>.tex</code>, <code>.md</code>, bibliography, and image files. Your project stays yours.</p></li>
+          <li><span class="step-number">01</span><h3>Open your files</h3><p>Edit ordinary <code>.tex</code>, <code>.md</code>, and bibliography files where they already live. Your files stay yours.</p></li>
           <li><span class="step-number">02</span><h3>Write with room to focus</h3><p>Move between source, problems, and preview without juggling separate tools or losing your place.</p></li>
-          <li><span class="step-number">03</span><h3>Build locally</h3><p>Build PDFs with the TeX tools installed on your Mac. Markdown files are planned to get a preview too.</p></li>
+          <li><span class="step-number">03</span><h3>Build locally</h3><p>Build PDFs with the TeX tools installed on your Mac. Markdown previews through Pandoc, if you have it installed.</p></li>
         </ol>
       </section>
 
@@ -120,8 +113,8 @@
         <h2 id="principles-title">Your files. <span class="accent">Your flow.</span></h2>
         <dl class="principle-list">
           <div><dt>Native on Mac</dt><dd>Familiar windows, menus, keyboard paths, and a real PDF preview.</dd></div>
-          <div><dt>Local by default</dt><dd>Editing and builds are designed to need no account and no internet connection.</dd></div>
-          <div><dt>More than one project</dt><dd>Keep separate workspaces open without mixing roots or results.</dd></div>
+          <div><dt>Local by default</dt><dd>Editing, builds, and previews need no account and no internet connection.</dd></div>
+          <div><dt>One window per document</dt><dd>Each file opens in its own window, and build output stays in a hidden folder beside it.</dd></div>
         </dl>
       </section>
     </main>
