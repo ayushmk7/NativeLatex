@@ -803,7 +803,8 @@ final class MarkdownWriteTests: XCTestCase {
         let style = storage.attribute(.paragraphStyle, at: pair.location(of: "Some"), effectiveRange: nil) as? NSParagraphStyle
         XCTAssertGreaterThan(style?.lineSpacing ?? 0, 0, "body has Read's 1.55 line height")
         let gap = storage.attribute(.paragraphStyle, at: pair.location(of: "\n\nSome") + 1, effectiveRange: nil) as? NSParagraphStyle
-        XCTAssertEqual(gap?.maximumLineHeight, MarkdownStyler.bodySize, "blank line is a 1em block gap")
+        XCTAssertEqual(gap, style, "a blank line is a body line (Read's block margin is its height)")
+        XCTAssertTrue(css.contains("margin-top:\(MarkdownStyler.blockGap)px; margin-bottom:\(MarkdownStyler.blockGap)px;"), "Read block gap")
 
         // Centered column: 1400 pt wide view keeps text 690 pt wide.
         pair.wv.enclosingScrollView!.frame.size.width = 1400
@@ -822,6 +823,49 @@ final class MarkdownWriteTests: XCTestCase {
             XCTAssertEqual(xs(), away, "caret on \(needle)'s line")
         }
         XCTAssertEqual(pair.doc, text, "styling never edits the source")
+
+        // Narrow: text starts 24 pt in, exactly where Read's padding puts it (inset + fragment padding).
+        pair.wv.enclosingScrollView!.frame.size.width = 500
+        pair.wv.frame.size.width = 500
+        XCTAssertEqual(pair.wv.textContainerInset.width + pair.wv.textContainer!.lineFragmentPadding, 24, "Read padding: 24 px")
+        pair.wv.frame.size.width = 1400
+        XCTAssertEqual(pair.wv.textContainerInset.width + pair.wv.textContainer!.lineFragmentPadding, (1400 - MarkdownStyler.columnWidth) / 2)
+    }
+
+    /// Typing on a blank line (where prose Return leaves the caret) never moves the text below it, and the
+    /// caret there is a full body line tall.
+    func testTypingOnABlankLineDoesNotMoveTextBelow() {
+        let text = "One.\n\n\n\nTwo.\n"
+        let pair = Pair(text)
+        defer { pair.window.close() }
+        pair.window.makeFirstResponder(pair.wv)
+        func y(_ needle: String) -> CGFloat {
+            let layout = pair.wv.layoutManager!
+            layout.ensureLayout(for: pair.wv.textContainer!)
+            return layout.lineFragmentRect(forGlyphAt: layout.glyphIndexForCharacter(at: pair.location(of: needle)), effectiveRange: nil).minY
+        }
+        func height(_ i: Int) -> CGFloat {
+            let layout = pair.wv.layoutManager!
+            return layout.lineFragmentRect(forGlyphAt: layout.glyphIndexForCharacter(at: i), effectiveRange: nil).height
+        }
+        let blank = pair.location(of: "\n\n\nTwo") + 1
+        let before = y("Two")
+        XCTAssertEqual(height(blank), height(0), "blank line as tall as a body line")
+        pair.wv.setSelectedRange(NSRange(location: blank, length: 0))
+        pair.key(pair.wv, "x")
+        XCTAssertEqual(pair.doc, "One.\n\nx\n\nTwo.\n")
+        XCTAssertEqual(y("Two"), before, "text below stays put")
+        pair.undo()
+        XCTAssertEqual(pair.doc, text)
+    }
+
+    /// Bar tooltips name the shortcut, like the menu: "Bold (⌘B)".
+    func testFormatBarTooltipsShowShortcuts() {
+        let help = Dictionary(uniqueKeysWithValues: MarkdownFormat.Command.all.map { ($0.id, $0.help) })
+        XCTAssertEqual(help["bold"], "Bold (⌘B)")
+        XCTAssertEqual(help["strikethrough"], "Strikethrough (⇧⌘X)")
+        XCTAssertEqual(help["heading1"], "Heading 1 (⌃⌘1)")
+        XCTAssertEqual(help["quote"], "Quote", "no shortcut, no parentheses")
     }
 
     /// Every formatting command toggles: once formats, twice restores the exact source. Bold and italic

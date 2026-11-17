@@ -134,6 +134,7 @@ enum MarkdownRenderer {
     math[display="block"] { display:block; margin:1em 0; overflow-x:auto; } math { font-size:1.1em; }
     hr { border:0; border-top:1px solid var(--line); } .footnotes { font-size:.9em; color:var(--muted); }
     ul.task-list { list-style:none; padding-left:1.2em; }
+    p, ul, ol, dl, blockquote, pre, table, figure, math[display="block"] { margin-top:\(MarkdownStyler.blockGap)px; margin-bottom:\(MarkdownStyler.blockGap)px; }
     """
 }
 

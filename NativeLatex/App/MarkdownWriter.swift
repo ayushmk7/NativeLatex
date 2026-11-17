@@ -16,7 +16,7 @@ enum MarkdownStyler {
     static let bodySize: CGFloat = 15
     /// h1–h6 in points; Read's stylesheet uses the same values in px.
     static let headingSizes: [CGFloat] = [30, 22.5, 18.75, 15, 13, 12]
-    /// Read: `line-height: 1.55`, paragraphs `margin: 1em`, headings `margin-top: 1.4em`, `line-height: 1.25`.
+    /// Read: `line-height: 1.55`, blocks `margin: blockGap`, headings `margin-top: 1.4em`, `line-height: 1.25`.
     static let lineHeight: CGFloat = 1.55, headingLineHeight: CGFloat = 1.25, headingSpaceBefore: CGFloat = 1.4
     /// Read's `main { max-width: 46em }` at the 15 px body size.
     static let columnWidth: CGFloat = 46 * bodySize
@@ -25,11 +25,14 @@ enum MarkdownStyler {
         let font = NSFont.systemFont(ofSize: size, weight: .bold)
         let style = NSMutableParagraphStyle()
         style.lineSpacing = lineSpacing(font, multiple: headingLineHeight)
-        // Read's 1.4em margin above, less the blank line's 1em that already separates the blocks.
-        style.paragraphSpacingBefore = max(0, size * headingSpaceBefore - bodySize)
+        // Read's 1.4em margin above (collapsed with the block gap), less the blank line already above it.
+        style.paragraphSpacingBefore = max(0, size * headingSpaceBefore - blockGap)
         return [.font: font, .paragraphStyle: style]
     }
     static let bodyLineSpacing = lineSpacing(.systemFont(ofSize: bodySize), multiple: lineHeight)
+    /// A blank line is an ordinary body line (so typing on it never changes its height), and it is the gap
+    /// between blocks: Read's paragraph, list, quote, code and table margins are this height too.
+    static let blockGap = NSLayoutManager().defaultLineHeight(for: .systemFont(ofSize: bodySize)) + bodyLineSpacing
     /// Extra space below each line so it is `lineHeight` × the font size tall, like CSS line-height.
     static func lineSpacing(_ font: NSFont, multiple: CGFloat) -> CGFloat {
         max(0, (font.pointSize * multiple - NSLayoutManager().defaultLineHeight(for: font)).rounded())
@@ -41,7 +44,6 @@ enum MarkdownStyler {
     private static let heading = regex(#"^ {0,3}(#{1,6})([ \t]+|$)"#)
     private static let quote = regex(#"^ {0,3}(>[ \t]?)+"#)
     private static let list = regex(#"^[ \t]*([-*+]|\d{1,9}[.)])[ \t]+(\[[ xX]\][ \t]+)?"#)
-    private static let blankLine = regex(#"^[ \t]*$"#)
     private static let literalLine = regex(#"^ {0,3}(\||\$\$|<|---[ \t]*$|\+\+\+).*$"#)
     /// Longest inline span (emphasis, link, image, math) the Write view styles, in UTF-16 units. Unbounded
     /// lazy spans made a long line of unmatched markers quadratic: a 24 KB line of `*a ` cost seconds per
@@ -99,9 +101,6 @@ enum MarkdownStyler {
         let codeBackground = NSColor(Theme.surface)
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = bodyLineSpacing
-        // A blank line is the gap between blocks: one body size tall, like Read's 1em paragraph margin.
-        let gap = NSMutableParagraphStyle()
-        gap.minimumLineHeight = bodySize; gap.maximumLineHeight = bodySize
 
         storage.beginEditing()
         defer { storage.endEditing() }
@@ -129,7 +128,6 @@ enum MarkdownStyler {
             protect(range)
         }
 
-        for m in matches(blankLine) { storage.addAttribute(.paragraphStyle, value: gap, range: text.lineRange(for: m.range)) }
         for block in blocks where NSIntersectionRange(block.range, target).length > 0 {
             storage.addAttribute(.font, value: mono, range: block.range)
             protect(block.range)
@@ -225,6 +223,17 @@ enum MarkdownFormat {
         }
 
         func perform(on view: NSTextView) { action(view) }
+
+        /// The shortcut as a menu shows it, e.g. "⇧⌘X"; nil without one.
+        var shortcutText: String? {
+            guard let shortcut else { return nil }
+            let m = shortcut.modifiers
+            let symbols = [(EventModifiers.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘")].filter { m.contains($0.0) }.map(\.1)
+            return symbols.joined() + String(shortcut.key.character).uppercased()
+        }
+
+        /// Tooltip: the title and its shortcut, "Bold (⌘B)".
+        var help: String { shortcutText.map { "\(title) (\($0))" } ?? title }
 
         /// Menu and bar order. ⌥⌘1–3, ⌥⌘E and ⌥⌘P are the View menu's, so block styles use ⌃⌘ and ⇧⌘.
         static let all: [Command] = [
@@ -500,11 +509,12 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
         if let resize { NotificationCenter.default.removeObserver(resize) }
     }
 
-    /// Side insets that center a column of at most `MarkdownStyler.columnWidth`, never less than Read's 24 pt padding.
+    /// Side insets that center a column of at most `MarkdownStyler.columnWidth`; text never starts closer than
+    /// Read's 24 pt padding. The inset excludes the line fragment padding, which TextKit adds inside it.
     func centerColumn() {
         guard let view else { return }
         let padding = view.textContainer?.lineFragmentPadding ?? 0
-        let side = max(Theme.s5, ((view.frame.width - MarkdownStyler.columnWidth) / 2 - padding).rounded(.down))
+        let side = (max(Theme.s5, (view.frame.width - MarkdownStyler.columnWidth) / 2) - padding).rounded(.down)
         if view.textContainerInset.width != side { view.textContainerInset = NSSize(width: side, height: Theme.s4) }
     }
 
@@ -736,7 +746,7 @@ struct MarkdownFormatBar: View {
                 Button { if let view = target() { command.perform(on: view); view.window?.makeFirstResponder(view) } } label: {
                     Label(command.title, systemImage: command.symbol)
                 }
-                .help(command.title)
+                .help(command.help)
                 .accessibilityLabel(command.title)
             }
             Spacer()
