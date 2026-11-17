@@ -12,7 +12,7 @@ The app is for authors who want a faster local editing loop than switching among
 
 | Question | Decision | Reason |
 | --- | --- | --- |
-| Native implementation | SwiftUI window and commands, AppKit source editor, PDFKit preview | Use mature macOS editing and PDF components. The current build uses SwiftUI `TextEditor`; the AppKit editor is still planned. |
+| Native implementation | SwiftUI window and commands, AppKit source editor, PDFKit preview | Use mature macOS editing and PDF components. The current build uses an AppKit `NSTextView` editor and PDFKit; syntax color and line numbers are still planned. |
 | Minimum macOS | 14.0 (app target, Design and Integrations packages) | Matches `MACOSX_DEPLOYMENT_TARGET` and package platforms. |
 | Project format | Ordinary `.tex`, `.md`, `.bib`, images and related files in a folder | Keep projects portable to TeX, Git and other editors. |
 | Workspace | One folder per window, several windows open at once | Separate build root, state and outputs clearly. **Planned.** The current build is a `DocumentGroup` app with one file per window and no folder tree. |

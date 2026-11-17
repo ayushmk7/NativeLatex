@@ -1,6 +1,6 @@
 # NativeLatex Mac UX plan
 
-Status: plan · revised 2026-11-17 · Mac only. The `NativeLatex/Design` package (theme, BB-8 toggle, `WorkspaceShell`; 4/4 tests pass) implements part of this plan but is not yet wired into the LibreLeaf app, which currently opens one file per window.
+Status: plan · revised 2026-11-17 · Mac only. The `NativeLatex/Design` package (theme, BB-8 toggle, `WorkspaceShell`; 4/4 tests pass) is linked into the LibreLeaf app. The app uses its theme, BB-8 toggle, appearance menu and settings, problems list and status bar; `WorkspaceShell` is not used yet. The app currently opens one file per window.
 
 ## Product promise
 
