@@ -69,12 +69,12 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 | surface | `#F5F5F7` | `#141416` |
 | foreground | `#0A0A0A` | `#F5F5F7` |
 | secondary | `#6E6E73` | `#98989D` |
-| accent (fill, white text) | `#0F2BFF` electric (7.47:1) | `#2438FF` (6.81:1) |
-| accentText | `#0F2BFF` (7.47:1 on white) | `#7A93FF` (7.45:1 on black) |
-| accent, Increase Contrast | `#0A1FC2` (10.6:1) | `#1A2BD9` (8.8:1) |
-| accentText, Increase Contrast | `#0A1FC2` | `#A6B6FF` (10.8:1 on black) |
+| accent (fill, white text) | `#0066CC` (5.57:1) | `#0071E3` (4.70:1) |
+| accentText | `#0066CC` (5.57:1 on white) | `#0A84FF` (5.76:1 on black) |
+| accent, Increase Contrast | `#004F9E` (8.04:1) | `#005BB5` (6.64:1) |
+| accentText, Increase Contrast | `#004F9E` | `#66B2FF` (9.38:1 on black) |
 
-The base values are the Website homepage palette (`body.opt7`: `--electric` light `#0F2BFF`, dark fill `#2438FF`, `--electric-ink` `#7A93FF`); Increase Contrast keeps that hue, deeper for fills and lighter for dark text. The Markdown preview CSS uses the same values, with `prefers-contrast: more` for Increase Contrast. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors; like the landing switch, its pill has an outline in `foreground` (1.5pt, 2.5pt with Increase Contrast) so the sky stays distinct from light and dark toolbars.
+The base values match the Internship tracker's blue tokens. Increase Contrast deepens fills and lightens dark text. The Markdown preview CSS uses the same values, with `prefers-contrast: more` for Increase Contrast. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors; like the landing switch, its pill has an outline in `foreground` (1.5pt, 2.5pt with Increase Contrast) so the sky stays distinct from light and dark toolbars.
 
 ## Check
 
@@ -86,6 +86,6 @@ swift run NativeLatexDesignDemo                             # LibreWeave sample 
 swift run NativeLatexDesignDemo --snapshot "$PWD/Screenshots"  # regenerate the PNGs above
 ```
 
-Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears them; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent hex values match the Website opt7 palette; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ; rendered BB-8 pixels show a dark outline on light and a light outline on dark, and a focus ring that is a clean capsule (empty bounding-box corners) within the control bounds, absent when unfocused, with no layout change on focus. Set `BB8_RENDER_DIR` to save those renders as PNGs.
+Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears the override; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent hex values match the Internship palette; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ; rendered BB-8 pixels show a dark outline on light and a light outline on dark, and a focus ring that is a clean capsule (empty bounding-box corners) within the control bounds, absent when unfocused, with no layout change on focus. Set `BB8_RENDER_DIR` to save those renders as PNGs.
 
 Still to check by hand in the real app: VoiceOver reading, Full Keyboard Access, Reduce Motion, and switching macOS appearance while two windows are open.
