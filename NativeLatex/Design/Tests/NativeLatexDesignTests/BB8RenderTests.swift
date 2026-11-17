@@ -3,10 +3,10 @@ import SwiftUI
 import XCTest
 @testable import NativeLatexDesign
 
-/// Renders the real BB-8 button style and checks the pill outline and focus ring pixel by pixel.
+/// Renders the real BB-8 button style and checks its unframed edge and focus ring pixel by pixel.
 @MainActor
 final class BB8RenderTests: XCTestCase {
-    private let em: CGFloat = 4, scale: CGFloat = 2
+    private let em: CGFloat = 4.5, scale: CGFloat = 2
     private var inset: CGFloat { BB8ButtonStyle.ringInset }
     private var pillWidth: CGFloat { BB8Artwork.width * em }
     private var pillHeight: CGFloat { BB8Artwork.height * em }
@@ -46,7 +46,7 @@ final class BB8RenderTests: XCTestCase {
                 let focused = render(night: night, focused: true, dark: dark)
                 XCTAssertEqual(size(idle), size(focused), "focus must not change layout, \(label)")
                 // Toolbar items are 52pt tall; keep the control within that budget.
-                XCTAssertLessThanOrEqual(size(focused).width, 52, label)
+                XCTAssertLessThanOrEqual(size(focused).width, 60, label)
                 XCTAssertLessThanOrEqual(size(focused).height, 52, label)
 
                 let w = size(focused).width, h = contentHeight
@@ -64,24 +64,17 @@ final class BB8RenderTests: XCTestCase {
         }
     }
 
-    /// The pill edge is drawn in the foreground token: dark on light windows, light on dark windows.
-    func testPillOutlineFollowsForeground() {
+    /// No outline: the pill's edge is the artwork itself, not a dark ring on light windows or a light one on dark.
+    func testPillHasNoOutline() {
         for dark in [false, true] {
             for night in [false, true] {
                 let rep = render(night: night, focused: false, dark: dark)
-                let h = contentHeight, midY = h - inset - pillHeight / 2
-                let edge = pixel(rep, inset + 0.5, midY)
+                let edge = pixel(rep, inset + 1, contentHeight - inset - pillHeight / 2)
                 let brightness = (edge.redComponent + edge.greenComponent + edge.blueComponent) / 3
-                if dark {
-                    XCTAssertGreaterThan(brightness, 0.85, "light outline on dark, night=\(night)")
-                } else {
-                    XCTAssertLessThan(brightness, 0.15, "dark outline on light, night=\(night)")
-                }
+                XCTAssertGreaterThan(edge.alphaComponent, 0.5, "artwork reaches the edge, dark=\(dark) night=\(night)")
+                XCTAssertTrue(brightness > 0.15 && brightness < 0.85 || edge.blueComponent - edge.redComponent > 0.1,
+                              "edge is sky, not a black or white ring, dark=\(dark) night=\(night): \(edge)")
             }
         }
-    }
-
-    func testIncreaseContrastThickensOutline() {
-        XCTAssertGreaterThan(BB8Artwork.outlineWidth(.increased), BB8Artwork.outlineWidth(.standard))
     }
 }

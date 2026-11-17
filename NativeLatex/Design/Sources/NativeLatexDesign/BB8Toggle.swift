@@ -14,7 +14,7 @@ public struct BB8Toggle: View {
     @State private var night: Bool?
     @FocusState private var focused: Bool
 
-    public init(store: AppearanceStore = .shared, em: CGFloat = 4) {
+    public init(store: AppearanceStore = .shared, em: CGFloat = 4.5) {
         self.store = store
         self.em = em
     }
@@ -72,22 +72,16 @@ public struct BB8Artwork: View {
 
     let night: Bool, pressed: Bool, em: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorSchemeContrast) private var contrast
 
     public init(night: Bool, pressed: Bool = false, em: CGFloat = 4) {
         self.night = night; self.pressed = pressed; self.em = em
     }
 
-    /// Pill outline in the foreground token, like the landing's 2px ring; heavier with Increase Contrast.
-    /// Without it the sky meets light and dark toolbars below 3:1.
-    static func outlineWidth(_ contrast: ColorSchemeContrast) -> CGFloat { contrast == .increased ? 2.5 : 1.5 }
-
     public var body: some View {
         ZStack(alignment: .topLeading) {
             scenery
                 .frame(width: Self.width * em, height: Self.height * em, alignment: .topLeading)
-                .clipShape(Capsule())
-                .overlay(Capsule().strokeBorder(Theme.foreground, lineWidth: Self.outlineWidth(contrast)))
+                .clipShape(Capsule()) // no outline: the artwork stands on its own
             robot
         }
         .frame(width: Self.width * em, height: Self.height * em, alignment: .topLeading)
