@@ -14,7 +14,8 @@ for i in json.load(open(f"{d}/Contents.json"))["images"]:
 print("sizes ok")
 P
 T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
 out=$(xcrun actool NativeLatex/Assets.xcassets --compile "$T" --platform macosx --minimum-deployment-target 14.0 \
-  --app-icon AppIcon --output-partial-info-plist "$T/info.plist" --output-format human-readable-text 2>&1)
+  --app-icon AppIcon --accent-color AccentColor --output-partial-info-plist "$T/info.plist" --output-format human-readable-text 2>&1)
 echo "$out" | grep -Eq 'warning|error' && { echo "$out"; exit 1; }
-test -s "$T/AppIcon.icns"; rm -rf "$T"; echo "actool ok"
+test -s "$T/AppIcon.icns"; echo "actool ok"

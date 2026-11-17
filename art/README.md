@@ -12,10 +12,11 @@ Design inputs: [art direction](../docs/workspaces/art/art-direction.md), concept
 | `source/switch-*.svg` | Appearance-switch stills: light, dark, light with blue focus ring. Original rolling robot; no BB-8 artwork or code copied. |
 | `exports/` | PNG previews of the marks and switch stills |
 | `../NativeLatex/Assets.xcassets/AppIcon.appiconset` | Generated Mac icon: 16–512 pt at 1x and 2x |
+| `../NativeLatex/Assets.xcassets/AccentColor.colorset` | App accent: `#4169E1` light, `#8BA6FF` dark. Matches Xcode's default `ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor`, so backend can keep that setting. |
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer art/tools/build.sh     # SVG → PNG via native macOS renderer
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer art/tools/validate.sh  # pixel sizes + clean actool compile
 ```
 
-Still to do: an Icon Composer `.icon` for macOS 26 dark/clear/tinted icons, made from these same layers, and the increased-contrast switch still.
+Not needed for the local app to run: an Icon Composer `.icon` for macOS 26 dark/clear/tinted icons, made from these same layers, and the increased-contrast switch still.
