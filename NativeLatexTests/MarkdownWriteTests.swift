@@ -737,6 +737,88 @@ final class MarkdownWriteTests: XCTestCase {
         }
     }
 
+    /// Return keeps every quote level and a list inside a quote ("> > a", "> - a" used to continue as "> ");
+    /// an empty nested item ends it, with the blank line that separates it from the item above.
+    func testReturnKeepsQuoteDepthAndQuotedLists() {
+        for (text, caret, expected) in [("> > a", 5, "> > a\n> > "), ("> - item", 8, "> - item\n> - "), ("> 1. one", 8, "> 1. one\n> 2. "),
+                                        ("  > q", 5, "  > q\n  > "), ("> > ", 4, ""), ("> - ", 4, ""),
+                                        ("> > a\n> > ", 10, "> > a\n\n"), ("> - a\n> - ", 10, "> - a\n\n")] {
+            let handle = WritingHandle()
+            _ = handle.scrollView(text: text, label: "Write")
+            let view = handle.view!
+            view.setSelectedRange(NSRange(location: caret, length: 0))
+            XCTAssertTrue(handle.textView(view, doCommandBy: #selector(NSResponder.insertNewline(_:))), text)
+            XCTAssertEqual(view.string, expected, text)
+        }
+    }
+
+    /// Write restyles only around each edit; after any edit that must look exactly like a full restyle, and undo
+    /// must restore the exact source. Regressions: a Return that splits off "# x" (the new line wasn't restyled),
+    /// front matter opened/closed/shifted by an edit, a delete at the end of text (restyled line 1 instead),
+    /// and inline code across lines (styled differently per line than whole). Then a seeded random-edit sweep.
+    func testIncrementalStylingMatchesAFullRestyleAfterAnyEdit() {
+        func runs(_ s: NSAttributedString) -> [String] {
+            var out: [String] = []
+            s.enumerateAttributes(in: NSRange(location: 0, length: s.length)) { a, r, _ in
+                let font = a[.font] as? NSFont, p = a[.paragraphStyle] as? NSParagraphStyle
+                out.append("\(r.location),\(r.length) \(font?.fontName ?? "-") \(font?.pointSize ?? 0) h\(a[.markdownHidden] != nil) b\(a[.backgroundColor] != nil) s\(a[.strikethroughStyle] != nil) u\(a[.underlineStyle] != nil) fg\((a[.foregroundColor] as? NSColor)?.description ?? "-") p\(p?.lineSpacing ?? -1),\(p?.headIndent ?? -1),\(p?.minimumLineHeight ?? -1)")
+            }
+            return out
+        }
+        func writer(_ text: String) -> (WritingHandle, NSTextView, NSWindow) {
+            let handle = WritingHandle()
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = handle.scrollView(text: text, label: "Write") // never ordered in
+            return (handle, handle.view!, window)
+        }
+        func matchesFull(_ view: NSTextView) -> Bool {
+            let fresh = NSTextStorage(string: view.string)
+            MarkdownStyler.apply(to: fresh, reveal: NSRange(location: NSNotFound, length: 0))
+            return runs(view.textStorage!) == runs(fresh)
+        }
+        let cases: [(String, NSRange, String)] = [
+            ("Te# x\n", NSRange(location: 2, length: 0), "\n\n"),                   // Return splits off a heading
+            ("Te```\nx\n", NSRange(location: 2, length: 0), "\n"),                   // ... or a fence
+            ("---\na: *b*\n---\n# c\n", NSRange(location: 4, length: 0), "---\n"),   // front matter closes earlier
+            ("---\na\n--- \n---\n# c\n", NSRange(location: 4, length: 0), "x---\n"), // ... and its old end moves down
+            ("](u)---\na\n---\n# c\n", NSRange(location: 0, length: 4), ""),         // front matter appears
+            ("x\na *b*", NSRange(location: 6, length: 1), ""),                    // delete at the end of the text
+            ("A `span\nmore` x", NSRange(location: 3, length: 0), "y"),               // backticks across lines
+        ]
+        for (text, range, insert) in cases {
+            let (_, view, window) = writer(text)
+            view.insertText(insert, replacementRange: range)
+            XCTAssertTrue(matchesFull(view), "\(text.debugDescription): insert \(insert.debugDescription) at \(range)")
+            window.close()
+        }
+
+        struct RNG { var s: UInt64; mutating func next(_ n: Int) -> Int { s = s &* 6364136223846793005 &+ 1442695040888963407; return Int((s >> 33) % UInt64(max(n, 1))) } }
+        let tokens = ["`", "*", "**", "\n", "```", "~~~", "# ", "> ", "- ", "a", " ", "---\n", "$", "[", "](u)", "\n\n", "_", "~~", "|"]
+        let commands = [#selector(NSResponder.insertNewline(_:)), #selector(NSResponder.deleteBackward(_:)), #selector(NSResponder.deleteForward(_:))]
+        for seed in 1...60 {
+            var rng = RNG(s: UInt64(seed))
+            let (_, view, window) = writer(Self.fixture)
+            for step in 0..<40 {
+                let length = (view.string as NSString).length, at = rng.next(length + 1)
+                if rng.next(3) == 0 {
+                    view.setSelectedRange(NSRange(location: at, length: 0))
+                    view.doCommand(by: commands[rng.next(commands.count)])
+                } else {
+                    // At the selection, as typing is: an insert elsewhere while AppKit coalesces typing undo
+                    // is not something a user can do, and its undo is AppKit's own, not this view's.
+                    let removed = rng.next(4) == 0 ? min(rng.next(4), length - at) : 0
+                    view.setSelectedRange(NSRange(location: at, length: removed))
+                    view.insertText(rng.next(3) == 0 ? "" : tokens[rng.next(tokens.count)], replacementRange: view.selectedRange())
+                }
+                if !matchesFull(view) { XCTFail("seed \(seed) step \(step): incremental styling differs from a full restyle"); break }
+            }
+            while view.undoManager?.canUndo == true { view.undoManager?.undo() }
+            XCTAssertEqual(view.string, Self.fixture, "seed \(seed): undo restores the exact source")
+            window.close()
+        }
+    }
+
     /// Typing on a fence line (its info string) restyles only the edit, not the whole text: ~1.5 s per keystroke
     /// on 1 MiB before. Incremental styling must equal a full restyle, including edits that open or close a
     /// fence (which change everything after them), and undo must restore the exact source.

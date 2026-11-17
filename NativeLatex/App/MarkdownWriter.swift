@@ -49,7 +49,9 @@ enum MarkdownStyler {
     /// lazy spans made a long line of unmatched markers quadratic: a 24 KB line of `*a ` cost seconds per
     /// keystroke. Bounded, each marker scans at most this far, so styling stays linear in the line length.
     static let maxInlineSpan = 300
-    private static let code = regex(#"(`+)(?!`)([\s\S]*?[^`])\1(?!`)"#)
+    /// One line only, like the other inline spans: a span across lines styled differently when the Write view
+    /// restyled just the edited line than on a full restyle (and a stray backtick could turn paragraphs into code).
+    private static let code = regex(#"(`+)(?!`)([^\n]{0,\#(maxInlineSpan)}?[^`\n])\1(?!`)"#)
     private static let strong = regex(#"(\*\*|__)(?=\S)([^\n]{0,\#(maxInlineSpan)}?\S)\1"#)
     private static let emphasis = regex(#"(?<![*_\w])([*_])(?=[^\s*_])([^\n]{0,\#(maxInlineSpan)}?[^\s\\])\1(?![*_\w])"#)
     private static let strike = regex(#"(~~)(?=\S)([^\n]{0,\#(maxInlineSpan)}?\S)~~"#)
@@ -84,6 +86,13 @@ enum MarkdownStyler {
         return result
     }
 
+    /// YAML front matter: `---` on the first line through the next line starting `---`.
+    static func frontMatter(_ text: NSString) -> NSRange? {
+        guard text.hasPrefix("---\n") else { return nil }
+        let end = text.range(of: "\n---", options: [], range: NSRange(location: 3, length: text.length - 3))
+        return end.location == NSNotFound ? nil : NSRange(location: 0, length: NSMaxRange(end))
+    }
+
     /// Restyles `limit` (whole paragraphs; all of `storage` if nil). Hidden markup stays hidden everywhere;
     /// only fence lines inside `reveal` (the caret's lines) turn from clear to dim, which never moves text. Code fences are found over the whole text, since an opening fence
     /// anywhere above changes what follows; a fence block touching `limit` is restyled whole.
@@ -91,10 +100,16 @@ enum MarkdownStyler {
         let text = storage.string as NSString
         let all = NSRange(location: 0, length: text.length)
         let blocks = known ?? fences(text)
-        var target = limit.map { text.paragraphRange(for: NSIntersectionRange($0, all).location == NSNotFound ? NSRange(location: text.length, length: 0) : NSIntersectionRange($0, all)) } ?? all
+        // Clamped, not NSIntersectionRange: that gives {0, 0} for an empty range at the end, which restyled the
+        // first line instead of the last after a delete at the end of the text.
+        var target = limit.map { r -> NSRange in
+            let lo = min(max(0, r.location), text.length), hi = min(max(lo, NSMaxRange(r)), text.length)
+            return text.paragraphRange(for: NSRange(location: lo, length: hi - lo))
+        } ?? all
         for block in blocks where NSIntersectionRange(block.range, target).length > 0 || NSLocationInRange(target.location, block.range) {
             target = NSUnionRange(target, text.paragraphRange(for: block.range))
         }
+        if let matter = frontMatter(text), target.location <= NSMaxRange(matter) { target = NSUnionRange(target, text.paragraphRange(for: matter)) }
         let fg = NSColor(Theme.foreground), secondary = NSColor(Theme.secondary), accent = NSColor(Theme.accentText)
         let body = NSFont.systemFont(ofSize: bodySize)
         let mono = NSFont.monospacedSystemFont(ofSize: bodySize - 2, weight: .regular)
@@ -148,9 +163,7 @@ enum MarkdownStyler {
             }
         }
         // Front matter at the very top stays literal.
-        if target.location == 0, text.hasPrefix("---\n"), let end = text.range(of: "\n---", options: [], range: NSRange(location: 3, length: text.length - 3)).nonEmpty {
-            monoLiteral(NSRange(location: 0, length: NSMaxRange(end)))
-        }
+        if let matter = frontMatter(text), NSIntersectionRange(matter, target).length > 0 { monoLiteral(matter) }
         for m in matches(literalLine) where !isProtected(m.range) { monoLiteral(m.range) }
 
         for m in matches(heading) where !isProtected(m.range) {
@@ -396,7 +409,9 @@ enum MarkdownFormat {
         guard caret.length == 0 else { return false }
         let lineRange = text.lineRange(for: NSRange(location: caret.location, length: 0))
         let line = text.substring(with: NSRange(location: lineRange.location, length: caret.location - lineRange.location))
-        guard let m = line.firstMatch(of: #/^([ \t]*)(?:([-*+])|(\d{1,9})([.)])|(>))([ \t]+)(\[[ xX]\][ \t]+)?/#) else { return false }
+        // Quote markers (any depth) then an optional list marker: "> > a" and "> - a" keep both.
+        guard let m = line.prefixMatch(of: #/([ \t]*(?:>[ \t]?)*)(?:(?:([-*+])|(\d{1,9})([.)]))([ \t]+)(\[[ xX]\][ \t]+)?)?/#),
+              m.output.1.contains(">") || m.output.2 != nil || m.output.3 != nil else { return false }
         let wholeLine = text.substring(with: lineRange).trimmingCharacters(in: .newlines)
         let rest = wholeLine.dropFirst(line.count)
         if line.count == m.output.0.count, rest.allSatisfy({ $0 == " " || $0 == "\t" }) {
@@ -410,9 +425,8 @@ enum MarkdownFormat {
         var marker = String(m.output.1)
         if let bullet = m.output.2 { marker += bullet }
         if let number = m.output.3.flatMap({ Int($0) }), let close = m.output.4 { marker += "\(number + 1)\(close)" }
-        if let q = m.output.5 { marker += q }
-        marker += m.output.6
-        if m.output.7 != nil { marker += "[ ] " }
+        marker += m.output.5 ?? ""
+        if m.output.6 != nil { marker += "[ ] " }
         view.insertText("\n" + marker, replacementRange: caret)
         return true
     }
@@ -482,6 +496,8 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
     private var fences: [(range: NSRange, markers: [NSRange])] = []
     private var edited: NSRange?
     private var fenceEdit = false
+    /// End of the front matter at the last restyle (0 if none).
+    private var frontMatterEnd = 0, styledLength = 0
     private var mouseUp: Any?
     private var resize: Any?
 
@@ -682,7 +698,9 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
 
     private func startsFence(_ range: NSRange) -> Bool {
         guard let text = view?.string as NSString?, NSMaxRange(range) <= text.length else { return true }
-        return text.substring(with: text.paragraphRange(for: range)).split(separator: "\n", omittingEmptySubsequences: false)
+        // Through the next line: a Return before "```" makes that line a fence.
+        let lines = NSRange(location: range.location, length: min(range.length + 1, text.length - range.location))
+        return text.substring(with: text.paragraphRange(for: lines)).split(separator: "\n", omittingEmptySubsequences: false)
             .contains { let t = $0.drop { $0 == " " }; return t.hasPrefix("```") || t.hasPrefix("~~~") }
     }
 
@@ -702,6 +720,14 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
         let caret = text.lineRange(for: NSRange(location: min(view.selectedRange().location, text.length), length: 0))
         revealed = view.window?.firstResponder === view ? caret : NSRange(location: NSNotFound, length: 0)
         if range == nil { fences = MarkdownStyler.fences(text) }
+        // The line after an edit too: Return splits a line, and the new line ("# x") needs its own style.
+        var range = range.map { NSRange(location: $0.location, length: min($0.length + 1, max(0, text.length - $0.location))) }
+        // Front matter that an edit opened, closed or shrank: restyle from the top through its old and new end.
+        // The old end is in the old text's coordinates; an edit above it moved it by up to the length change.
+        let matterEnd = max(MarkdownStyler.frontMatter(text).map(NSMaxRange) ?? 0, frontMatterEnd + max(0, text.length - styledLength))
+        if let r = range, matterEnd > 0, r.location <= matterEnd + 1 { range = NSUnionRange(r, NSRange(location: 0, length: min(matterEnd + 1, text.length))) }
+        frontMatterEnd = MarkdownStyler.frontMatter(text).map(NSMaxRange) ?? 0
+        styledLength = text.length
         let limits: [NSRange?] = range == nil ? [nil] : [range, also].compactMap { $0 }
             .filter { $0.location != NSNotFound }
             .map { NSRange(location: min($0.location, text.length), length: max(0, min(NSMaxRange($0), text.length) - min($0.location, text.length))) }
