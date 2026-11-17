@@ -30,7 +30,10 @@ The first concept (a brace over a page on a black field) read as a box inside a 
 | --- | --- | --- | --- |
 | Light | `#0A0A0A` | `#FFFFFF` | `#4169E1` |
 | Dark | `#FFFFFF` | `#0A0A0A` | `#4169E1` |
-| Tinted, clear | System-generated from the same layers | | |
+| Clear light / dark | System glass (replaces our fill) | White | Mid-gray |
+| Tinted light / dark | User's tint | White / tint | Tint, lighter / darker |
+
+macOS picks Clear and Tinted from the user's icon-style setting and composites Clear's backdrop translucency live in the Dock. In static renders, Clear is the same opaque neutral glass for our icon and for Apple's own icons. The app forces no alpha and needs no setting. Tinted dark is the lowest-contrast mode; it is still readable at 32 px and up, and fixing it would cost Clear legibility (see art/README).
 
 The landing favicon follows the same rule through `prefers-color-scheme`: black sheet on light pages, white sheet on dark pages.
 
@@ -44,7 +47,7 @@ The landing favicon follows the same rule through `prefers-color-scheme`: black 
 - The Icon Composer document `NativeLatex/AppIcon.icon` gives real variants:
   - `fill-specializations` sets the sheet colour per appearance.
   - `image-name-specializations` swaps the lines layer between white and black.
-- In the built app, `Assets.car` holds `IconImageStack` renditions for `NSAppearanceNameAqua`, `NSAppearanceNameDarkAqua` and `ISAppearanceTintable`.
+- In the built app, `Assets.car` holds `IconImageStack` renditions for `NSAppearanceNameAqua`, `NSAppearanceNameDarkAqua` and `ISAppearanceTintable`. The last drives both Clear and Tinted. Our `icon.json` has no `tinted` (Mono) specialization, so actool derives the tintable stack from the default layers: per `assetutil`, its group is byte-identical to the Aqua group. A `tinted` specialization is an optional override. Adding one in a test changed only the tintable group and left Aqua and DarkAqua untouched.
 - From the same `.icon`, actool also generates the legacy `AppIcon.icns` (black sheet) for macOS 14–25 and the flat `Icon Image` renditions.
 - When `AppIcon.icon` exists, actool ignores a same-named `.appiconset`: removing it left `AppIcon.icns` byte-identical. The project's `.appiconset` was deleted.
 
