@@ -26,7 +26,7 @@ The existing Herdr **NativeLatex** workspace is the primary space. Art, UX, Back
 
 ## Implemented on main (checked 2026-11-17)
 
-These are facts about `main` at `7abd859` (integration `5386b36`, Adversarial repairs, the LibreWeave rename, rich Markdown preview, new-document flow, adaptive icon, and the Art and Landing merges), separate from the plans linked above. Test counts are from one isolated, non-parallel run of the app suite on that code.
+These are verified facts about current `main`, separate from the plans linked above. App test counts are from the isolated, non-parallel suite in `/tmp/libreweave-website-blue-test.log`.
 
 | Area | Current state | Verified by |
 | --- | --- | --- |
