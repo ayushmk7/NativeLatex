@@ -1,11 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="200 200 640 600" width="640" height="600">
-  <title>LibreLeaf mark, one color (black)</title>
-  <mask id="m"><rect x="0" y="0" width="1024" height="1024" fill="#fff"/>
-    <path d="M452 262C368 262 345 292 345 352V440C345 490 320 512 262 512C320 512 345 534 345 584V672C345 732 368 762 452 762" fill="none" stroke="#000" stroke-width="100" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="496" y="508" width="238" height="48" rx="24" fill="#000"/>
-    <rect x="496" y="604" width="168" height="48" rx="24" fill="#000"/>
-    <path d="M690 230V340H800" fill="none" stroke="#000" stroke-width="20"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="200 200 624 624" width="624" height="624">
+  <title>LibreWeave mark, one color</title>
+  <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+    <rect x="236" y="300" width="552" height="104" rx="52" fill="#fff"/><rect x="236" y="460" width="552" height="104" rx="52" fill="#fff"/><rect x="236" y="620" width="488" height="104" rx="52" fill="#fff"/><rect x="324" y="300" width="160" height="104" shape-rendering="crispEdges" fill="#000"/><rect x="324" y="620" width="160" height="104" shape-rendering="crispEdges" fill="#000"/><rect x="540" y="460" width="160" height="104" shape-rendering="crispEdges" fill="#000"/><rect x="352" y="236" width="104" height="552" rx="52" fill="#fff"/><rect x="568" y="236" width="104" height="552" rx="52" fill="#fff"/><rect x="352" y="432" width="104" height="160" shape-rendering="crispEdges" fill="#000"/><rect x="352" y="460" width="104" height="104" shape-rendering="crispEdges" fill="#fff"/><rect x="568" y="272" width="104" height="160" shape-rendering="crispEdges" fill="#000"/><rect x="568" y="300" width="104" height="104" shape-rendering="crispEdges" fill="#fff"/><rect x="568" y="592" width="104" height="160" shape-rendering="crispEdges" fill="#000"/><rect x="568" y="620" width="104" height="104" shape-rendering="crispEdges" fill="#fff"/>
   </mask>
-  <path d="M430 230H690L800 340V794H430Z" fill="#0A0A0A" mask="url(#m)"/>
-  <path d="M452 262C368 262 345 292 345 352V440C345 490 320 512 262 512C320 512 345 534 345 584V672C345 732 368 762 452 762" fill="none" stroke="#0A0A0A" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="1024" height="1024" fill="#0A0A0A" mask="url(#m)"/>
 </svg>

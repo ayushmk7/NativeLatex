@@ -1,6 +1,6 @@
-# Art direction: NativeLatex for Mac
+# Art direction: LibreWeave for Mac
 
-Status: brief; first assets merged · 2026-11-17. **LibreLeaf** is the working app name (NativeLatex stays the repository and project path); the mark must work without a wordmark. The icon set and `AccentColor` are in `NativeLatex/Assets.xcassets` and pass `art/tools/validate.sh`; see [art/README](../../../art/README.md).
+Status: icon redone for LibreWeave · 2026-11-17. **LibreWeave** is the working app name (NativeLatex stays the repository and project path; the Xcode product is still named LibreLeaf until the app owners rename it); the mark must work without a wordmark. The icon set and `AccentColor` are in `NativeLatex/Assets.xcassets` and pass `art/tools/validate.sh`; see [art/README](../../../art/README.md).
 
 ## Visual thesis
 
@@ -22,17 +22,20 @@ The blue values are design targets, not a promise that one hex value works on ev
 
 Use San Francisco for ordinary Mac controls and a clear monospaced face for source. Give start-screen titles and major section labels a bolder editorial weight; keep editor text regular and adjustable rather than using the guide's ultra-thin body example. The wordmark, if used, can pair a bold sans name with the standalone icon mark. Avoid downloaded web fonts in the app's core interface.
 
-## App icon: concepts and decision
+## App icon: woven sheet (current)
 
-| Concept | Visual | Assessment |
-| --- | --- | --- |
-| **A. Brace to page** | A bold source brace merges with a crisp typeset sheet. | Best expression of source becoming output, independent of the working name. |
-| **B. Typesetter's block** | Rules of text around one large mathematical glyph. | Attractive at large size; fine rules risk vanishing in the Dock. |
-| **C. Folded manuscript** | One folded sheet with a monogram. | Familiar but generic and tied to a name that may change. |
+The first concept (a brace over a page on a black field) read as a box inside a box. The current icon fixes that: **the macOS silhouette itself is the sheet**, with no inner page or frame. On it, two or three "lines of text" (wefts) weave over and under two royal-blue threads (warps). Each crossing alternates, so it reads as fabric rather than a `#`. There are no letters.
 
-**Choose A.** The square 1024 × 1024 source has a centered, bold brace at roughly the left third and a page beginning just right of center. Let the shapes overlap slightly so they read as one source-to-output symbol. Use a black or white field according to the icon appearance, a contrasting page, and royal blue for the brace or the connection between shapes. Keep two broad text rules on the page at most. No literal code, tiny equations, pen nib, faux app screenshot, or multicolor gradient. Make two or three editable layers: background, page, and brace. Inspect the system mask rather than drawing rounded corners into the artwork.
+| Variant | Sheet | Lines | Threads | Used for |
+| --- | --- | --- | --- | --- |
+| Dark (shipped) | `#0A0A0A` | `#FFFFFF` | `#4169E1` | Mac app icon in every appearance; landing favicon on light pages |
+| Light | `#FFFFFF` | `#0A0A0A` | `#4169E1` | Landing favicon on dark pages; a future Icon Composer light layer |
 
-Create default and dark reviews, plus clear and tinted appearance checks, from the same central geometry. Produce custom variants only if system-generated ones lose the mark. Apple's [app icon guidance](https://developer.apple.com/design/human-interface-guidelines/app-icons) recommends simple centered content and square unmasked layers for Icon Composer.
+- **Grid:** Apple's macOS icon template: one 824 px silhouette, 100 px inset, 185 px corner radius on a 1024 canvas.
+- **Small size:** the 16 and 32 px slots use a simpler two-by-two weave snapped to the 16 px pixel grid (64 units = 1 px): 2 px strands and 1 px gaps. The over/under crossings stay distinct in the menu bar, Finder lists and the Dock.
+- **Geometry:** everything is generated from one table in `art/tools/gen.py`.
+
+**Platform limit, verified 2026-11-17 with Xcode 27.2 on macOS 27.3:** a macOS `.appiconset` has no dark-appearance slot. Entries marked `luminosity: dark` compile without a warning, but actool leaves them out of `Assets.car`: all 11 AppIcon renditions have appearance "any". `NSWorkspace.icon(forFile:)` on the built app returns the same black sheet under Aqua and Dark Aqua (`art/tools/appearance-check.swift`). So the app ships **one universal icon**, the dark one, chosen because it holds up on both light and dark Docks. Real per-appearance icons (default, dark, clear, tinted) need an Icon Composer `.icon` document added to the Xcode target. That is a project change for the app owners; the light SVG layers here are ready for it.
 
 ## Appearance switch: adapt the Website reference
 
@@ -49,7 +52,7 @@ The reference source credits **Uiverse.io / Galahhad**. If implementation copies
 | Asset | Source and export |
 | --- | --- |
 | Mac app icon | Editable vector layers, Icon Composer project, and app asset catalog; include default/dark/clear/tinted review sheet. |
-| Standalone source-to-page mark | SVG/PDF vector for About, help, and project materials, plus one-color black and white versions. |
+| Standalone woven mark | SVG/PDF vector for About, help, and project materials, plus one-color black and white versions. |
 | Wordmark lockup | Editable type source and outlined export; keep name separate from icon geometry. |
 | Appearance-switch art | Native/vector source for light, dark, focused, increased-contrast, and reduced-motion still states. |
 | Palette sheet | Role names, light/dark values, contrast results, and examples on actual Mac controls. |
@@ -58,7 +61,7 @@ Keep source files in the future art implementation workspace and exports in the 
 
 ## Review checklist
 
-1. Check the icon at 16, 32, 64, 128, and 512 px in light and dark Dock contexts. At 32 px, brace and page must remain distinct.
+1. Check the icon at 16, 32, 64, 128, and 512 px in light and dark Dock contexts (`art/tools/review.sh`). At 16 and 32 px, the blue/white over-under crossings must remain distinct.
 2. Inspect icon variants in Icon Composer for clipping, weight, and legibility; test the one-color mark at 16 px.
 3. Review the switch as two stills and a short transition at actual toolbar size. The robot must remain readable without clouds, tan ground, or orange markings.
 4. Test the switch with keyboard focus, VoiceOver, Reduce Motion, Increase Contrast, and grayscale. UX owns behavior; art owns visible state and silhouette.
