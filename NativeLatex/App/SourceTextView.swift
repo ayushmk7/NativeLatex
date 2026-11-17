@@ -22,6 +22,16 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
         view.window?.makeFirstResponder(view)
     }
 
+    /// Selects what `other` has selected and scrolls to it. Both panes hold the buffer's text, so the
+    /// offsets carry over; clamped in case a sync is still pending.
+    func takeSelection(from other: TextViewHandle) {
+        guard let view, let selected = other.view?.selectedRange() else { return }
+        let length = (view.string as NSString).length, start = min(selected.location, length)
+        let range = NSRange(location: start, length: min(selected.length, length - start))
+        view.setSelectedRange(range)
+        view.scrollRangeToVisible(range)
+    }
+
     func reveal(line: Int) {
         guard let view else { return }
         let text = view.string as NSString

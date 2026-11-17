@@ -234,8 +234,10 @@ enum MarkdownFormat {
         let line = text.substring(with: NSRange(location: lineRange.location, length: caret.location - lineRange.location))
         guard let m = line.firstMatch(of: #/^([ \t]*)(?:([-*+])|(\d{1,9})([.)])|(>))([ \t]+)(\[[ xX]\][ \t]+)?/#) else { return false }
         let wholeLine = text.substring(with: lineRange).trimmingCharacters(in: .newlines)
-        if line.count == m.output.0.count, wholeLine.count == line.count { // empty item (nothing after the caret): end the list
-            view.insertText("", replacementRange: NSRange(location: lineRange.location, length: (line as NSString).length))
+        let rest = wholeLine.dropFirst(line.count)
+        if line.count == m.output.0.count, rest.allSatisfy({ $0 == " " || $0 == "\t" }) {
+            // Empty item (at most spaces after the caret): end the list, trailing spaces included.
+            view.insertText("", replacementRange: NSRange(location: lineRange.location, length: (wholeLine as NSString).length))
             return true
         }
         var marker = String(m.output.1)

@@ -146,9 +146,11 @@ struct EditorView: View {
             if new == .preview, isMarkdown, markdownWrite { DispatchQueue.main.async { writer.focus() } }
         }
         .onChange(of: markdownWrite) {
-            if markdownWrite, shown != .source { DispatchQueue.main.async { writer.focus() } }
+            // Write replaces the source (and back): the caret and scroll position carry over. Focus first, so
+            // Write reveals the markup on the caret's line.
+            if markdownWrite, shown != .source { DispatchQueue.main.async { writer.focus(); writer.takeSelection(from: editor) } }
             // Leaving Write removes the focused editor; keep the keyboard in the window.
-            if !markdownWrite { DispatchQueue.main.async { focusAfterRead() } }
+            if !markdownWrite { DispatchQueue.main.async { editor.takeSelection(from: writer); focusAfterRead() } }
         }
         .onChange(of: isMarkdown) {
             // Saved as another type (e.g. .tex) while in Write: Write is Markdown-only, so return to the earlier layout.

@@ -308,6 +308,17 @@ final class MarkdownWriteTests: XCTestCase {
         }
 
         await check(.both, write: false, "default")
+        // Write replaces the source in place: caret (and so scroll position) carries over both ways, and Write has focus.
+        let writeAt = ("# Modes\n\nTe" as NSString).length
+        source.setSelectedRange(NSRange(location: writeAt, length: 0))
+        try setWrite(true, in: window)
+        let writer = try XCTUnwrap(textView("Write", in: window))
+        XCTAssertEqual(writer.selectedRange(), NSRange(location: writeAt, length: 0), "Source caret carried into Write")
+        XCTAssertIdentical(window.firstResponder, writer, "Write focused")
+        writer.setSelectedRange(NSRange(location: 2, length: 3))
+        try setWrite(false, in: window)
+        XCTAssertEqual(source.selectedRange(), NSRange(location: 2, length: 3), "Write selection carried back to Source")
+        XCTAssertIdentical(window.firstResponder, source, "Source focused after Read")
         try setWrite(true, in: window); await check(.preview, write: true, "Both → Write")
         try setWrite(false, in: window); await check(.both, write: false, "Write → Read restores Both")
 
@@ -534,7 +545,9 @@ final class MarkdownWriteTests: XCTestCase {
     /// empty and delete the marker ("- foo" became "foo"). A truly empty item still ends the list.
     func testReturnRightAfterAMarkerSplitsTheItem() {
         for (text, caret, expected) in [("- foo", 2, "- \n- foo"), ("1. foo", 3, "1. \n2. foo"), ("> foo", 2, "> \n> foo"),
-                                        ("- [ ] task", 6, "- [ ] \n- [ ] task"), ("- ", 2, ""), ("a\n- \nb", 4, "a\n\nb")] {
+                                        ("- [ ] task", 6, "- [ ] \n- [ ] task"), ("- ", 2, ""), ("a\n- \nb", 4, "a\n\nb"),
+                                        // Only spaces after the caret: still empty, so the list ends and the spaces go too.
+                                        ("-   ", 2, ""), ("1.  ", 3, ""), (">  ", 2, ""), ("a\n-  \nb", 4, "a\n\nb"), ("-  x", 2, "- \n-  x")] {
             let handle = WritingHandle()
             _ = handle.scrollView(text: text, label: "Write")
             let view = handle.view!
