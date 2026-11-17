@@ -72,7 +72,7 @@ The first update path is manual: publish a new signed/notarized ZIP with a highe
 | Signing tools | `notarytool`, `stapler`, and `codesign` present with full Xcode selected | Tooling is ready for a future release archive. |
 | Signing identity | `security find-identity -p codesigning -v` reports **0 valid identities** in the current keychain | A public Developer ID release cannot be signed from this keychain yet; Xcode account/team setup or certificate import is required. This does not reveal whether the user has program membership. |
 
-`NativeLatex.xcodeproj` builds, tests (27 test cases) and archives the `LibreWeave` scheme with ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`). The archive is universal (`x86_64 arm64`), Hardened Runtime, empty entitlements; only arm64 has run. Developer ID signing and notarization need the owner's real Apple credentials and have not been attempted.
+`NativeLatex.xcodeproj` builds, tests (51 test cases, all passing) and archives the `LibreWeave` scheme with ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`). The Release app is universal (`x86_64 arm64`) with Hardened Runtime, and no debug entitlement is injected (`CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`); only arm64 has run. Developer ID signing and notarization need the owner's real Apple credentials and have not been attempted.
 
 ## Limits for the first release
 

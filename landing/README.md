@@ -14,4 +14,4 @@ From the repository root, run `python3 -m http.server 4173 --directory landing` 
 
 ## Deployment
 
-GitHub Pages is the live deployment (<https://ayushmk7.github.io/NativeLatex/>), published from `landing/` by `.github/workflows/pages.yml`. Vercel is optional and not connected: import the repository with **Root Directory** `landing` and framework **Other** (no build command). Vercel Hobby is for personal, non-commercial use; check the [deployment plan](../docs/deployment-plan.md) first.
+GitHub Pages is the deployment (default URL <https://ayushmk7.github.io/NativeLatex/>), published from `landing/` by `.github/workflows/pages.yml`. Custom domain `libreweave.ayushmadhav.com` is configured in GitHub Pages settings and in Vercel DNS (CNAME to `ayushmk7.github.io`), but its HTTPS certificate is still pending, so it is not verified live yet. Vercel hosting is optional and not connected: import the repository with **Root Directory** `landing` and framework **Other** (no build command). Vercel Hobby is for personal, non-commercial use; check the [deployment plan](../docs/deployment-plan.md) first.
