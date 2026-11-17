@@ -11,7 +11,7 @@ The icon is a woven sheet. The macOS silhouette is the paper, with no inner box 
 
 The threads are royal blue in both.
 
-**Clear and Tinted** are chosen by the user in macOS (icon & widget style), not by the app, and there is no in-app setting. The system builds them from the same `.icon`, using the `ISAppearanceTintable` stack. actool derives that stack from the default layers, because `icon.json` has no `tinted` (Mono) override; `assetutil` shows its group is identical to the Aqua group.
+**Clear and Tinted** are chosen by the user in macOS, not by the app, and there is no in-app setting. In macOS 27, System Settings ▸ Appearance offers Icon & widget style (Default, Dark, Clear, Tinted) and a Liquid Glass slider that moves icons from clear to heavily tinted. LibreWeave follows both, with no opacity control of its own ([Apple: change Appearance settings on Mac](https://support.apple.com/en-euro/guide/mac-help/mchlp1225/27/mac/27)). The system builds them from the same `.icon`, using the `ISAppearanceTintable` stack. actool derives that stack from the default layers, because `icon.json` has no `tinted` (Mono) override; `assetutil` shows its group is identical to the Aqua group.
 - **Clear:** the system replaces our fill with its own glass sheet. Lines go white, threads go mid-gray, so the weave stays three-toned (sheet < threads < lines).
 - **Tinted:** the user's tint colour drives the sheet and threads.
 
