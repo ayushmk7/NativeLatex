@@ -1,87 +1,102 @@
-"""Writes the LibreWeave icon and mark SVGs into art/source from one weave geometry.
+"""Writes every LibreWeave icon, mark, favicon and Icon Composer layer from one weave geometry.
 
-The mark: black or white "lines of text" (wefts) woven over and under two
-royal-blue threads (warps) on a single macOS icon silhouette. No frame, no
-inner box: the silhouette itself is the sheet.
-Run: python3 -I art/tools/gen.py
+The mark: "lines of text" (wefts) woven over and under two royal-blue threads
+(warps) on a single macOS icon silhouette. No frame, no inner box: the
+silhouette itself is the sheet. Black sheet in light appearance, white sheet
+in dark appearance.
+Run: python3 -I art/tools/gen.py   (build.sh runs it)
 """
 import os
 
 BLUE = "#4169E1"
-THEMES = {"dark": ("#0A0A0A", "#FFFFFF"), "light": ("#FFFFFF", "#0A0A0A")}  # sheet, ink
-# (weft rows as (center_y, x0, x1), warp columns as center_x, strand width, gap)
-GEOMETRY = {
-    "full": ([(352, 236, 788), (512, 236, 788), (672, 236, 724)], [404, 620], 104, 28),
-    # 16/32 px slots, snapped to the 16 px grid (64 units = 1 px): 2 px strands, 1 px gaps
-    "small": ([(384, 192, 832), (640, 192, 832)], [384, 640], 128, 64),
-}
+INK, PAPER = "#0A0A0A", "#FFFFFF"
+SHEETS = {"black": (INK, PAPER), "white": (PAPER, INK)}  # sheet name: (sheet, lines)
+# On the 1024 canvas, the macOS body is 824 px at a 100 px inset. Coordinates are multiples of 64,
+# so at 16 px the strands are 2 px with 1 px gaps. The system renders every size from this one geometry.
+WEFTS = [384, 640]          # line centres (y)
+WARPS = [384, 640]          # thread centres (x)
+START, END = 192, 832       # strand extent, both axes
+S, G = 128, 64              # strand width, gap beside a crossing
+H = S // 2
+
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 
 
-def r(x, y, w, h, fill, rx=0):
-    # Square cut pieces get crispEdges so abutting edges leave no anti-aliased seams.
-    edge = f'rx="{rx}"' if rx else 'shape-rendering="crispEdges"'
-    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" {edge} fill="{fill}"/>'
+def over(i, j):
+    """True where thread j passes over line i (alternating = woven)."""
+    return (i + j) % 2 == 0
 
 
-def weave(size, ink, sheet):
-    wefts, warps, s, g = GEOMETRY[size]
-    top, bottom = wefts[0][1], wefts[0][2]  # square weave: warps span the weft width
-    h = s // 2
-    out = [r(x0, y - h, x1 - x0, s, ink, h) for y, x0, x1 in wefts]
-    gaps, warp_bars, tops = [], [], []
-    for j, x in enumerate(warps):
-        warp_bars.append(r(x - h, top, s, bottom - top, BLUE, h))
-        for i, (y, _, _) in enumerate(wefts):
-            if (i + j) % 2 == 0:  # warp over weft: cut the weft beside the warp
-                gaps.append(r(x - h - g, y - h, s + 2 * g, s, sheet))
-            else:  # weft over warp: cut the warp, redraw the weft across it
-                tops += [r(x - h, y - h - g, s, s + 2 * g, sheet), r(x - h, y - h, s, s, ink)]
-    return out + gaps + warp_bars + tops
+def split(cuts):
+    # Segments of START..END left after removing cut intervals; flags mark original (rounded) ends.
+    segs, pos = [], START
+    for c0, c1 in sorted(cuts):
+        segs.append((pos, c0, pos == START, False))
+        pos = c1
+    return segs + [(pos, END, pos == START, True)]
 
 
-def icon(theme, size):
-    sheet, ink = THEMES[theme]
-    body = "\n  ".join(weave(size, ink, sheet))
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <title>LibreWeave app icon, {theme}, {size}</title>
-  <!-- macOS icon grid: one 824 px silhouette, 100 px inset, 185 px corner radius. -->
-  {r(100, 100, 824, 824, sheet, 185)}
-  {body}
-</svg>
-'''
+def bar(a, b, c, round_a, round_b, vertical, fill):
+    # One strand segment from a to b along its axis, centred on c; rounded only at outer ends.
+    pt = (lambda u, v: f"{v} {u}") if vertical else (lambda u, v: f"{u} {v}")
+    sweep = 0 if vertical else 1  # swapping axes mirrors the arc direction
+    d = f"M{pt(a + H * round_a, c - H)}L{pt(b - H * round_b, c - H)}"
+    d += f"A{H} {H} 0 0 {sweep} {pt(b - H, c + H)}" if round_b else f"L{pt(b, c - H)}L{pt(b, c + H)}"
+    d += f"L{pt(a + H * round_a, c + H)}"
+    d += f"A{H} {H} 0 0 {sweep} {pt(a + H, c - H)}" if round_a else f"L{pt(a, c + H)}"
+    return f'<path d="{d}Z" fill="{fill}"/>'
 
 
-def mark(color):
-    # One-color mark: gaps become transparent through a mask.
-    bits = [b.replace(BLUE, "#fff") for b in weave("full", "#fff", "#000")]
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="200 200 624 624" width="624" height="624">
-  <title>LibreWeave mark, one color</title>
-  <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
-    {"".join(bits)}
-  </mask>
-  <rect width="1024" height="1024" fill="{color}" mask="url(#m)"/>
-</svg>
-'''
+def lines(fill):
+    out = []
+    for i, y in enumerate(WEFTS):
+        cuts = [(x - H - G, x + H + G) for j, x in enumerate(WARPS) if over(i, j)]
+        out += [bar(p, q, y, ra, rb, False, fill) for p, q, ra, rb in split(cuts)]
+    return out
 
 
-src = os.path.join(os.path.dirname(__file__), "..", "source")
-for theme in THEMES:
-    for size in GEOMETRY:
-        open(f"{src}/app-icon-{theme}{'-small' if size == 'small' else ''}.svg", "w").write(icon(theme, size))
-for name, color in (("black", "#0A0A0A"), ("white", "#FFFFFF")):
-    open(f"{src}/mark-{name}.svg", "w").write(mark(color))
+def threads():
+    out = []
+    for j, x in enumerate(WARPS):
+        cuts = [(y - H - G, y + H + G) for i, y in enumerate(WEFTS) if not over(i, j)]
+        out += [bar(p, q, x, ra, rb, True, BLUE) for p, q, ra, rb in split(cuts)]
+    return out
 
 
-def favicon():
-    # Landing favicon: small geometry, cropped to the silhouette, light/dark from the OS scheme.
-    body = "\n  ".join(weave("small", "INK", "SHEET")).replace('fill="INK"', 'class="i"').replace('fill="SHEET"', 'class="s"')
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824" role="img" aria-label="LibreWeave">
-  <!-- Generated by art/tools/gen.py; edit there. -->
-  <style>.s{{fill:#0A0A0A}}.i{{fill:#FFFFFF}}@media (prefers-color-scheme:dark){{.s{{fill:#FFFFFF}}.i{{fill:#0A0A0A}}}}</style>
-  <rect x="100" y="100" width="824" height="824" rx="185" class="s"/>
-  {body}
-</svg>
-'''
+def svg(view, size, title, parts, head=""):
+    body = "\n  ".join(([f"<title>{title}</title>"] if title else []) + ([head] if head else []) + parts)
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view}" width="{size}" height="{size}">\n  {body}\n</svg>\n'
 
 
-open(os.path.join(os.path.dirname(__file__), "..", "..", "landing", "icon.svg"), "w").write(favicon())
+def sheet(fill, cls=""):
+    attr = f'class="{cls}"' if cls else f'fill="{fill}"'
+    return f'<rect x="100" y="100" width="824" height="824" rx="185" {attr}/>'
+
+
+def write(path, text):
+    path = os.path.join(ROOT, path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    open(path, "w").write(text)
+
+
+# Flat icons on Apple's macOS grid (used for the .appiconset and previews).
+for name, (bg, ink) in SHEETS.items():
+    write(f"art/source/app-icon-{name}.svg",
+          svg("0 0 1024 1024", 1024, f"LibreWeave app icon, {name} sheet", [sheet(bg)] + lines(ink) + threads()))
+
+# One-color marks: gaps are real gaps, so they work on any background.
+for name, color in (("black", INK), ("white", PAPER)):
+    parts = [p.replace(f'fill="{BLUE}"', f'fill="{color}"') for p in lines(color) + threads()]
+    write(f"art/source/mark-{name}.svg", svg(f"{START} {START} {END - START} {END - START}", 640, f"LibreWeave mark, {name}", parts))
+
+# Icon Composer layers: transparent gaps, so the .icon fill is the sheet. 824 body scaled to the full canvas.
+for name, ink in (("lines-white", PAPER), ("lines-black", INK)):
+    write(f"NativeLatex/AppIcon.icon/Assets/{name}.svg", svg("100 100 824 824", 1024, "", lines(ink)))
+write("NativeLatex/AppIcon.icon/Assets/threads.svg", svg("100 100 824 824", 1024, "", threads()))
+
+# Landing favicon: black sheet on light pages, white sheet on dark pages.
+style = (f"<style>.s{{fill:{INK}}}.i{{fill:{PAPER}}}"
+         f"@media (prefers-color-scheme:dark){{.s{{fill:{PAPER}}}.i{{fill:{INK}}}}}</style>")
+fav = svg("100 100 824 824", 824, "", [sheet("", "s")] + [p.replace(f'fill="{PAPER}"', 'class="i"') for p in lines(PAPER)] + threads(),
+          head="<!-- Generated by art/tools/gen.py; edit there. -->\n  " + style)
+write("landing/icon.svg", fav.replace('width="824" height="824"', 'role="img" aria-label="LibreWeave"', 1))
