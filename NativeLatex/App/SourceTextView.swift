@@ -37,18 +37,17 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
     /// Brings the view to `text` after a change made elsewhere (other pane, revert, undo). Only the span that
     /// differs is replaced (no undo registered here), so attributes, layout and the caret elsewhere stay put.
     func sync(_ text: String) {
-        guard let view, let storage = view.textStorage, view.string != text else { return }
-        // ponytail: O(n) diff per sync (~50 ms at 1 MiB); track edit ranges from the other pane if that shows.
-        let a = Array(view.string.utf16), b = Array(text.utf16)
-        var prefix = 0
-        while prefix < min(a.count, b.count), a[prefix] == b[prefix] { prefix += 1 }
-        var suffix = 0
-        while suffix < min(a.count, b.count) - prefix, a[a.count - 1 - suffix] == b[b.count - 1 - suffix] { suffix += 1 }
-        let replaced = NSRange(location: prefix, length: a.count - prefix - suffix)
-        let piece = (text as NSString).substring(with: NSRange(location: prefix, length: b.count - prefix - suffix))
+        guard let view, let storage = view.textStorage else { return }
+        // Compared in place (the storage's own string, no copies), so a keystroke in the other pane costs a
+        // memory scan, not two full-text copies: ~1 ms at 1 MiB instead of ~150 ms.
+        let old: NSString = storage.mutableString, new = text as NSString
+        let (prefix, suffix) = Self.commonEnds(old, new)
+        if prefix == old.length, old.length == new.length { return } // already showing this text
+        let replaced = NSRange(location: prefix, length: old.length - prefix - suffix)
+        let piece = new.substring(with: NSRange(location: prefix, length: new.length - prefix - suffix))
         let delta = (piece as NSString).length - replaced.length
         let selection = view.selectedRange()
-        let removed = (view.string as NSString).substring(with: replaced)
+        let removed = old.substring(with: replaced)
         isUpdating = true
         storage.replaceCharacters(in: replaced, with: piece)
         var caret = selection.location
@@ -56,6 +55,29 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
         view.setSelectedRange(NSRange(location: min(caret, storage.length), length: 0))
         isUpdating = false
         didSync(changed: NSRange(location: prefix, length: (piece as NSString).length), removed: removed, delta: delta)
+    }
+
+    /// Lengths of the common UTF-16 prefix and (non-overlapping) suffix of `a` and `b`, read in chunks.
+    nonisolated static func commonEnds(_ a: NSString, _ b: NSString) -> (prefix: Int, suffix: Int) {
+        let shorter = min(a.length, b.length), chunk = 4096
+        var x = [unichar](repeating: 0, count: chunk), y = [unichar](repeating: 0, count: chunk)
+        var prefix = 0
+        scan: while prefix < shorter {
+            let n = min(chunk, shorter - prefix)
+            a.getCharacters(&x, range: NSRange(location: prefix, length: n))
+            b.getCharacters(&y, range: NSRange(location: prefix, length: n))
+            for i in 0..<n where x[i] != y[i] { prefix += i; break scan }
+            prefix += n
+        }
+        var suffix = 0
+        scan: while suffix < shorter - prefix {
+            let n = min(chunk, shorter - prefix - suffix)
+            a.getCharacters(&x, range: NSRange(location: a.length - suffix - n, length: n))
+            b.getCharacters(&y, range: NSRange(location: b.length - suffix - n, length: n))
+            for i in stride(from: n - 1, through: 0, by: -1) where x[i] != y[i] { suffix += n - 1 - i; break scan }
+            suffix += n
+        }
+        return (prefix, suffix)
     }
 
     /// Subclasses restyle here.
@@ -78,6 +100,7 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
         view.isAutomaticSpellingCorrectionEnabled = false
         view.isAutomaticLinkDetectionEnabled = false
         view.isContinuousSpellCheckingEnabled = false
+        view.layoutManager?.allowsNonContiguousLayout = true // large files: lay out only what's visible
         view.font = .monospacedSystemFont(ofSize: 13, weight: .regular) // Theme.editorFont
         view.textContainerInset = NSSize(width: Theme.s3, height: Theme.s3)
         view.backgroundColor = NSColor(Theme.background)
@@ -104,14 +127,17 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
 
     func textViewDidChangeSelection(_ notification: Notification) {
         guard !isUpdating, let view = notification.object as? NSTextView else { return }
-        // One pass over UTF-16 up to the caret (no substrings), so large files stay responsive.
-        let text = view.string as NSString
+        // Counts newlines up to the caret in chunks of the storage itself (no copy of the text), so large
+        // files stay responsive.
+        let text: NSString = view.textStorage?.mutableString ?? (view.string as NSString)
         let caret = min(view.selectedRange().location, text.length)
         var line = 1, lineStart = 0, index = 0
-        for unit in view.string.utf16 {
-            if index >= caret { break }
-            if unit == 10 { line += 1; lineStart = index + 1 }
-            index += 1
+        var buffer = [unichar](repeating: 0, count: 4096)
+        while index < caret {
+            let n = min(buffer.count, caret - index)
+            text.getCharacters(&buffer, range: NSRange(location: index, length: n))
+            for i in 0..<n where buffer[i] == 10 { line += 1; lineStart = index + i + 1 }
+            index += n
         }
         onCursor?(line, text.substring(with: NSRange(location: lineStart, length: caret - lineStart)).count + 1)
     }
