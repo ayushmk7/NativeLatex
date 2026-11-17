@@ -177,4 +177,31 @@ final class NewDocumentTests: XCTestCase {
         XCTAssertEqual(try fresh.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate, modified)
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: dir.path), ["paper.tex"])
     }
+
+    /// Finder / Open With path. SwiftUI's document class reads concurrently, so AppKit makes the
+    /// document on a background queue and SwiftUI calls DocumentGroup's newDocument factory there
+    /// (Release builds trapped in MainActor.assumeIsolated). The file's contents must still load.
+    func testOpeningExistingFilesOffMainLoadsThemWithoutTrapping() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("finder-open-\(UUID())")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        // The factory itself, invoked the way SwiftUI does while reading off the main thread.
+        let offMain = await Task.detached { (Thread.isMainThread, NewDocument.makeDocument()) }.value
+        XCTAssertFalse(offMain.0)
+        XCTAssertEqual(offMain.1.contentType, .plainText, "off-main placeholder; the file read replaces it")
+
+        for (name, text, type) in [("notes.md", "# Notes\n\n$x^2$\n", "net.daringfireball.markdown"),
+                                   ("paper.tex", "\\documentclass{article}\n", "org.tug.tex")] {
+            let url = dir.appendingPathComponent(name)
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            let (document, _) = try await NSDocumentController.shared.openDocument(withContentsOf: url, display: true)
+            defer { document.close() }
+            XCTAssertTrue(Swift.type(of: document).canConcurrentlyReadDocuments(ofType: type),
+                          "premise: \(name) is read off the main thread")
+            XCTAssertEqual(document.fileURL?.lastPathComponent, name)
+            XCTAssertEqual(document.fileType, type)
+            XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), text, "opening never writes")
+        }
+    }
 }

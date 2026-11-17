@@ -30,10 +30,13 @@ enum NewDocument {
 
     /// DocumentGroup's newDocument value. Without a pending kind (e.g. a Dock-click New), it uses
     /// the controller's default type, which is what NSDocument itself was given.
-    /// Nonisolated because DocumentGroup's newDocument autoclosure is; AppKit calls it on the main
-    /// thread inside makeUntitledDocument(ofType:), and assumeIsolated traps if that ever changes.
+    /// SwiftUI calls this for every document it creates, including files opened from Finder/Open With,
+    /// which AppKit reads on a background queue (concurrent reading). There the value is only a
+    /// placeholder that the file's contents replace, so return plain text without touching main-actor
+    /// state. Untitled documents (⌘N, Dock New) are always made on the main thread.
     nonisolated static func makeDocument() -> TextDocument {
-        MainActor.assumeIsolated {
+        guard Thread.isMainThread else { return TextDocument() }
+        return MainActor.assumeIsolated {
             let type = pendingType ?? NSDocumentController.shared.defaultType.flatMap { UTType($0) } ?? .plainText
             return TextDocument(contentType: type)
         }
