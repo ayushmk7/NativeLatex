@@ -233,7 +233,8 @@ enum MarkdownFormat {
         let lineRange = text.lineRange(for: NSRange(location: caret.location, length: 0))
         let line = text.substring(with: NSRange(location: lineRange.location, length: caret.location - lineRange.location))
         guard let m = line.firstMatch(of: #/^([ \t]*)(?:([-*+])|(\d{1,9})([.)])|(>))([ \t]+)(\[[ xX]\][ \t]+)?/#) else { return false }
-        if line.count == m.output.0.count { // empty item: end the list
+        let wholeLine = text.substring(with: lineRange).trimmingCharacters(in: .newlines)
+        if line.count == m.output.0.count, wholeLine.count == line.count { // empty item (nothing after the caret): end the list
             view.insertText("", replacementRange: NSRange(location: lineRange.location, length: (line as NSString).length))
             return true
         }
@@ -300,17 +301,50 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
     override func textDidChange(_ notification: Notification) {
         super.textDidChange(notification)
         if let edited, startsFence(edited) { fenceEdit = true }
-        restyle(fenceEdit ? nil : edited)
+        if fenceEdit { restyleAfterFenceEdit() } else { restyle(edited) }
         edited = nil
         fenceEdit = false
+        pendingEdits = []
     }
 
     override func didSync(changed: NSRange, removed: String, delta: Int) {
         noteEdit(at: changed.location, removedLength: changed.length - delta, insertedLength: changed.length,
                  changedText: removed + ((view?.string ?? "") as NSString).substring(with: changed))
         if startsFence(changed) { fenceEdit = true }
-        restyle(fenceEdit ? nil : changed)
+        if fenceEdit { restyleAfterFenceEdit() } else { restyle(changed) }
         fenceEdit = false
+        pendingEdits = []
+    }
+
+    /// One edit since the last restyle, with the fence blocks as they were before it.
+    private struct Edit { let location: Int, removed: Int, inserted: Int; let before: [(range: NSRange, markers: [NSRange])] }
+    private var pendingEdits: [Edit] = []
+
+    /// After an edit that may change fence structure: rescan fences (cheap), then restyle only what moved.
+    /// Blocks before the edit can't change (fences are scanned top-down). If the blocks after it are the old ones
+    /// shifted, only the edited paragraphs and the blocks that touched the edit restyle; otherwise everything
+    /// from the edit to the end does (e.g. a new opening fence turns the rest of the text into code).
+    private func restyleAfterFenceEdit() {
+        guard let view, pendingEdits.count == 1, let e = pendingEdits.first else { restyle(nil); return }
+        let text = view.string as NSString
+        let new = MarkdownStyler.fences(text)
+        fences = new
+        let delta = e.inserted - e.removed, oldEnd = e.location + e.removed, newEnd = e.location + e.inserted
+        guard newEnd <= text.length else { restyle(nil); return }
+        func same(_ a: [(range: NSRange, markers: [NSRange])], _ b: [(range: NSRange, markers: [NSRange])]) -> Bool {
+            a.count == b.count && zip(a, b).allSatisfy { $0.range == $1.range && $0.markers == $1.markers }
+        }
+        let oldTail = e.before.filter { $0.range.location >= oldEnd }.map { block in
+            (range: NSRange(location: block.range.location + delta, length: block.range.length),
+             markers: block.markers.map { NSRange(location: $0.location + delta, length: $0.length) })
+        }
+        var start = e.location
+        var end = same(oldTail, new.filter { $0.range.location >= newEnd }) ? newEnd : text.length
+        for block in e.before where block.range.location < oldEnd + 1 && NSMaxRange(block.range) + 1 >= e.location {
+            start = min(start, block.range.location)
+            end = max(end, min(text.length, NSMaxRange(block.range) + (NSMaxRange(block.range) >= oldEnd ? delta : 0)))
+        }
+        restyle(NSRange(location: start, length: max(0, end - start)))
     }
 
     override func textViewDidChangeSelection(_ notification: Notification) {
@@ -335,6 +369,7 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
     /// Fence structure can change only if a fence run is typed/removed, the edit touches a fence line, or an
     /// edited line now starts like a fence (`isFenceLine`); otherwise cached blocks shift (no document rescan).
     private func noteEdit(at location: Int, removedLength: Int, insertedLength: Int, changedText: String) {
+        pendingEdits.append(Edit(location: location, removed: removedLength, inserted: insertedLength, before: fences))
         let edit = NSRange(location: max(0, location - 1), length: removedLength + 2) // touching a fence line counts
         if changedText.contains("```") || changedText.contains("~~~")
             || fences.contains(where: { $0.markers.contains { NSIntersectionRange(edit, NSRange(location: $0.location, length: $0.length + 1)).length > 0 } }) {

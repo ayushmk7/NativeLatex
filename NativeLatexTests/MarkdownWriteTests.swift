@@ -475,6 +475,68 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertEqual(pair.doc, "- item\n- ", "outside code, Return continues the list")
     }
 
+    /// Return with the caret right after a list or quote marker splits the item; it used to treat the item as
+    /// empty and delete the marker ("- foo" became "foo"). A truly empty item still ends the list.
+    func testReturnRightAfterAMarkerSplitsTheItem() {
+        for (text, caret, expected) in [("- foo", 2, "- \n- foo"), ("1. foo", 3, "1. \n2. foo"), ("> foo", 2, "> \n> foo"),
+                                        ("- [ ] task", 6, "- [ ] \n- [ ] task"), ("- ", 2, ""), ("a\n- \nb", 4, "a\n\nb")] {
+            let handle = WritingHandle()
+            _ = handle.scrollView(text: text, label: "Write")
+            let view = handle.view!
+            view.setSelectedRange(NSRange(location: caret, length: 0))
+            XCTAssertTrue(handle.textView(view, doCommandBy: #selector(NSResponder.insertNewline(_:))), text)
+            XCTAssertEqual(view.string, expected, text)
+        }
+    }
+
+    /// Typing on a fence line (its info string) restyles only the edit, not the whole text: ~1.5 s per keystroke
+    /// on 1 MiB before. Incremental styling must equal a full restyle, including edits that open or close a
+    /// fence (which change everything after them), and undo must restore the exact source.
+    func testFenceLineEditsRestyleLocallyAndMatchAFullRestyle() {
+        var big = ""
+        while big.utf8.count < 1 << 20 { big += "## H\n\nSome **bold** and *it* with `code`.\n\n- a\n\n```swift\nlet x = 1\n```\n\n" }
+        let handle = WritingHandle()
+        let scroll = handle.scrollView(text: big, label: "Write")
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.contentView = scroll // never ordered in
+        let view = handle.view!
+        func styleRuns(_ s: NSAttributedString) -> [String] {
+            var runs: [String] = []
+            s.enumerateAttributes(in: NSRange(location: 0, length: s.length)) { a, r, _ in
+                let font = a[.font] as? NSFont
+                runs.append("\(r.location),\(r.length) \(font?.fontName ?? "-") \(font?.pointSize ?? 0) h\(a[.markdownHidden] != nil) b\(a[.backgroundColor] != nil) c\((a[.foregroundColor] as? NSColor) == .clear)")
+            }
+            return runs
+        }
+        func assertMatchesFullRestyle(_ label: String) {
+            let fresh = NSTextStorage(string: view.string)
+            MarkdownStyler.apply(to: fresh, reveal: NSRange(location: NSNotFound, length: 0))
+            XCTAssertEqual(styleRuns(view.textStorage!), styleRuns(fresh), label)
+        }
+        let infoLine = NSMaxRange((big as NSString).range(of: "```swift", options: [], range: NSRange(location: 500_000, length: 100_000)))
+        view.setSelectedRange(NSRange(location: infoLine, length: 0))
+        var worst: Duration = .zero
+        for ch in ["u", "i"] {
+            let start = ContinuousClock.now
+            view.insertText(ch, replacementRange: view.selectedRange())
+            worst = max(worst, ContinuousClock.now - start)
+        }
+        XCTAssertLessThan(worst, .milliseconds(150), "keystroke on a fence line \(worst)")
+        assertMatchesFullRestyle("info string edit")
+        // Structural edits: open a fence mid-paragraph, then close it again by deleting a backtick.
+        let para = (view.string as NSString).range(of: "Some **bold**", options: [], range: NSRange(location: 600_000, length: 100_000)).location
+        view.setSelectedRange(NSRange(location: para, length: 0))
+        view.insertText("```\n", replacementRange: view.selectedRange())
+        assertMatchesFullRestyle("new opening fence")
+        view.insertText("", replacementRange: NSRange(location: para, length: 1))
+        assertMatchesFullRestyle("fence broken by deleting a backtick")
+        while view.undoManager?.canUndo == true { view.undoManager?.undo() }
+        XCTAssertEqual(view.string, big, "undo restores the exact source")
+        assertMatchesFullRestyle("after undo")
+    }
+
     /// Moving the caret onto a hidden fence line reveals it without moving the text below.
     func testRevealingAFenceLineDoesNotShiftTextBelow() {
         let pair = Pair("Intro.\n\n```\ncode\n```\n\nAfter.\n")
