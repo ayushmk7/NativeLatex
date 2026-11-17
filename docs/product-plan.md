@@ -4,7 +4,7 @@ Status: planning only · 2026-11-16
 
 ## Product promise
 
-NativeLatex is a native macOS app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. It works without an account or network connection. Each folder opens as its own workspace window, so several papers, notes or books can be open independently.
+NativeLatex is planned as a native Mac, iPad, and iPhone app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. Mac ships first. LaTeX compiles with the Mac's TeX installation there; iPad and iPhone require a proven embedded compiler for the same offline promise. Markdown renders locally on every device. No account or network connection is required for local projects. See the [platform plan](platform-plan.md).
 
 The app is for authors who want a faster local editing loop than switching among a text editor, terminal, PDF viewer and Finder. It should handle a single article quickly and remain dependable on multi-file projects with images and bibliographies.
 
@@ -13,6 +13,7 @@ The app is for authors who want a faster local editing loop than switching among
 | Question | Decision | Reason |
 | --- | --- | --- |
 | Native implementation | SwiftUI window and commands, AppKit source editor, PDFKit preview | Use mature macOS editing and PDF components. |
+| Apple devices | Separate Mac and universal iPad/iPhone targets with shared document logic | Keep each interface native while reusing file and diagnostic behavior. |
 | Project format | Ordinary `.tex`, `.md`, `.bib`, images and related files in a folder | Keep projects portable to TeX, Git and other editors. |
 | Workspace | One folder per window, several windows open at once | Separate build root, state and outputs clearly. |
 | Render target | An opened `.md` file, or an explicitly selected root `.tex` file per workspace | Render the active note by default without guessing a multi-file TeX root. |
@@ -22,9 +23,9 @@ The app is for authors who want a faster local editing loop than switching among
 | Distribution | Developer ID signed/notarized local app first | Support the local TeX toolchain and ordinary folders. |
 | External formats | Non-destructive import/export copies | Document models do not convert losslessly. |
 
-Technical detail and source references are in the [architecture](workspaces/backend/architecture.md) and [integration plan](workspaces/integrations/integrations.md).
+Technical detail and source references are in the [architecture](workspaces/backend/architecture.md), [platform plan](platform-plan.md), and [integration plan](workspaces/integrations/integrations.md).
 
-## First usable release
+## First usable release: Mac
 
 1. Open a `.tex`, `.md` or `.markdown` file directly from Finder/Open With or File > Open, or open/create a folder workspace. A direct file opens its containing folder as a workspace and selects that file. Support multiple windows, recent folders, a file tree and source tabs for text assets. Register these types as openable; the user chooses whether macOS makes NativeLatex their default app. [Apple document type registration](https://developer.apple.com/documentation/SwiftUI/DocumentGroup).
 2. Provide a strong editor: undo/redo, syntax color, matching delimiters, line numbers, find/replace, comment toggle, indentation and standard macOS keyboard/menu behavior.
@@ -56,8 +57,9 @@ Opening a file does not execute its contents. **Build/Render** is a deliberate u
 | Compiler choice | XeLaTeX/LuaLaTeX profiles; optional Build on Save | Tool discovery, cancellation and conflict handling. |
 | Interchange | DOCX and ODT import/export copies with a conversion report | Fidelity corpus and review in Word/Writer. |
 | Connected exchange | Opt-in Google Docs transfer, then evaluated LibreTexts publishing path | OAuth, content ownership, conflict and license handling. |
+| iPad/iPhone | Native Files-based editing, local Markdown and PDF preview, then offline LaTeX after an embedded-engine gate | Mobile cannot rely on the Mac's `latexmk` executable. |
 
-The scope excludes a collaboration server, bundled TeX distribution, package manager, WYSIWYG editor, arbitrary execution recipes and proprietary file format. These do not improve the first local editing loop enough to justify their cost.
+The first Mac release excludes a collaboration server, bundled TeX distribution, package manager, WYSIWYG editor, arbitrary execution recipes and proprietary file format. Mobile offline compilation will need an embedded engine and a bounded package bundle; that work follows the [platform feasibility gate](platform-plan.md).
 
 ## Critical behavior
 

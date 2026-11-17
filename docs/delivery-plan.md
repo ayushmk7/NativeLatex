@@ -9,6 +9,7 @@ Status: planning only · 2026-11-16. No app implementation is part of this pass.
 | Art | [Art direction](workspaces/art/art-direction.md) | Icon and brand assets, native window mockups, color and contrast review. |
 | UX | [UX plan](workspaces/ux/ux-plan.md) | Flows, menus, keyboard paths, empty/error states and accessibility checks. |
 | Backend | [Architecture](workspaces/backend/architecture.md) | Swift app shell, file safety, compiler process, PDF preview, SyncTeX and release. |
+| Mobile | [Platform plan](platform-plan.md) | Shared document logic, Files access, iPad/iPhone layouts, embedded compiler proof and device release. |
 | Integrations | [Integration plan](workspaces/integrations/integrations.md) | Conversion corpus, non-destructive DOCX/ODT exchange, provider feasibility. |
 
 One coordinator keeps shared decisions in the [product plan](product-plan.md). Changes to document ownership, file safety and main window commands need cross-workstream review.
@@ -25,7 +26,11 @@ One coordinator keeps shared decisions in the [product plan](product-plan.md). C
 | 5. File interchange | Pandoc-backed DOCX/ODT copy conversion | Review fidelity corpus in Word and LibreOffice; conversion report and original preservation verified. |
 | 6. Connected options | Google Docs transfer; evaluate LibreTexts path | OAuth scope, sign-out, remote conflict, license and attribution tests; ship only proven actions. |
 
-Gates 1–3 form the first useful local release. Gates 4–6 can follow without changing project files.
+Gates 1–3 form the first useful Mac release. Gates 4–6 can follow without changing project files.
+
+## iPad and iPhone track
+
+After Mac gate 3, start a universal iPad/iPhone target while Mac power and interchange work can continue independently. First prove Files-based open/save, local Markdown preview and PDF viewing on both device sizes. Then prove an embedded LaTeX compiler on physical iPhone and iPad in airplane mode using the same TeX fixtures. Release mobile only after multi-file builds, error links, cancellation, file-provider conflicts, accessibility and App Store review pass. The [platform plan](platform-plan.md) defines the feature boundary and evidence required.
 
 ## Fixtures to prepare when implementation begins
 
@@ -41,4 +46,4 @@ Keep fixtures small and representative. Test trust boundaries and data-loss risk
 
 ## Release check
 
-Run on a Mac with TeX installed and a clean Mac without it. Verify `.md` preview works on both without Pandoc. Verify ordinary project files remain readable outside the app. Check signed/notarized launch, keyboard and VoiceOver paths, file-provider folders, multi-workspace builds and recovery from failed compilation. Record exact TeX and macOS versions. A cloud integration is never a dependency for local editing.
+Run on a Mac with TeX installed and a clean Mac without it. Verify `.md` preview works on both without Pandoc. Verify ordinary project files remain readable outside the app. Check signed/notarized launch, keyboard and VoiceOver paths, file-provider folders, multi-workspace builds and recovery from failed compilation. For mobile, repeat the offline file and compile checks on physical iPhone and iPad and record OS/device/engine versions. A cloud integration is never a dependency for local editing.

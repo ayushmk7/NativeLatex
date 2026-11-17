@@ -1,4 +1,4 @@
-# NativeLatex UX plan
+# NativeLatex Mac UX plan
 
 Status: planning only · 2026-11-16
 
@@ -138,6 +138,10 @@ Shortcuts are proposals to validate against macOS and editor conflicts; every ac
 
 Live collaboration, simultaneous cloud editing, and a built-in package manager are outside the initial product. Their complexity and data ownership requirements would distract from the local compile loop. Revisit them only after the editor is reliable on real projects.
 
+## iPad and iPhone adaptation
+
+Keep the same file, root-selection, Build/Render, stale-output, and conflict meanings across devices. On iPad, show a Files-backed project sidebar with source and preview side by side when space allows; support an external keyboard and multiple windows. On iPhone, make Files/project, source, preview, and problems separate focused screens with a persistent way back to the current file. Do not squeeze the Mac three-pane layout onto a phone. A LaTeX Build button appears on mobile only when the offline embedded engine passes the [platform gate](../../platform-plan.md); Markdown preview and opening existing PDFs work earlier. [Apple iPad multiwindow behavior](https://developer.apple.com/documentation/SwiftUI/WindowGroup), [Apple Files importer](https://developer.apple.com/documentation/swiftui/view/fileimporter%28ispresented%3Aallowedcontenttypes%3Aoncompletion%3A%29).
+
 ## UX validation before build
 
-Prototype and observe four short tasks: create a first article, open a multi-file thesis and select root, fix a compile error, and switch between two workspace windows. Test a keyboard-only path and a VoiceOver path for the same tasks. These should expose wrong-root assumptions, hidden build state, focus traps, and stale PDF confusion before implementation hardens them.
+Prototype and observe four Mac tasks: create a first article, open a multi-file thesis and select root, fix a compile error, and switch between two workspace windows. Test a keyboard-only path and a VoiceOver path for the same tasks. On iPad and iPhone, also test opening a project through Files, editing offline, switching source/preview, and reaching an error from the compact layout. These should expose wrong-root assumptions, hidden build state, focus traps, and stale PDF confusion before implementation hardens them.

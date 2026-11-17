@@ -4,7 +4,7 @@ Status: planning. **NativeLatex** is a working name; the mark must also work wit
 
 ## Art objective
 
-Create one recognizable macOS Dock icon for a local LaTeX and Markdown editor: source becomes a polished document. The mark should read at small sizes, sit comfortably among current macOS app icons, and be usable in Finder, Spotlight, and the app's About window. The brand system is deliberately small: the app icon, its central mark, and a restrained wordmark. Interface styling is secondary.
+Create one recognizable mark for a local LaTeX and Markdown editor: source becomes a polished document. It should read at small sizes in the Mac Dock and on iPhone/iPad Home Screens, and work in Finder, Spotlight, and the app's About view. The brand system is deliberately small: the app icon, its central mark, and a restrained wordmark. Interface styling is secondary.
 
 ## Concept exploration
 
@@ -31,13 +31,13 @@ Apple's current [app icon guidance](https://developer.apple.com/design/human-int
 
 | Asset | Source of truth | Output/use |
 | --- | --- | --- |
-| Layered app icon | Editable vector source with named background, page, and brace layers | Icon Composer source plus app asset catalog output |
+| Layered app icon | Editable vector source with named background, page, and brace layers | Mac Icon Composer source plus platform-specific app asset catalogs for Mac, iPad, and iPhone |
 | Appearance checks | Same core mark in default, dark, clear light/dark, and tinted light/dark contexts | Review sheet; custom variants only if automatic versions lose the mark |
 | Standalone mark | Same geometry without the square background | About window and documentation |
 | Monochrome mark | Single-color vector | Small UI or print contexts where full-color art is unsuitable |
 | Wordmark lockup | Editable type and outline-safe export | About window and project materials |
 
-Keep the editable vector file, Icon Composer project, exported asset catalog, and review sheet in the future implementation workspace. SVG/PDF vector exports are appropriate for review; the app build should consume the platform asset catalog. Record the font and color values alongside the source so the art can be regenerated.
+Keep the editable vector file, Icon Composer project, exported asset catalogs, and review sheet in the future implementation workspace. SVG/PDF vector exports are appropriate for review; each app target should consume its platform asset catalog. Record the font and color values alongside the source so the art can be regenerated.
 
 ## Validation before approval
 
