@@ -347,4 +347,33 @@ final class MarkdownPreviewTests: XCTestCase {
         add(attachment)
         print("Markdown preview screenshot: \(url.path)")
     }
+
+    /// Read's block gaps match Write: nested lists sit tight under their item (no 23 px block gap), the page's
+    /// first block starts at the 16 px top padding like Write's inset, and a task checkbox doesn't touch its text.
+    func testReadSpacingMatchesWriteForNestedListsTopAndTasks() async throws {
+        _ = try pandocOrSkip()
+        let text = "Intro paragraph.\n\n- one\n- two\n  - nested\n    - deeper\n\n- [ ] todo\n- [x] done\n\n> quoted line\n"
+        let html = try await MarkdownRenderer.render(text)
+        let coordinator = MarkdownWebView.Coordinator()
+        let view = MarkdownWebView.makeWebView(coordinator)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = view // never ordered in
+        defer { window.close() }
+        coordinator.show(html, folder: nil, in: view)
+        for _ in 0..<100 where view.isLoading { try await Task.sleep(for: .milliseconds(50)) }
+        try await Task.sleep(for: .milliseconds(300))
+        let result = try await view.evaluateJavaScript("""
+            (() => { const r = e => e.getBoundingClientRect(), lis = [...document.querySelectorAll('li')];
+              const item = t => lis.find(l => l.firstChild.textContent.trim() === t);
+              const two = item('two'), nested = item('nested'), box = document.querySelector('input[type=checkbox]');
+              const after = document.createRange(); after.selectNodeContents(box.nextSibling);
+              return [r(nested).top - r(two).top - parseFloat(getComputedStyle(two).lineHeight),
+                      r(document.querySelector('main > :first-child')).top, after.getBoundingClientRect().left - r(box).right] })()
+            """)
+        let metrics = try XCTUnwrap(result as? [Double])
+        XCTAssertEqual(metrics[0], 0, accuracy: 1, "nested list directly under its item, not a block gap below")
+        XCTAssertEqual(metrics[1], 16, accuracy: 1, "first block at the top padding, like Write's 16 pt inset")
+        XCTAssertGreaterThan(metrics[2], 3, "checkbox separated from its text")
+    }
 }

@@ -135,6 +135,9 @@ enum MarkdownRenderer {
     hr { border:0; border-top:1px solid var(--line); } .footnotes { font-size:.9em; color:var(--muted); }
     ul.task-list { list-style:none; padding-left:1.2em; }
     p, ul, ol, dl, blockquote, pre, table, figure, math[display="block"] { margin-top:\(MarkdownStyler.blockGap)px; margin-bottom:\(MarkdownStyler.blockGap)px; }
+    li > ul, li > ol { margin-top:0; margin-bottom:0; }
+    main > :first-child, blockquote > :first-child { margin-top:0; } main > :last-child, blockquote > :last-child { margin-bottom:0; }
+    ul.task-list input[type="checkbox"] { margin:0 .5em 0 0; }
     """
 }
 
