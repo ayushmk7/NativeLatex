@@ -12,7 +12,8 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
     /// Set by the representable each update: writes the buffer / reports the caret line and column.
     var onText: ((String) -> Void)?
     var onCursor: ((Int, Int) -> Void)?
-    private var isUpdating = false
+    /// True while `sync` rewrites the view; edits and selection changes then come from the other pane, not the user.
+    private(set) var isUpdating = false
 
     func focus() {
         guard let view else { return }
