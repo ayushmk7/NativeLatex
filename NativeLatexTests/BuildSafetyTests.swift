@@ -29,7 +29,7 @@ final class BuildSafetyTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("PWNED").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent(BuildService.buildFolderName).path))
 
-        for name in ["paper.tex", "My Paper_v2-final.tex", "thèse 2.TEX"] {
+        for name in ["paper.tex", "My Paper_v2-final.tex", "thèse 2.TEX", "notes.ltx", "book.latex"] {
             XCTAssertTrue(BuildService.isSafeRootName(name), name)
         }
         let args = BuildService.arguments(engine: "latexmk", root: folder.appendingPathComponent("My Paper.tex"))
@@ -59,6 +59,108 @@ final class BuildSafetyTests: XCTestCase {
         try fm.createSymbolicLink(at: out.appendingPathComponent("paper.pdf"), withDestinationURL: victim)
         XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: root))
         XCTAssertEqual(try String(contentsOf: victim, encoding: .utf8), "FAKE_API_KEY=test-not-real")
+    }
+
+    func testOutputFolderRefusesNestedSymlinksAndHardLinks() async throws {
+        let fm = FileManager.default
+        let canary = try write("canary.txt", "CANARY")
+        let root = try write("paper.tex", #"\documentclass{article}\begin{document}x\end{document}"#)
+        let out = try BuildService.prepareOutputDirectory(for: root)
+
+        // Symlink two levels down inside an otherwise owned folder.
+        let nested = out.appendingPathComponent("chapters/deep", isDirectory: true)
+        try fm.createDirectory(at: nested, withIntermediateDirectories: true)
+        try fm.createSymbolicLink(at: nested.appendingPathComponent("paper.aux"), withDestinationURL: canary)
+        XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: root))
+        do { _ = try await BuildService().build(root: root); XCTFail("build must refuse a linked output tree") }
+        catch { XCTAssertEqual(error as? BuildError, .unownedOutputDirectory(out.path)) }
+
+        // Symlinked subfolder pointing outside.
+        try fm.removeItem(at: out.appendingPathComponent("chapters"))
+        try fm.createSymbolicLink(at: out.appendingPathComponent("chapters"), withDestinationURL: folder)
+        XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: root))
+
+        // Nested hard link to a file outside the tree.
+        try fm.removeItem(at: out.appendingPathComponent("chapters"))
+        try fm.createDirectory(at: nested, withIntermediateDirectories: true)
+        try fm.linkItem(at: canary, to: nested.appendingPathComponent("paper.log"))
+        XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: root))
+
+        // Clean nested folders stay reusable.
+        try fm.removeItem(at: nested.appendingPathComponent("paper.log"))
+        try "aux".write(to: nested.appendingPathComponent("ok.aux"), atomically: true, encoding: .utf8)
+        XCTAssertNoThrow(try BuildService.prepareOutputDirectory(for: root))
+        XCTAssertEqual(try String(contentsOf: canary, encoding: .utf8), "CANARY")
+    }
+
+    func testRunawayLogIsCappedOnDiskAndStopsTheBuild() async throws {
+        // Fake engine that prints forever, like a looping document.
+        let engine = try write("latexmk", "#!/bin/sh\nexec /usr/bin/yes 'Runaway output from a looping document'\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: engine.path)
+        let root = try write("loop.tex", "x")
+        let service = BuildService()
+        service.engineOverride = engine
+        service.logLimit = 1 << 20
+        do { _ = try await service.build(root: root); XCTFail("runaway build must stop") }
+        catch { XCTAssertEqual(error as? BuildError, .logTooLarge(1 << 20)) }
+        let log = folder.appendingPathComponent(".libreleaf-build/loop/LibreLeaf.log")
+        let size = try XCTUnwrap(try FileManager.default.attributesOfItem(atPath: log.path)[.size] as? Int)
+        XCTAssertEqual(size, 1 << 20, "log must stop exactly at the cap")
+        XCTAssertFalse(service.isRunning)
+    }
+
+    func testLtxAndLatexRootsBuild() async throws {
+        for name in ["notes.ltx", "book.latex"] {
+            let root = try write(name, #"\documentclass{article}\begin{document}Hi\end{document}"#)
+            do {
+                let result = try await BuildService().build(root: root)
+                XCTAssertEqual(result.pdfData?.prefix(4), Data("%PDF".utf8), result.log)
+            } catch BuildError.missingTeX { throw XCTSkip("No TeX installed") }
+        }
+    }
+
+    func testFoldersWithTeXSpecialCharactersAreRefused() async throws {
+        for name in ["a$b", "x;y", "c:d", "{e}", "f!!g"] {
+            let sub = folder.appendingPathComponent(name)
+            try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+            let root = sub.appendingPathComponent("paper.tex")
+            try "x".write(to: root, atomically: true, encoding: .utf8)
+            do { _ = try await BuildService().build(root: root); XCTFail(name) }
+            catch { XCTAssertEqual(error as? BuildError, .unsafeFolder(sub.path), name) }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: sub.appendingPathComponent(BuildService.buildFolderName).path))
+        }
+        XCTAssertTrue(BuildService.isSafeFolderPath("/Users/me/My Papers/thèse (2026)"))
+    }
+
+    func testCancelAlwaysReportsCancelledEvenIfEngineExitsNormally() async throws {
+        // Engine that catches SIGTERM and exits with an ordinary status, as latexmk can (12).
+        let engine = try write("latexmk", "#!/bin/sh\ntrap 'exit 12' TERM\necho started\nwhile :; do sleep 0.05; done\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: engine.path)
+        let root = try write("slow.tex", "x")
+        let service = BuildService()
+        service.engineOverride = engine
+        let build = Task { try await service.build(root: root) }
+        while !service.isRunning { try await Task.sleep(for: .milliseconds(20)) }
+        try await Task.sleep(for: .milliseconds(200)) // let the trap install
+        service.cancel()
+        do { _ = try await build.value; XCTFail("cancelled build must not report a result") }
+        catch { XCTAssertEqual(error as? BuildError, .cancelled) }
+        XCTAssertFalse(service.isRunning)
+        service.cancel() // nothing running: must not signal a stale (possibly reused) PID
+    }
+
+    /// Clean (autosaved) buffer, then another app restores an older copy with an older mtime.
+    func testCleanBufferDetectsExternalReplacementWithOlderMtime() throws {
+        let url = try write("root.tex", "MINE\r\n")
+        let buffer = try TextDocument(data: Data(contentsOf: url))
+        XCTAssertTrue(buffer.matchesDisk(at: url), "CRLF buffer must match its own file byte-for-byte")
+
+        try "COAUTHOR\r\n".write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 0)], ofItemAtPath: url.path)
+        XCTAssertFalse(buffer.matchesDisk(at: url))
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "COAUTHOR\r\n", "check must not write")
+        try FileManager.default.removeItem(at: url)
+        XCTAssertFalse(buffer.matchesDisk(at: url), "missing file is a mismatch, not a match")
     }
 
     func testDiagnosticsAndTextRoundTrip() throws {

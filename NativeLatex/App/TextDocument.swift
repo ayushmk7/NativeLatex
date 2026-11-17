@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 extension UTType {
     static let tex = UTType(importedAs: "org.tug.tex", conformingTo: .plainText)
     static let markdown = UTType(importedAs: "net.daringfireball.markdown", conformingTo: .plainText)
+    static let bibtex = UTType(importedAs: "org.tug.bib", conformingTo: .plainText)
+    static let texPackage = UTType(importedAs: "org.tug.sty", conformingTo: .plainText)
+    static let texClass = UTType(importedAs: "org.tug.cls", conformingTo: .plainText)
 }
 
 enum SourceFileError: LocalizedError {
@@ -18,8 +21,9 @@ enum SourceFileError: LocalizedError {
 /// NSDocument (behind DocumentGroup) supplies coordinated atomic saves, autosave,
 /// versions and the "changed by another application" conflict check.
 struct TextDocument: FileDocument {
-    // ponytail: public.data lets Open With accept extensionless/unknown text files; non-UTF-8 bytes are rejected on read.
-    static let readableContentTypes: [UTType] = [.tex, .markdown, .plainText, .data]
+    // Text types only: claiming public.data put LibreLeaf in Open With for every binary file.
+    // ponytail: extensionless files resolve to public.data and can't be opened; add a typed Open panel if needed.
+    static let readableContentTypes: [UTType] = [.tex, .markdown, .bibtex, .texPackage, .texClass, .plainText]
     static let writableContentTypes: [UTType] = [.tex, .markdown, .plainText]
 
     var text: String
@@ -48,6 +52,12 @@ struct TextDocument: FileDocument {
         var bytes = Data(out.utf8)
         if hasBOM { bytes.insert(contentsOf: [0xEF, 0xBB, 0xBF], at: 0) }
         return bytes
+    }
+
+    /// True when the file holds exactly the bytes this buffer would save. Catches external
+    /// replacements NSDocument misses on a clean buffer (cp -p/rsync keep an older mtime).
+    func matchesDisk(at url: URL) -> Bool {
+        (try? Data(contentsOf: url)) == data()
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
