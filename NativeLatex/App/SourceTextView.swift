@@ -34,7 +34,6 @@ struct SourceTextView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()
         let view = scroll.documentView as! NSTextView
-        view.delegate = context.coordinator
         view.isRichText = false
         view.importsGraphics = false
         view.allowsUndo = true
@@ -53,6 +52,9 @@ struct SourceTextView: NSViewRepresentable {
         view.insertionPointColor = NSColor(Theme.accent)
         scroll.backgroundColor = NSColor(Theme.background)
         view.string = text
+        // Delegate after the initial text: setting `string` fires a selection change, which would
+        // write SwiftUI @State (onCursor) during the view update.
+        view.delegate = context.coordinator
         view.setAccessibilityLabel("Source")
         handle.view = view
         return scroll

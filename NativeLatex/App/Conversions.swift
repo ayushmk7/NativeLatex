@@ -92,7 +92,7 @@ enum Conversions {
         let panel = NSOpenPanel()
         panel.message = "Choose a file. LibreLeaf writes a new \(format.displayName) copy next to it; the original is not changed."
         panel.prompt = "Import Copy"
-        panel.allowedContentTypes = ["docx", "odt", "md", "markdown", "tex"].compactMap { UTType(filenameExtension: $0) }
+        panel.allowedContentTypes = ["docx", "odt", "md", "markdown", "tex", "ltx", "latex"].compactMap { UTType(filenameExtension: $0) }
         guard panel.runModal() == .OK, let source = panel.url else { return }
         Task {
             do {
@@ -168,7 +168,7 @@ enum Conversions {
         switch alert.runModal() {
         case .alertFirstButtonReturn:
             let url = result.outputURL
-            if ["tex", "md"].contains(url.pathExtension) {
+            if ["tex", "ltx", "latex", "md", "markdown"].contains(url.pathExtension.lowercased()) {
                 NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, _ in }
             } else {
                 NSWorkspace.shared.open(url)

@@ -5,7 +5,7 @@ public enum DocumentFormat: String, CaseIterable, Sendable {
 
     public init?(fileExtension ext: String) {
         switch ext.lowercased() {
-        case "tex", "latex": self = .latex
+        case "tex", "ltx", "latex": self = .latex
         case "md", "markdown": self = .markdown
         case "htm", "html": self = .html
         default: self.init(rawValue: ext.lowercased())

@@ -37,6 +37,9 @@ struct EditorView: View {
     @State private var showProblems = false
     @State private var line = 1
     @State private var column = 1
+    /// Another app changed the file while this window has unsaved edits.
+    @State private var diskChanged = false
+    @State private var seenDiskDate: Date?
 
     private var isTeX: Bool { BuildService.rootExtensions.contains(fileURL?.pathExtension.lowercased() ?? "") }
     private var isMarkdown: Bool { ["md", "markdown"].contains(fileURL?.pathExtension.lowercased() ?? "") }
@@ -59,6 +62,7 @@ struct EditorView: View {
                 HSplitView {
                     SourceTextView(text: $document.text, handle: editor) { line = $0; column = $1 }
                         .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+                        .overlay(alignment: .top) { if diskChanged { diskBanner } }
                     if showPreview, isMarkdown {
                         MarkdownPreview(text: document.text).frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
                     } else if showPreview, isTeX {
@@ -81,6 +85,9 @@ struct EditorView: View {
         .frame(minWidth: 640, minHeight: 420)
         .focusedSceneValue(\.documentFileURL, fileURL)
         .task { reopenSymlinkAtTarget() }
+        // ponytail: 2 s poll + activation check; swap for NSFilePresenter/FSEvents if many windows stay open.
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in checkDisk() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in checkDisk() }
         .onChange(of: document.text) {
             // The PDF shows the text as of the last successful build; any other text makes it stale.
             if pdfData != nil, !lastFailed { isStale = document.text != builtText }
@@ -144,6 +151,48 @@ struct EditorView: View {
         }
     }
 
+    private var diskBanner: some View {
+        HStack(spacing: Theme.s2) {
+            Label("“\(fileURL?.lastPathComponent ?? "")” changed on disk. Your unsaved edits are kept.",
+                  systemImage: "exclamationmark.triangle.fill")
+                .font(Theme.captionFont)
+            Spacer()
+            Button("Reload from Disk") { reloadFromDisk() }
+                .help("Discard unsaved edits and load the version on disk")
+            Button("Keep Mine") { diskChanged = false }
+                .help("Keep editing; saving will ask how to resolve the conflict")
+        }
+        .padding(Theme.s2)
+        .background(Theme.surface)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.warning).frame(height: 1) }
+        .accessibilityElement(children: .contain)
+    }
+
+    /// DocumentGroup's NSDocument doesn't reload a clean buffer after another app writes the file,
+    /// and cp -p/rsync can restore an older mtime. Any mtime other than NSDocument's own save date is
+    /// an outside write: reload a clean buffer, flag a dirty one. Never discards unsaved edits.
+    // ponytail: mtime-based; an outside write that reproduces NSDocument's exact save date is missed.
+    private func checkDisk() {
+        guard let fileURL, let doc = NSDocumentController.shared.document(for: fileURL) else { return }
+        var url = fileURL
+        url.removeAllCachedResourceValues()
+        guard let onDisk = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+              onDisk != doc.fileModificationDate, onDisk != seenDiskDate else { return }
+        seenDiskDate = onDisk
+        guard !document.matchesDisk(at: fileURL) else { return }
+        if doc.isDocumentEdited { diskChanged = true } else { reloadFromDisk() }
+    }
+
+    private func reloadFromDisk() {
+        guard let fileURL, let doc = NSDocumentController.shared.document(for: fileURL) else { return }
+        do {
+            try doc.revert(toContentsOf: fileURL, ofType: doc.fileType ?? "public.plain-text")
+            diskChanged = false
+        } catch {
+            self.error = "LibreLeaf couldn’t reload “\(fileURL.lastPathComponent)”: \(error.localizedDescription)"
+        }
+    }
+
     private func reveal(_ problem: Problem) {
         guard let diagnostic = diagnostics.first(where: { $0.id == problem.id }), let file = diagnostic.file else { return }
         if file.resolvingSymlinksInPath() == fileURL?.resolvingSymlinksInPath() {
@@ -191,17 +240,31 @@ struct EditorView: View {
 struct PDFPreview: NSViewRepresentable {
     let data: Data
 
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeNSView(context: Context) -> PDFView {
         let view = PDFView()
         view.autoScales = true
         return view
     }
 
-    func updateNSView(_ view: PDFView, context: Context) {
-        guard view.document?.dataRepresentation() != data else { return }
-        let page = view.currentPage.flatMap { view.document?.index(for: $0) } ?? 0
-        view.document = PDFDocument(data: data)
-        if let restored = view.document?.page(at: page) { view.go(to: restored) }
+    func updateNSView(_ view: PDFView, context: Context) { context.coordinator.show(data, in: view) }
+
+    @MainActor
+    final class Coordinator {
+        private(set) var shown: Data?
+
+        /// Same bytes (every keystroke re-renders the window): leave page, zoom and scroll alone.
+        /// `dataRepresentation()` re-serialises the PDF and never equals the input, so compare inputs.
+        func show(_ data: Data, in view: PDFView) {
+            guard data != shown else { return }
+            shown = data
+            let page = view.currentPage.flatMap { view.document?.index(for: $0) } ?? 0
+            let autoScales = view.autoScales, scale = view.scaleFactor
+            view.document = PDFDocument(data: data)
+            if !autoScales { view.scaleFactor = scale }
+            if let restored = view.document?.page(at: page) { view.go(to: restored) }
+        }
     }
 }
 

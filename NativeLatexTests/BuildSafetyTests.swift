@@ -1,3 +1,4 @@
+import PDFKit
 import XCTest
 @testable import LibreLeaf
 
@@ -33,7 +34,7 @@ final class BuildSafetyTests: XCTestCase {
             XCTAssertTrue(BuildService.isSafeRootName(name), name)
         }
         let args = BuildService.arguments(engine: "latexmk", root: folder.appendingPathComponent("My Paper.tex"))
-        XCTAssertEqual(Array(args.suffix(2)), ["-outdir=.libreleaf-build/My Paper", "./My Paper.tex"])
+        XCTAssertEqual(Array(args.suffix(2)), ["-outdir=.libreleaf-build/My Paper-\(BuildService.ownerToken.prefix(8))", "./My Paper.tex"])
         XCTAssertTrue(args.contains("-norc") && args.contains("-no-shell-escape"))
         XCTAssertFalse(args.joined().contains(folder.path), "absolute folder path must not reach latexmk")
     }
@@ -44,12 +45,14 @@ final class BuildSafetyTests: XCTestCase {
         let victim = try write("victim.txt", "FAKE_API_KEY=test-not-real")
 
         // Forged marker shipped with a project.
-        try fm.createDirectory(at: build.appendingPathComponent("forged"), withIntermediateDirectories: true)
-        try "LibreLeaf\n".write(to: build.appendingPathComponent("forged/.libreleaf-owner"), atomically: true, encoding: .utf8)
+        let forged = build.appendingPathComponent(BuildService.outputName(for: folder.appendingPathComponent("forged.tex")))
+        try fm.createDirectory(at: forged, withIntermediateDirectories: true)
+        try "LibreLeaf\n".write(to: forged.appendingPathComponent(".libreleaf-owner"), atomically: true, encoding: .utf8)
         XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: folder.appendingPathComponent("forged.tex")))
 
         // Output folder is a symlink to elsewhere.
-        try fm.createSymbolicLink(at: build.appendingPathComponent("linked"), withDestinationURL: folder)
+        try fm.createSymbolicLink(at: build.appendingPathComponent(BuildService.outputName(for: folder.appendingPathComponent("linked.tex"))),
+                                  withDestinationURL: folder)
         XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: folder.appendingPathComponent("linked.tex")))
 
         // Our own folder is reusable until a symlink is planted inside it.
@@ -93,6 +96,120 @@ final class BuildSafetyTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: canary, encoding: .utf8), "CANARY")
     }
 
+    /// chmod 0300 (write+search, no read) hid a nested symlink from FileManager.enumerator while TeX
+    /// could still write through the known path. The scan must refuse what it can't list.
+    func testUnreadableNestedFolderFailsClosed() async throws {
+        let fm = FileManager.default
+        let canary = try write("canary.txt", "CANARY")
+        let root = try write("paper.tex", #"\documentclass{article}\begin{document}x\end{document}"#)
+        let out = try BuildService.prepareOutputDirectory(for: root)
+        let hidden = out.appendingPathComponent("chapters", isDirectory: true)
+        try fm.createDirectory(at: hidden, withIntermediateDirectories: true)
+        try fm.createSymbolicLink(at: hidden.appendingPathComponent("paper.aux"), withDestinationURL: canary)
+        try fm.setAttributes([.posixPermissions: 0o300], ofItemAtPath: hidden.path)
+        defer { try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hidden.path) }
+
+        XCTAssertThrowsError(try BuildService.isPlainTree(out))
+        XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: root))
+        do { _ = try await BuildService().build(root: root); XCTFail("build must refuse an unlistable output tree") }
+        catch { XCTAssertEqual(error as? BuildError, .unownedOutputDirectory(out.path)) }
+        XCTAssertEqual(try String(contentsOf: canary, encoding: .utf8), "CANARY")
+
+        // Readable but not searchable (0600) also fails closed; restoring 0755 makes it reusable.
+        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: hidden.path)
+        XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: root))
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hidden.path)
+        try fm.removeItem(at: hidden.appendingPathComponent("paper.aux"))
+        XCTAssertNoThrow(try BuildService.prepareOutputDirectory(for: root))
+    }
+
+    /// A reset token (defaults wiped, folder copied from another Mac) must not block the folder
+    /// forever: it gets a fresh folder, the old output stays, and forged markers are still refused.
+    func testLostOwnerTokenGetsFreshFolderAndKeepsOldOutput() throws {
+        let defaults = UserDefaults.standard, key = "buildOwnerToken"
+        let saved = defaults.string(forKey: key)
+        defer { if let saved { defaults.set(saved, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        let root = try write("paper.tex", "x")
+        let old = try BuildService.prepareOutputDirectory(for: root)
+        try "OLD".write(to: old.appendingPathComponent("paper.pdf"), atomically: true, encoding: .utf8)
+
+        defaults.set(UUID().uuidString, forKey: key)
+        let fresh = try BuildService.prepareOutputDirectory(for: root)
+        XCTAssertNotEqual(fresh, old)
+        XCTAssertEqual(try String(contentsOf: old.appendingPathComponent("paper.pdf"), encoding: .utf8), "OLD")
+        XCTAssertTrue(BuildService.arguments(engine: "latexmk", root: root).contains("-outdir=.libreleaf-build/\(fresh.lastPathComponent)"))
+
+        // Someone who guesses the new folder name still can't forge the full token.
+        let other = try write("other.tex", "x")
+        let guessed = folder.appendingPathComponent(".libreleaf-build/\(BuildService.outputName(for: other))")
+        try FileManager.default.createDirectory(at: guessed, withIntermediateDirectories: true)
+        try String(BuildService.ownerToken.prefix(8)).write(to: guessed.appendingPathComponent(".libreleaf-owner"), atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: other))
+    }
+
+    /// latexmk skips an unchanged failed document and prints no file:line; the engine .log has them.
+    func testFailedBuildRecoversDiagnosticsFromEngineLog() async throws {
+        let engine = try write("latexmk", "#!/bin/sh\necho 'Latexmk: Nothing to do, previous errors'\nexit 12\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: engine.path)
+        let root = try write("paper.tex", "x")
+        _ = try write("chap.tex", "x")
+        let out = try BuildService.prepareOutputDirectory(for: root)
+        try "! Undefined control sequence.\n./chap.tex:3: Undefined control sequence.\n".write(
+            to: out.appendingPathComponent("paper.log"), atomically: true, encoding: .utf8)
+        let service = BuildService()
+        service.engineOverride = engine
+        let result = try await service.build(root: root)
+        XCTAssertFalse(result.succeeded)
+        XCTAssertEqual(result.diagnostics.map { "\($0.file?.lastPathComponent ?? "nil"):\($0.line ?? 0)" }, ["chap.tex:3"])
+    }
+
+    /// The engine .log fallback is read as a bounded tail, never loaded whole.
+    func testEngineLogFallbackReadsBoundedTail() throws {
+        let log = folder.appendingPathComponent("huge.log")
+        let filler = Data(repeating: UInt8(ascii: "x"), count: 3 << 20)
+        try (filler + Data("\n./chap.tex:9: Undefined control sequence.\n".utf8)).write(to: log)
+        let tail = try XCTUnwrap(BuildService.readTail(of: log, limit: 1 << 20))
+        XCTAssertEqual(tail.count, 1 << 20)
+        XCTAssertEqual(BuildService.parseDiagnostics(String(decoding: tail, as: UTF8.self), sourceFolder: folder).map(\.line), [9])
+        XCTAssertEqual(BuildService.readTail(of: folder.appendingPathComponent("missing.log"), limit: 10), nil)
+        try Data("short".utf8).write(to: log)
+        XCTAssertEqual(BuildService.readTail(of: log, limit: 1 << 20), Data("short".utf8))
+    }
+
+    /// Same thing end to end with real latexmk: Build, Build again unchanged.
+    func testRepeatedFailedLatexmkBuildKeepsDiagnostics() async throws {
+        let root = try write("paper.tex", "\\documentclass{article}\\begin{document}\\input{chap}\\end{document}\n")
+        _ = try write("chap.tex", "Text\n\n\\undefinedmacro\n")
+        let service = BuildService()
+        for attempt in 1...2 {
+            let result: BuildResult
+            do { result = try await service.build(root: root) } catch BuildError.missingTeX { throw XCTSkip("No TeX installed") }
+            XCTAssertFalse(result.succeeded)
+            XCTAssertTrue(result.diagnostics.contains { $0.file?.lastPathComponent == "chap.tex" && $0.line == 3 },
+                          "attempt \(attempt): \(result.diagnostics.map(\.message))")
+        }
+    }
+
+    func testPDFPreviewKeepsDocumentAndZoomForSameBytes() throws {
+        func pdf(_ text: String) -> Data {
+            let view = NSTextField(labelWithString: text)
+            view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+            return view.dataWithPDF(inside: view.bounds)
+        }
+        let first = pdf("one"), second = pdf("two")
+        let view = PDFView(), coordinator = PDFPreview.Coordinator()
+        coordinator.show(first, in: view)
+        let shown = try XCTUnwrap(view.document)
+        view.autoScales = false
+        view.scaleFactor = 2.5
+        coordinator.show(Data(first), in: view) // equal bytes, new Data value: what each keystroke passes
+        XCTAssertTrue(view.document === shown, "same PDF must not be reassigned")
+        XCTAssertEqual(view.scaleFactor, 2.5, accuracy: 0.01)
+        coordinator.show(second, in: view)
+        XCTAssertFalse(view.document === shown)
+        XCTAssertEqual(view.scaleFactor, 2.5, accuracy: 0.01, "zoom survives a rebuilt PDF")
+    }
+
     func testRunawayLogIsCappedOnDiskAndStopsTheBuild() async throws {
         // Fake engine that prints forever, like a looping document.
         let engine = try write("latexmk", "#!/bin/sh\nexec /usr/bin/yes 'Runaway output from a looping document'\n")
@@ -103,7 +220,7 @@ final class BuildSafetyTests: XCTestCase {
         service.logLimit = 1 << 20
         do { _ = try await service.build(root: root); XCTFail("runaway build must stop") }
         catch { XCTAssertEqual(error as? BuildError, .logTooLarge(1 << 20)) }
-        let log = folder.appendingPathComponent(".libreleaf-build/loop/LibreLeaf.log")
+        let log = folder.appendingPathComponent(".libreleaf-build/\(BuildService.outputName(for: root))/LibreLeaf.log")
         let size = try XCTUnwrap(try FileManager.default.attributesOfItem(atPath: log.path)[.size] as? Int)
         XCTAssertEqual(size, 1 << 20, "log must stop exactly at the cap")
         XCTAssertFalse(service.isRunning)

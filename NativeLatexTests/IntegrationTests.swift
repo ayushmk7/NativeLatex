@@ -18,6 +18,8 @@ final class IntegrationTests: XCTestCase {
     func testExportTargetsMatchSourceType() {
         XCTAssertEqual(Conversions.exportTargets(for: URL(fileURLWithPath: "/x/a.tex")), [.docx, .odt, .markdown])
         XCTAssertEqual(Conversions.exportTargets(for: URL(fileURLWithPath: "/x/a.md")), [.docx, .odt, .latex])
+        XCTAssertEqual(Conversions.exportTargets(for: URL(fileURLWithPath: "/x/a.ltx")), [.docx, .odt, .markdown])
+        XCTAssertEqual(Conversions.exportTargets(for: URL(fileURLWithPath: "/x/a.LATEX")), [.docx, .odt, .markdown])
         XCTAssertEqual(Conversions.exportTargets(for: URL(fileURLWithPath: "/x/a.txt")), [])
         XCTAssertEqual(Conversions.exportTargets(for: nil), [])
     }

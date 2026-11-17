@@ -88,7 +88,7 @@ final class BuildService: ObservableObject {
     /// directory), so the user's folder path never reaches latexmk's internal shell commands.
     nonisolated static func arguments(engine: String, root: URL) -> [String] {
         let input = "./" + root.lastPathComponent
-        let outdir = "\(buildFolderName)/\(root.deletingPathExtension().lastPathComponent)"
+        let outdir = "\(buildFolderName)/\(outputName(for: root))"
         let common = ["-interaction=nonstopmode", "-file-line-error", "-synctex=1", "-no-shell-escape"]
         if engine == "latexmk" {
             return ["-norc", "-pdf"] + common + ["-outdir=\(outdir)", input]
@@ -97,18 +97,24 @@ final class BuildService: ObservableObject {
         return common + ["-output-directory=\(outdir)", input]
     }
 
-    /// Creates `<folder>/.libreleaf-build/<stem>`, or reuses it only if it carries this install's
-    /// token and nothing in the chain is a symlink (TeX would write through it).
+    /// `<stem>-<token prefix>`: a reset token or a folder copied from another Mac gets a fresh
+    /// output folder instead of a permanent refusal. Other installs' folders are left untouched.
+    nonisolated static func outputName(for root: URL) -> String {
+        root.deletingPathExtension().lastPathComponent + "-" + ownerToken.prefix(8)
+    }
+
+    /// Creates `<folder>/.libreleaf-build/<stem>-<token8>`, or reuses it only if it carries this install's
+    /// full token and nothing in the tree is a link or unreadable (TeX would write through it).
     nonisolated static func prepareOutputDirectory(for root: URL) throws -> URL {
         let fm = FileManager.default
         let parent = root.deletingLastPathComponent().appendingPathComponent(buildFolderName, isDirectory: true)
-        let folder = parent.appendingPathComponent(root.deletingPathExtension().lastPathComponent, isDirectory: true)
+        let folder = parent.appendingPathComponent(outputName(for: root), isDirectory: true)
         let marker = folder.appendingPathComponent(".libreleaf-owner")
         let refuse = BuildError.unownedOutputDirectory(folder.path)
         for url in [parent, folder] where isSymlink(url) { throw refuse }
         if fm.fileExists(atPath: folder.path) {
             guard !isSymlink(marker), (try? String(contentsOf: marker, encoding: .utf8)) == ownerToken,
-                  try isPlainTree(folder)
+                  (try? isPlainTree(folder)) == true
             else { throw refuse }
         } else {
             try fm.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -184,8 +190,24 @@ final class BuildService: ObservableObject {
         let log = String(decoding: output, as: UTF8.self)
         let pdfURL = outputDirectory.appendingPathComponent(root.deletingPathExtension().lastPathComponent + ".pdf")
         let pdfData = status == 0 ? try? Data(contentsOf: pdfURL) : nil
-        return BuildResult(succeeded: pdfData != nil, pdfData: pdfData, log: log,
-                           diagnostics: Self.parseDiagnostics(log, sourceFolder: sourceFolder))
+        var diagnostics = Self.parseDiagnostics(log, sourceFolder: sourceFolder)
+        // latexmk doesn't rerun an unchanged failed document and prints no file:line lines;
+        // the engine's own .log from that run still has them.
+        let engineLog = outputDirectory.appendingPathComponent(root.deletingPathExtension().lastPathComponent + ".log")
+        if diagnostics.isEmpty, pdfData == nil, let data = Self.readTail(of: engineLog, limit: Self.logTailLimit) {
+            diagnostics = Self.parseDiagnostics(String(decoding: data, as: UTF8.self), sourceFolder: sourceFolder)
+        }
+        return BuildResult(succeeded: pdfData != nil, pdfData: pdfData, log: log, diagnostics: diagnostics)
+    }
+
+    /// Last `limit` bytes of a file: a looping document can write a TeX .log of any size,
+    /// and errors sit near its end.
+    nonisolated static func readTail(of url: URL, limit: Int) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return nil }
+        try? handle.seek(toOffset: size > UInt64(limit) ? size - UInt64(limit) : 0)
+        return try? handle.read(upToCount: limit)
     }
 
     /// `path.ext:line: message` lines from -file-line-error. Paths outside the source folder are not linked.
@@ -212,20 +234,20 @@ final class BuildService: ObservableObject {
         kill(pid, SIGTERM)
     }
 
-    /// True if nothing anywhere under `folder` is a symlink or a hard-linked file. TeX and latexmk
-    /// write into subfolders (`\include`, minted, aux dirs), so a link at any depth could redirect a write.
+    /// True if every entry under `folder` is a plain directory or a singly linked regular file.
+    /// TeX writes into subfolders (`\include`, minted, aux dirs), so a link at any depth could redirect
+    /// a write. Fails closed: an unreadable or unlistable directory throws (FileManager.enumerator
+    /// silently skipped those, hiding links inside a chmod 0300 folder), and any lstat failure,
+    /// symlink, hard link or special file returns false.
     nonisolated static func isPlainTree(_ folder: URL) throws -> Bool {
-        let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isRegularFileKey]
-        // The enumerator does not descend through symlinked folders; it reports the link itself.
-        guard let items = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [],
-                                                         errorHandler: { _, _ in false }) else { return false }
-        for case let url as URL in items {
-            let values = try url.resourceValues(forKeys: Set(keys))
-            if values.isSymbolicLink == true { return false }
-            // A hard link shares the inode with a file outside the tree; truncating it writes through.
-            if values.isRegularFile == true,
-               let links = try FileManager.default.attributesOfItem(atPath: url.path)[.referenceCount] as? Int, links > 1 {
-                return false
+        for name in try FileManager.default.contentsOfDirectory(atPath: folder.path) {
+            let path = folder.appendingPathComponent(name).path
+            var info = stat()
+            guard lstat(path, &info) == 0 else { return false }
+            switch info.st_mode & S_IFMT {
+            case S_IFDIR: guard try isPlainTree(URL(fileURLWithPath: path, isDirectory: true)) else { return false }
+            case S_IFREG: if info.st_nlink > 1 { return false }
+            default: return false // symlink, fifo, socket, device
             }
         }
         return true
