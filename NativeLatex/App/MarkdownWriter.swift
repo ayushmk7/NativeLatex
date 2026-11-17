@@ -225,18 +225,30 @@ enum MarkdownStyler {
     /// Pandoc needs a blank line (or a block boundary) before a list: `- x` right under paragraph text is
     /// more of that paragraph. A marker line starts or continues a list after a blank line, another item,
     /// an indented line (item content), a heading, or at the top. Quote markers are ignored on both lines.
-    /// Pandoc starts a new list when the marker kind changes between adjacent items at the same indentation:
-    /// `-`, `*`, `+`, or a number with `.` or `)`. Read shows the two lists a block gap apart.
-    // ponytail: only the line directly above is compared; an item after a wrapped continuation line gets no gap.
+    /// Pandoc starts a new list when the marker kind changes between items at the same indentation: `-`, `*`,
+    /// `+`, or a number with `.` or `)`. Read shows the two lists a block gap apart. The item compared is the
+    /// nearest one above at the same indentation, skipping deeper (nested) items, so `- a` / `  - b` / `1. c`
+    /// gets the gap too; a shallower item or any other line above means no sibling, so no gap.
+    // ponytail: walks list-item lines only (bounded by maxBlockLines); an item after a wrapped continuation
+    // line gets no gap.
     static func startsNewList(_ m: NSTextCheckingResult, in text: NSString) -> Bool {
-        let line = text.lineRange(for: m.range)
-        guard line.location > 0 else { return false }
-        let above = text.lineRange(for: NSRange(location: line.location - 1, length: 0))
-        guard let prev = list.firstMatch(in: text as String, range: above),
-              text.substring(with: prev.range(at: 1)) == text.substring(with: m.range(at: 1)),
-              text.substring(with: prev.range(at: 2)) == text.substring(with: m.range(at: 2)) else { return false }
-        func kind(_ marker: String) -> String { marker.last.map(String.init) ?? "" } // `-`/`*`/`+`, or `.`/`)` after digits
-        return kind(text.substring(with: prev.range(at: 3))) != kind(text.substring(with: m.range(at: 3)))
+        func width(_ indent: String) -> Int { indent.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) } }
+        let quote = text.substring(with: m.range(at: 1)), indent = width(text.substring(with: m.range(at: 2)))
+        var start = text.lineRange(for: m.range).location
+        let source = text as String // bridged once, not per line walked
+        for _ in 0..<maxBlockLines where start > 0 {
+            let above = text.lineRange(for: NSRange(location: start - 1, length: 0))
+            guard let prev = list.firstMatch(in: source, range: above),
+                  text.substring(with: prev.range(at: 1)) == quote else { return false }
+            let depth = width(text.substring(with: prev.range(at: 2)))
+            if depth < indent { return false }
+            if depth == indent {
+                func kind(_ marker: String) -> String { marker.last.map(String.init) ?? "" } // `-`/`*`/`+`, or `.`/`)` after digits
+                return kind(text.substring(with: prev.range(at: 3))) != kind(text.substring(with: m.range(at: 3)))
+            }
+            start = above.location // a nested item: keep looking for a sibling
+        }
+        return false
     }
 
     static func startsList(_ m: NSTextCheckingResult, in text: NSString) -> Bool {

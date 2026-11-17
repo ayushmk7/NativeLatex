@@ -718,6 +718,42 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertEqual(view.string, text)
     }
 
+    /// A numbered list after a bullet list whose last item is nested still starts a new list with Read's gap:
+    /// the sibling compared is the nearest item at the same indentation, not the nested one. Nested items and
+    /// ordinary continuing lists stay gapless.
+    func testNewListAfterANestedLastItemGetsTheBlockGap() throws {
+        let text = "- a\n  - nested\n    - deeper\n1. one\n2. two\n   - sub\n3. three\n\n- x\n  1. inner\n  2. inner two\n- y\n"
+        let ns = text as NSString
+        let handle = WritingHandle()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 560), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = handle.scrollView(text: text, label: "Write") // never ordered in
+        defer { window.close() }
+        settle(0.3)
+        let storage = try XCTUnwrap(handle.view?.textStorage)
+        XCTAssertEqual(handle.view?.string, text)
+        for (needle, gap) in [("- a", false), ("  - nested", false), ("    - deeper", false), ("1. one", true), ("2. two", false),
+                              ("   - sub", false), ("3. three", false), ("- x", false), ("  1. inner", false), ("  2. inner two", false), ("- y", false)] {
+            let style = storage.attribute(.paragraphStyle, at: ns.range(of: needle).location, effectiveRange: nil) as? NSParagraphStyle
+            XCTAssertEqual(style?.paragraphSpacingBefore, gap ? MarkdownStyler.blockGap : 0, needle)
+        }
+
+        // Editing the sibling's kind updates the gap; undo restores the exact bytes and the gap.
+        let view = try XCTUnwrap(handle.view)
+        window.makeFirstResponder(view)
+        func gap(_ needle: String) -> CGFloat? {
+            let at = (view.string as NSString).range(of: needle).location
+            return (storage.attribute(.paragraphStyle, at: at, effectiveRange: nil) as? NSParagraphStyle)?.paragraphSpacingBefore
+        }
+        view.insertText("- ", replacementRange: ns.range(of: "1. ", options: [], range: ns.range(of: "1. one")))
+        settle(0.1)
+        XCTAssertEqual(gap("- one"), 0, "same kind as `- a` now: one list, no gap")
+        view.undoManager?.undo()
+        settle(0.1)
+        XCTAssertEqual(view.string, text, "undo restores the bytes")
+        XCTAssertEqual(gap("1. one"), MarkdownStyler.blockGap, "and the gap")
+    }
+
     // MARK: Headless pair: Source and Write in one bare window that is never shown or made key.
 
     /// Both panes wired like EditorView: an edit writes the buffer, then both views sync to it. Offscreen text
