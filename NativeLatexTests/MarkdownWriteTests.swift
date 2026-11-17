@@ -418,13 +418,13 @@ final class MarkdownWriteTests: XCTestCase {
 
         func pump() { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
 
-        func key(_ view: NSTextView, _ chars: String, code: UInt16 = 0) {
+        func key(_ view: NSTextView, _ chars: String, code: UInt16 = 0, settle: Bool = true) {
             window.makeFirstResponder(view) // a bare, unshown window: no app focus change
             for c in chars {
                 window.sendEvent(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
                                                   context: nil, characters: String(c), charactersIgnoringModifiers: String(c), isARepeat: false, keyCode: code)!)
             }
-            pump()
+            if settle { pump() }
         }
 
         func undo() { window.undoManager!.undo(); pump() }
@@ -501,6 +501,63 @@ final class MarkdownWriteTests: XCTestCase {
         pair.set("```\n- a")
         pair.set("- item")
         XCTAssertEqual(pair.wv.string, "- item")
+    }
+
+    /// A long line of unmatched markers styles in linear time. Unbounded lazy spans took 0.7–2.5 s per
+    /// keystroke on a 24–32 KB line; bounded, a 4× longer line costs about 4× (quadratic would be 16×).
+    func testLongLinesOfUnmatchedMarkersStyleInLinearTime() {
+        func style(_ unit: String, _ count: Int) -> Duration {
+            let storage = NSTextStorage(string: String(repeating: unit, count: count))
+            let start = ContinuousClock.now
+            MarkdownStyler.apply(to: storage, reveal: NSRange(location: NSNotFound, length: 0))
+            return ContinuousClock.now - start
+        }
+        for unit in ["*a ", "**a ", "_a ", "~~a ", "[a ", "![a ", "$a ", "`a "] {
+            let short = style(unit, 8000), long = style(unit, 32000)
+            XCTAssertLessThan(short, .milliseconds(500), "\(unit) x8000: \(short)")
+            XCTAssertLessThan(long / max(short, .microseconds(1)), 8, "\(unit): x8000 \(short), x32000 \(long)")
+        }
+        // Spans up to the bound still style.
+        let em = String(repeating: "x", count: MarkdownStyler.maxInlineSpan - 1)
+        let storage = NSTextStorage(string: "*\(em)*")
+        MarkdownStyler.apply(to: storage, reveal: NSRange(location: NSNotFound, length: 0))
+        XCTAssertNotNil(storage.attribute(.markdownHidden, at: 0, effectiveRange: nil), "emphasis at the bound is styled")
+    }
+
+    /// The other pane's sync finds the changed span with a chunked compare; check the edge cases.
+    func testCommonEndsFindsTheChangedSpan() {
+        func ends(_ a: String, _ b: String) -> [Int] { let r = TextViewHandle.commonEnds(a as NSString, b as NSString); return [r.prefix, r.suffix] }
+        XCTAssertEqual(ends("same", "same"), [4, 0])
+        XCTAssertEqual(ends("abc", "Xabc"), [0, 3])
+        XCTAssertEqual(ends("abc", "abcX"), [3, 0])
+        XCTAssertEqual(ends("aaa", "aa"), [2, 0], "suffix never overlaps the prefix")
+        XCTAssertEqual(ends("hi 👋 x", "hi 👍 x"), [4, 2], "emoji sharing a high surrogate: the prefix ends mid-pair")
+        let long = String(repeating: "é👋 ", count: 5000) // spans several 4096-unit chunks
+        XCTAssertEqual(ends(long + "A" + long, long + "BC" + long), [(long as NSString).length, (long as NSString).length])
+    }
+
+    /// One keystroke on a 1 MiB document with both panes open: the typing pane, the binding and the other
+    /// pane's sync, restyle and layout. Was ~130 ms mean (~420 ms worst) in Source and ~90 ms in Write.
+    func testOneMiBKeystrokeWithBothPanesOpen() {
+        var big = ""
+        while big.utf8.count < 1 << 20 { big += "# Heading café\n\nPara with **bold**, *it*, `code`, [l](u) and 👋🏽.\n- a\n- b\n\n```\ncode\n```\n\n" }
+        let pair = Pair(big)
+        defer { pair.window.close() }
+        for view in [pair.sv, pair.wv] {
+            view.setSelectedRange(NSRange(location: 500_000, length: 0))
+            pair.key(view, "w") // warm up
+            var worst: Duration = .zero
+            for c in ["a", "*", "`", "b"] {
+                let start = ContinuousClock.now
+                pair.key(view, c, settle: false) // the whole edit path runs synchronously inside the key event
+                view.layoutManager?.ensureLayout(forCharacterRange: view.selectedRange())
+                worst = max(worst, ContinuousClock.now - start)
+                pair.pump()
+            }
+            XCTAssertLessThan(worst, .milliseconds(100), "\(view.accessibilityLabel() ?? "") worst keystroke \(worst)")
+        }
+        XCTAssertEqual(pair.sv.string, pair.doc)
+        XCTAssertEqual(pair.wv.string, pair.doc)
     }
 
     /// Typing in Write stays responsive on a 1 MiB document (measured ~16 ms per keystroke on Apple silicon).

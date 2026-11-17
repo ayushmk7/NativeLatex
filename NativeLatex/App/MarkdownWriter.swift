@@ -22,13 +22,17 @@ enum MarkdownStyler {
     private static let quote = regex(#"^ {0,3}(>[ \t]?)+"#)
     private static let list = regex(#"^[ \t]*([-*+]|\d{1,9}[.)])[ \t]+(\[[ xX]\][ \t]+)?"#)
     private static let literalLine = regex(#"^ {0,3}(\||\$\$|<|---[ \t]*$|\+\+\+).*$"#)
+    /// Longest inline span (emphasis, link, image, math) the Write view styles, in UTF-16 units. Unbounded
+    /// lazy spans made a long line of unmatched markers quadratic: a 24 KB line of `*a ` cost seconds per
+    /// keystroke. Bounded, each marker scans at most this far, so styling stays linear in the line length.
+    static let maxInlineSpan = 300
     private static let code = regex(#"(`+)(?!`)([\s\S]*?[^`])\1(?!`)"#)
-    private static let strong = regex(#"(\*\*|__)(?=\S)([^\n]*?\S)\1"#)
-    private static let emphasis = regex(#"(?<![*_\w])([*_])(?=[^\s*_])([^\n]*?[^\s\\])\1(?![*_\w])"#)
-    private static let strike = regex(#"(~~)(?=\S)([^\n]*?\S)~~"#)
-    private static let image = regex(#"!\[[^\]\n]*\]\([^)\n]*\)"#)
-    private static let link = regex(#"(?<!!)(\[)([^\]\n]+)(\]\([^)\n]*\))"#)
-    private static let math = regex(#"\$[^$\n]+\$"#)
+    private static let strong = regex(#"(\*\*|__)(?=\S)([^\n]{0,\#(maxInlineSpan)}?\S)\1"#)
+    private static let emphasis = regex(#"(?<![*_\w])([*_])(?=[^\s*_])([^\n]{0,\#(maxInlineSpan)}?[^\s\\])\1(?![*_\w])"#)
+    private static let strike = regex(#"(~~)(?=\S)([^\n]{0,\#(maxInlineSpan)}?\S)~~"#)
+    private static let image = regex(#"!\[[^\]\n]{0,\#(maxInlineSpan)}+\]\([^)\n]{0,\#(maxInlineSpan)}+\)"#)
+    private static let link = regex(#"(?<!!)(\[)([^\]\n]{1,\#(maxInlineSpan)}+)(\]\([^)\n]{0,\#(maxInlineSpan)}+\))"#)
+    private static let math = regex(#"\$[^$\n]{1,\#(maxInlineSpan)}+\$"#)
 
     /// Fenced code blocks (``` or ~~~, closed by the same fence or the end of the text) and their fence lines.
     static func fences(_ text: NSString) -> [(range: NSRange, markers: [NSRange])] {
