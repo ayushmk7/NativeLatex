@@ -46,15 +46,21 @@ public struct BB8Toggle: View {
 struct BB8ButtonStyle: ButtonStyle {
     let night: Bool, em: CGFloat, focused: Bool
 
+    /// Room kept around the pill for the focus ring, focused or not, so focus never shifts
+    /// the toolbar layout and the ring is never clipped by the item's bounds.
+    /// The artwork's headroom (1.8em) already covers the space above the pill.
+    static let ringInset: CGFloat = 4, ringWidth: CGFloat = 2
+
     func makeBody(configuration: Configuration) -> some View {
         BB8Artwork(night: night, pressed: configuration.isPressed, em: em)
+            .padding([.horizontal, .bottom], Self.ringInset)
             .overlay(alignment: .bottom) {
-                if focused {
-                    Capsule()
-                        .stroke(Theme.accent, lineWidth: 2)
-                        .padding(-3)
-                        .frame(width: BB8Artwork.width * em, height: BB8Artwork.height * em)
-                }
+                // Landing: 3px ring in the blue-text token (#4169E1 light, #8BA6FF dark), offset from the pill.
+                Capsule()
+                    .strokeBorder(Theme.accentText, lineWidth: Self.ringWidth)
+                    .frame(width: BB8Artwork.width * em + 2 * Self.ringInset,
+                           height: BB8Artwork.height * em + 2 * Self.ringInset)
+                    .opacity(focused ? 1 : 0)
             }
             .contentShape(Rectangle())
     }
@@ -66,16 +72,22 @@ public struct BB8Artwork: View {
 
     let night: Bool, pressed: Bool, em: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
 
     public init(night: Bool, pressed: Bool = false, em: CGFloat = 4) {
         self.night = night; self.pressed = pressed; self.em = em
     }
+
+    /// Pill outline in the foreground token, like the landing's 2px ring; heavier with Increase Contrast.
+    /// Without it the sky meets light and dark toolbars below 3:1.
+    static func outlineWidth(_ contrast: ColorSchemeContrast) -> CGFloat { contrast == .increased ? 2.5 : 1.5 }
 
     public var body: some View {
         ZStack(alignment: .topLeading) {
             scenery
                 .frame(width: Self.width * em, height: Self.height * em, alignment: .topLeading)
                 .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(Theme.foreground, lineWidth: Self.outlineWidth(contrast)))
             robot
         }
         .frame(width: Self.width * em, height: Self.height * em, alignment: .topLeading)

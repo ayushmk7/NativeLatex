@@ -53,7 +53,7 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 | --- | --- |
 | `AppearanceStore.shared` | `mode: AppAppearance` (`.system` default, `.light`, `.dark`), persisted in `UserDefaults` key `appearanceMode`. Sets `NSApp.appearance`, so all windows, sheets and menus change together. `.system` sets it to `nil`, so macOS changes flow through live. `toggle(currentIsDark:)` picks the opposite of the effective appearance as an override. |
 | `AppearanceSettingsView`, `AppearanceCommands` | Settings radio group; View menu picker with checkmarks. |
-| `BB8Toggle(store:em:)` | Day/night switch. Shows the effective appearance and stays in sync across windows through `colorScheme`. Tab-focusable with an accent focus ring; Space toggles. VoiceOver: "Dark appearance, On/Off", hint "Use System is in Settings". Tooltip: "Switch to Light/Dark Appearance". Reduce Motion: the scene changes with no animation. Pressing tilts the head ±25°, as `:active` does in the CSS. |
+| `BB8Toggle(store:em:)` | Day/night switch. Shows the effective appearance and stays in sync across windows through `colorScheme`. Tab-focusable; the focus ring is a 2pt capsule in `accentText` drawn 4pt outside the pill, inside space the control always reserves, so focus never shifts or clips the toolbar item (about 51×34pt). Space toggles. VoiceOver: "Dark appearance, On/Off", hint "Use System is in Settings". Tooltip: "Switch to Light/Dark Appearance". Reduce Motion: the scene changes with no animation. Pressing tilts the head ±25°, as `:active` does in the CSS. |
 | `BB8Artwork(night:pressed:em:)` | Stateless art for previews and tests. |
 | `Theme` | Dynamic colors (`background`, `surface`, `foreground`, `secondary`, `line`, `accent`, `accentText`, `onAccent`, `error`, `warning`, `success`), spacing `s1…s6` (4–32), `controlHeight`, `editorFont`, `titleFont`, `captionFont`. Each color resolves per window appearance, with Increase Contrast variants. |
 | `View.libreLeafTheme()` | Root modifier: accent tint, foreground, background. |
@@ -74,7 +74,7 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 | accent, Increase Contrast | `#1E3FB8` (8.5:1) | `#2F55D4` (6.2:1) |
 | accentText, Increase Contrast | `#1E3FB8` | `#B4C6FF` (12.5:1) |
 
-These match the shared tokens in Art's `AccentColor` and Landing. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors.
+These match the shared tokens in Art's `AccentColor` and Landing. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors; like the landing switch, its pill has an outline in `foreground` (1.5pt, 2.5pt with Increase Contrast) so the sky stays distinct from light and dark toolbars.
 
 ## Check
 
@@ -86,6 +86,6 @@ swift run NativeLatexDesignDemo                             # LibreLeaf sample w
 swift run NativeLatexDesignDemo --snapshot "$PWD/Screenshots"  # regenerate the PNGs above
 ```
 
-Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears them; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent hex values match the shared brand tokens; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ.
+Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears them; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent hex values match the shared brand tokens; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ; rendered BB-8 pixels show a dark outline on light and a light outline on dark, and a focus ring that is a clean capsule (empty bounding-box corners) within the control bounds, absent when unfocused, with no layout change on focus. Set `BB8_RENDER_DIR` to save those renders as PNGs.
 
 Still to check by hand in the real app: VoiceOver reading, Full Keyboard Access, Reduce Motion, and switching macOS appearance while two windows are open.
