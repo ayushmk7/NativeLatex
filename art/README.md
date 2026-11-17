@@ -2,28 +2,43 @@
 
 LibreWeave is the working app name. The artwork has no words in it, so a rename only changes labels. Design brief: [art direction](../docs/workspaces/art/art-direction.md). Palette: ink `#0A0A0A`, paper `#FFFFFF`, royal blue `#4169E1` (`#8BA6FF` for the dark accent).
 
-The icon is a woven sheet. The macOS silhouette is the paper, with no inner box or frame. White lines weave over and under two royal-blue threads.
+The icon is a woven sheet. The macOS silhouette is the paper, with no inner box or frame. Two lines weave over and under two royal-blue threads.
+
+| Appearance | Sheet | Lines |
+| --- | --- | --- |
+| Light | black | white |
+| Dark | white | black |
+
+The threads are royal blue in both. macOS generates the tinted and clear variants.
 
 | Path | What |
 | --- | --- |
-| `tools/gen.py` | Single source of the weave geometry. Writes every icon/mark SVG below and `../landing/icon.svg`. Edit here, not in the SVGs. |
-| `source/app-icon-dark.svg` | 1024 master that ships in the app (black sheet) |
-| `source/app-icon-dark-small.svg` | 16/32 px master: a 2×2 weave on the 16 px pixel grid |
-| `source/app-icon-light*.svg` | White-sheet variants for the dark-page favicon and a future Icon Composer layer |
-| `source/mark-black.svg`, `mark-white.svg` | One-color mark with transparent gaps |
-| `source/switch-*.svg` | Appearance-switch stills: an original rolling robot; no BB-8 artwork or code copied |
-| `exports/review.png` | Review sheet made from the actool-compiled `.icns` on light and dark grounds |
-| `exports/*.png` | Other previews |
-| `../NativeLatex/Assets.xcassets/AppIcon.appiconset` | Generated Mac icon: 16–512 pt at 1x and 2x |
+| `tools/gen.py` | Single source of the geometry. Writes every SVG below, the `.icon` layers and `../landing/icon.svg`. Edit here. |
+| `../NativeLatex/AppIcon.icon` | **The app icon.** Icon Composer document in the LibreWeave target's Resources. Sheet colour comes from `fill-specializations`; `lines-white.svg` / `lines-black.svg` swap per appearance; `threads.svg` stays blue. |
+| `../NativeLatex/Assets.xcassets/AppIcon.appiconset` | Flat black-sheet PNGs (16–512 pt, 1x/2x). They only feed in-app `NSImage("AppIcon")` lookups; actool builds the Dock icon and the legacy `.icns` from `AppIcon.icon`. |
 | `../NativeLatex/Assets.xcassets/AccentColor.colorset` | App accent: `#4169E1` light, `#8BA6FF` dark |
+| `source/app-icon-black.svg`, `app-icon-white.svg` | Flat icons on the macOS grid |
+| `source/mark-black.svg`, `mark-white.svg` | One-color mark with real gaps |
+| `source/switch-*.svg` | Appearance-switch stills: an original rolling robot; no BB-8 artwork or code copied |
 | `../landing/icon.svg` | Favicon: black sheet on light pages, white sheet on dark pages, via `prefers-color-scheme` inside the SVG |
+| `exports/review.png` | Review sheet (see below) |
+| `exports/built-app-icons.png`, `built-app-evidence.txt` | Evidence from a real `xcodebuild` of LibreWeave.app: `Assets.car` renditions and IconServices renders at 16, 32 and 256 px |
+
+`exports/review.png` rows:
+1. Light appearance as macOS 26+ draws it (IconServices): 16 and 32 px zoomed, then 256 px
+2. The same for dark appearance
+3. Icon Composer renditions from `ictool`: Default, Dark, TintedLight, TintedDark, ClearLight, ClearDark
+4. Legacy `AppIcon.icns` for macOS 14–25
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-art/tools/build.sh      # gen.py → SVGs → PNGs (native macOS SVG renderer)
-art/tools/validate.sh   # PNG sizes match Contents.json; actool compiles with no warnings
-art/tools/review.sh     # actool → .icns → art/exports/review.png
-swift art/tools/appearance-check.swift path/to/LibreLeaf.app   # icon colour under Aqua vs Dark Aqua
+art/tools/build.sh      # gen.py → SVGs/.icon layers → PNGs
+art/tools/validate.sh   # PNG sizes; actool compiles catalog + .icon with no warnings; Aqua and DarkAqua stacks exist
+art/tools/review.sh     # actool into a throwaway bundle → IconServices + ictool + .icns → exports/review.png
+clang -fobjc-arc -framework AppKit art/tools/appearance-check.m -o /tmp/appearance-check
+/tmp/appearance-check path/to/LibreWeave.app /tmp/icon   # light/dark renders of a built app, no system toggle
 ```
 
-**One universal Mac icon.** A macOS `.appiconset` has no dark slot. actool drops `luminosity: dark` entries without any warning, and the built app shows the same icon in light and dark mode (verified 2026-11-17, Xcode 27.2, macOS 27.3). Adaptive light, dark, clear and tinted icons need an Icon Composer `.icon` file in the Xcode target. The app owners would have to add it; it is not needed for the app to run.
+**Testing appearances:** `appearance-check.m` uses private IconServices classes, so it is a dev check only and must never ship. It renders each appearance without changing the system setting. Two things don't work as a test:
+- `NSWorkspace.icon(forFile:)` follows the system appearance and ignores per-process or drawing appearance.
+- Toggling the system to Light for a few seconds still returned the cached dark icon.

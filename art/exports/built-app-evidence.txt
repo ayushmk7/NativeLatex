@@ -1,0 +1,25 @@
+# AppIcon renditions in a built LibreWeave.app (xcodebuild Debug, Xcode 27.2, macOS 27.3, 2026-11-17)
+# assetutil --info Contents/Resources/Assets.car | AppIcon entries: AssetType, Appearance, PixelWidth
+Icon Image	(any)	1024
+Icon Image	(any)	1024
+Icon Image	(any)	128
+Icon Image	(any)	256
+Icon Image	(any)	32
+Icon Image	(any)	512
+Icon Image	(any)	64
+IconImageStack	ISAppearanceTintable	0
+IconImageStack	NSAppearanceNameAqua	0
+IconImageStack	NSAppearanceNameDarkAqua	0
+MultiSized Image	(any)	0
+# Info.plist
+  "CFBundleIconFile" => "AppIcon"
+  "CFBundleIconName" => "AppIcon"
+# IconServices render of the built app (art/tools/appearance-check.m), sheet = red channel above the weave
+light  16px sheet 0.04 alpha 1.00
+light  32px sheet 0.04 alpha 1.00
+light 256px sheet 0.04 alpha 1.00
+dark   16px sheet 1.00 alpha 1.00
+dark   32px sheet 1.00 alpha 1.00
+dark  256px sheet 1.00 alpha 1.00
+# NSWorkspace.icon(forFile:) with system appearance = Dark
+sheet 0.97
