@@ -160,6 +160,29 @@ final class MarkdownObjectsTests: XCTestCase {
         if case .rule = box(view, at: start("|:-"))?.content {} else { XCTFail("delimiter row is not a rule") }
     }
 
+    /// Where each row draws its column hairlines (the separator before each cell), from the drawn geometry.
+    private func hairlines(_ view: NSTextView, row: String) -> [CGFloat] {
+        let lm = view.layoutManager!, storage = view.textStorage!
+        lm.ensureLayout(for: view.textContainer!)
+        let line = (storage.string as NSString).lineRange(for: NSRange(location: (storage.string as NSString).range(of: row).location, length: 0))
+        var xs: [CGFloat] = []
+        storage.enumerateAttribute(.markdownObject, in: line) { value, range, _ in
+            guard case let .edge(_, pad, rule)? = (value as? MarkdownObjectBox)?.content, rule else { return }
+            let cell = lm.boundingRect(forGlyphRange: NSRange(location: lm.glyphIndexForCharacter(at: range.location), length: 1), in: view.textContainer!)
+            xs.append((cell.maxX - pad).rounded())
+        }
+        return xs
+    }
+
+    func testColumnHairlinesLineUpInEveryRowWhateverTheAlignment() {
+        let source = "| Name | Qty | Mid |\n|:-----|----:|:---:|\n| apple pie | 3 | x |\n| fig | 1200 | wider cell |\n"
+        let (view, _) = make(source)
+        let header = hairlines(view, row: "| Name"), first = hairlines(view, row: "| apple"), second = hairlines(view, row: "| fig")
+        XCTAssertEqual(header.count, 3)
+        XCTAssertEqual(header, first, "header and body separators at the same x")
+        XCTAssertEqual(header, second)
+    }
+
     func testTableEditRealignsOtherRows() {
         let source = "| a | b |\n|---|---|\n| x | y |\n"
         let (view, _) = make(source)

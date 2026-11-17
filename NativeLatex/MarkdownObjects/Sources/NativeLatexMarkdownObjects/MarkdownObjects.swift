@@ -16,7 +16,7 @@ let writerHiddenKey = NSAttributedString.Key("LibreWeaveMarkdownHidden")
 /// What an object glyph draws.
 public final class MarkdownObjectBox: NSObject {
     enum Content {
-        /// A table separator: whitespace up to `edge` (x in the line), with a hairline `pad` before it.
+        /// A table separator: whitespace up to `edge` (x in the line), with a hairline `pad` before it (the column start less the cell padding).
         case edge(CGFloat, pad: CGFloat, rule: Bool)
         /// The delimiter row: a horizontal rule `width` wide.
         case rule(CGFloat)
@@ -239,15 +239,14 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
             for gap in row.padding where gap.length > 0 { storage.addAttribute(.markdownObjectHidden, value: true, range: gap) }
             for (k, pipe) in row.pipes.enumerated() {
                 let cell = k + (row.leading ? 0 : 1) // the cell that follows this pipe
-                let edge: CGFloat
+                var edge = total, shift: CGFloat = 0
                 if cell < n, cell < row.cells.count {
                     let slack = widths[cell] - cellWidths[index][cell]
-                    let shift: CGFloat = switch table.alignments[cell] { case .right: slack; case .center: (slack / 2).rounded(); default: 0 }
+                    shift = switch table.alignments[cell] { case .right: slack; case .center: (slack / 2).rounded(); default: 0 }
                     edge = starts[cell] + shift
-                } else {
-                    edge = total
                 }
-                storage.addAttribute(.markdownObject, value: MarkdownObjectBox(.edge(edge, pad: pad, rule: k > 0 || !table.leadingPipe)),
+                // The hairline sits `pad` before the column start, not before this row's aligned text.
+                storage.addAttribute(.markdownObject, value: MarkdownObjectBox(.edge(edge, pad: pad + shift, rule: k > 0 || !table.leadingPipe)),
                                      range: NSRange(location: pipe, length: 1))
             }
         }
