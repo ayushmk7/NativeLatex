@@ -138,6 +138,8 @@ enum MarkdownRenderer {
     li > ul, li > ol { margin-top:0; margin-bottom:0; }
     main > :first-child, blockquote > :first-child { margin-top:0; } main > :last-child, blockquote > :last-child { margin-bottom:0; }
     ul.task-list input[type="checkbox"] { margin:0 .5em 0 0; }
+    ul.task-list input[type=checkbox] { appearance:none; -webkit-appearance:none; width:13px; height:13px; vertical-align:-1px; border:1px solid var(--muted); border-radius:3px; opacity:1; }
+    ul.task-list input[type=checkbox]:checked { background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13'%3E%3Cpath d='M3.2 6.5L5.6 9.6L10 3.4' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/13px no-repeat; border-color:var(--accent); }
     """
 }
 

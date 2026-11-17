@@ -640,13 +640,13 @@ final class MarkdownWriteTests: XCTestCase {
             let s = source.scrollView(text: text, label: "Source"), w = writer.scrollView(text: text, label: "Write")
             s.frame = NSRect(x: 0, y: 0, width: 450, height: 500); w.frame = NSRect(x: 450, y: 0, width: 450, height: 500)
             content.addSubview(s); content.addSubview(w)
-            for handle in [source, writer] as [TextViewHandle] { handle.onText = { [unowned self] in self.set($0) } }
+            for handle in [source, writer] as [TextViewHandle] { handle.onText = { [weak self] in self?.set($0) } }
             for view in [sv, wv] {
-                observers.append(NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: view.textStorage, queue: nil) { [unowned self] _ in
+                observers.append(NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: view.textStorage, queue: nil) { [weak self] _ in
                     MainActor.assumeIsolated {
-                        guard !self.source.isUpdating, !self.writer.isUpdating, view.textStorage!.editedMask.contains(.editedCharacters) else { return }
+                        guard let self, !self.source.isUpdating, !self.writer.isUpdating, view.textStorage!.editedMask.contains(.editedCharacters) else { return }
                         let text = view.string
-                        DispatchQueue.main.async { self.set(text) }
+                        DispatchQueue.main.async { [weak self] in self?.set(text) } // a short-lived Pair may be gone
                     }
                 })
             }
@@ -727,7 +727,9 @@ final class MarkdownWriteTests: XCTestCase {
         for (text, caret, expected) in [("- foo", 2, "- \n- foo"), ("1. foo", 3, "1. \n2. foo"), ("> foo", 2, "> \n> foo"),
                                         ("- [ ] task", 6, "- [ ] \n- [ ] task"), ("- ", 2, ""), ("a\n- \nb", 4, "a\n\nb"),
                                         // Only spaces after the caret: still empty, so the list ends and the spaces go too.
-                                        ("-   ", 2, ""), ("1.  ", 3, ""), (">  ", 2, ""), ("a\n-  \nb", 4, "a\n\nb"), ("-  x", 2, "- \n-  x")] {
+                                        ("-   ", 2, ""), ("1.  ", 3, ""), (">  ", 2, ""), ("a\n-  \nb", 4, "a\n\nb"),
+                                        // The marker and its spaces are one caret stop now (drawn as a bullet): caret 2 lands after them.
+                                        ("-  x", 2, "-  \n-  x")] {
             let handle = WritingHandle()
             _ = handle.scrollView(text: text, label: "Write")
             let view = handle.view!
@@ -1019,10 +1021,10 @@ final class MarkdownWriteTests: XCTestCase {
             return stops
         }
         view.setSelectedRange(NSRange(location: 0, length: 0))
-        let right = walk { view.moveRight(nil) }
+        let right = walk { view.doCommand(by: #selector(NSResponder.moveRight(_:))) }
         XCTAssertEqual(right.last, storage.length, "reaches the end of the text")
         view.setSelectedRange(NSRange(location: storage.length, length: 0))
-        let left = walk { view.moveLeft(nil) }
+        let left = walk { view.doCommand(by: #selector(NSResponder.moveLeft(_:))) }
         XCTAssertEqual(left.last, 0)
         XCTAssertEqual(Set(right), Set(left), "same stops both ways")
         for stops in [right, left] {
@@ -1034,7 +1036,9 @@ final class MarkdownWriteTests: XCTestCase {
         let head = (text as NSString).range(of: "Head").location
         XCTAssertTrue(right.contains(head) && !right.contains(head - 1) && !right.contains(head - 2), "heading's one stop is after `# `")
         let opener = pair.location(of: "**bold")
-        XCTAssertTrue(right.contains(opener + 2) && !right.contains(opener) && !right.contains(opener + 1), "one stop at **|bold")
+        XCTAssertTrue(right.contains(opener) && !right.contains(opener + 1) && !right.contains(opener + 2), "one stop before **bold (typing there isn't bold)")
+        let closer = pair.location(of: "** and")
+        XCTAssertTrue(right.contains(closer) && !right.contains(closer + 2), "one stop before the closing ** (typing continues the bold, as TextEdit)")
 
         // Backspace at the heading's stop removes `# ` (TextEdit: delete at a heading's start makes it body text).
         view.setSelectedRange(NSRange(location: head, length: 0))
@@ -1086,13 +1090,149 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertFalse(MarkdownFormat.isTableRow((pipes as NSString).lineRange(for: NSRange(location: (pipes as NSString).length - 1, length: 0)), in: pipes as NSString))
         XCTAssertLessThan(ContinuousClock.now - start, .milliseconds(30), "bounded table scan")
         XCTAssertEqual(press("---\ntitle: x\n---\n", at: "title: x"), "---\ntitle: x\n\n---\n")
-        XCTAssertEqual(press("One two.", at: "One", #selector(NSResponder.insertLineBreak(_:))), "One\n two.", "Shift-Return: \\n, never U+2028")
+        XCTAssertEqual(press("One two.", at: "One", #selector(NSResponder.insertLineBreak(_:))), "One\\\n two.", "Shift-Return: a hard break, never U+2028")
 
         guard (try? await MarkdownRenderer.render("x")) != nil else { throw XCTSkip("Pandoc not installed") }
         let prose = try await MarkdownRenderer.render(press("First line of prose", at: "First line") + "next")
         XCTAssertEqual(prose.components(separatedBy: "<p>").count - 1, 2, "two paragraphs in Read: \(prose)")
         let list = try await MarkdownRenderer.render(press(press("- item", at: "item"), at: "- item\n- ") + "next")
         XCTAssertTrue(list.contains("<p>next</p>"), "text after an ended list is its own paragraph: \(list)")
+    }
+
+    static let blocks = """
+    Intro.
+
+    - one
+      - nested
+
+    1. first
+
+    - [ ] todo
+    - [x] done
+
+    > quoted line
+    > - continues the paragraph
+
+    > quote:
+    >
+    > - quoted item
+
+    ***
+
+    Title
+    ---
+    """
+
+    /// Bullets, numbers, task boxes, quote bars and rules look like Read: decorations drawn over the unchanged
+    /// Markdown, text at Read's indents, Pandoc's meaning (no list right under paragraph text). The source,
+    /// caret, Delete, undo, copy and the accessibility value all still see the exact Markdown.
+    func testBlockVisualsMatchReadAndKeepTheSource() async throws {
+        let text = Self.blocks
+        let pair = Pair(text)
+        defer { pair.window.close() }
+        pair.window.appearance = NSAppearance(named: .aqua)
+        let view = pair.wv, storage = view.textStorage!
+        pair.window.makeFirstResponder(view)
+        XCTAssertTrue(view.layoutManager is MarkdownLayoutManager)
+        func decoration(_ needle: String, _ offset: Int = 0) -> String? {
+            storage.attribute(.markdownDecoration, at: pair.location(of: needle) + offset, effectiveRange: nil) as? String
+        }
+        XCTAssertEqual(decoration("- one"), "disc")
+        XCTAssertEqual(decoration("- nested"), "circle")
+        XCTAssertNil(decoration("1. first"), "numbers stay text")
+        XCTAssertEqual(decoration("[ ] todo"), "task")
+        XCTAssertEqual(decoration("[x] done"), "taskDone")
+        XCTAssertEqual(decoration("***"), "rule")
+        XCTAssertNil(decoration("---"), "--- under text is a heading underline, not a rule")
+        XCTAssertNil(decoration("- continues"), "Pandoc: a list needs a blank line before it")
+        XCTAssertEqual(decoration("- quoted item"), "disc")
+        XCTAssertEqual(storage.attribute(.markdownQuote, at: pair.location(of: "quoted line"), effectiveRange: nil) as? Int, 1)
+
+        // Text starts where Read's does: lists 40 pt per level, task lists 18 pt + box, quotes 18 pt.
+        let layout = view.layoutManager!
+        layout.ensureLayout(for: view.textContainer!)
+        func x(_ needle: String) -> CGFloat {
+            layout.location(forGlyphAt: layout.glyphIndexForCharacter(at: pair.location(of: needle))).x - view.textContainer!.lineFragmentPadding
+        }
+        XCTAssertEqual(x("one"), 40, accuracy: 0.5)
+        XCTAssertEqual(x("nested"), 80, accuracy: 0.5)
+        XCTAssertEqual(x("first"), 40, accuracy: 0.5)
+        XCTAssertEqual(x("[ ] todo"), 18, accuracy: 0.5)
+        XCTAssertEqual(x("todo"), 18 + MarkdownStyler.taskWidth, accuracy: 0.5)
+        XCTAssertEqual(x("done"), 18 + MarkdownStyler.taskWidth, accuracy: 0.5, "[x] as wide as [ ]")
+        XCTAssertEqual(x("quoted line"), 18, accuracy: 0.5)
+        XCTAssertEqual(x("quoted item"), 58, accuracy: 0.5)
+
+        // Pixels: a dark bullet, a #2563EB quote bar and checked box, a hairline rule.
+        let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let origin = view.textContainerOrigin
+        func pixel(at point: NSPoint) -> NSColor { rep.colorAt(x: Int(point.x * CGFloat(rep.pixelsWide) / view.bounds.width), y: Int(point.y * CGFloat(rep.pixelsHigh) / view.bounds.height))!.usingColorSpace(.sRGB)! }
+        func glyphBox(_ needle: String, _ length: Int = 1) -> NSRect {
+            layout.boundingRect(forGlyphRange: layout.glyphRange(forCharacterRange: NSRange(location: pair.location(of: needle), length: length), actualCharacterRange: nil), in: view.textContainer!).offsetBy(dx: origin.x, dy: origin.y)
+        }
+        let font = NSFont.systemFont(ofSize: MarkdownStyler.bodySize)
+        func fragment(_ needle: String) -> NSRect {
+            layout.lineFragmentRect(forGlyphAt: layout.glyphIndexForCharacter(at: pair.location(of: needle)), effectiveRange: nil).offsetBy(dx: origin.x, dy: origin.y)
+        }
+        func baseline(_ needle: String) -> CGFloat {
+            fragment(needle).minY + layout.location(forGlyphAt: layout.glyphIndexForCharacter(at: pair.location(of: needle))).y
+        }
+        XCTAssertLessThan(pixel(at: NSPoint(x: glyphBox("- one").midX, y: baseline("- one") - font.xHeight / 2)).brightnessComponent, 0.3, "bullet drawn")
+        // #2563EB, compared loosely: the bitmap's colour space shifts the components a little.
+        func isBrandBlue(_ c: NSColor) -> Bool { c.blueComponent > 0.8 && c.redComponent < 0.35 && c.greenComponent < 0.5 }
+        let bar = pixel(at: NSPoint(x: origin.x + view.textContainer!.lineFragmentPadding + 1.5, y: fragment("quoted line").midY))
+        XCTAssertTrue(isBrandBlue(bar), "quote bar is #2563EB: \(bar)")
+        let center = NSPoint(x: glyphBox("[x] done", 3).midX, y: baseline("[x] done") - font.capHeight / 2)
+        let fill = pixel(at: NSPoint(x: center.x - 4, y: center.y - 4)) // inside the box, clear of the tick
+        XCTAssertTrue(isBrandBlue(fill), "checked box is #2563EB: \(fill)")
+        let open = pixel(at: NSPoint(x: glyphBox("[ ] todo", 3).midX, y: baseline("[ ] todo") - font.capHeight / 2))
+        XCTAssertGreaterThan(open.brightnessComponent, 0.9, "unchecked box is empty")
+        let rule = fragment("***")
+        XCTAssertLessThan(pixel(at: NSPoint(x: rule.minX + 200, y: (rule.minY + font.ascender - font.descender).rounded() - 0.5)).brightnessComponent, 0.97, "rule drawn")
+
+        // Source, accessibility and copy are the Markdown; the caret steps over a marker; Delete removes it whole.
+        XCTAssertEqual(pair.doc, text)
+        XCTAssertEqual(view.accessibilityValue() as? String, text)
+        let board = NSPasteboard.withUniqueName() // never the user's clipboard
+        defer { board.releaseGlobally() }
+        view.setSelectedRange((text as NSString).range(of: "- [ ] todo"))
+        let plain = try XCTUnwrap(view.writablePasteboardTypes.first) // a plain-text view's string type (legacy name)
+        XCTAssertTrue(view.writeSelection(to: board, type: plain), "copy")
+        XCTAssertEqual(board.string(forType: .string), "- [ ] todo")
+        let line = pair.location(of: "- [ ] todo")
+        view.setSelectedRange(NSRange(location: line - 1, length: 0))
+        view.doCommand(by: #selector(NSResponder.moveRight(_:)))
+        XCTAssertEqual(view.selectedRange().location, pair.location(of: "todo"), "one stop after the box")
+        view.doCommand(by: #selector(NSResponder.deleteBackward(_:))); pair.pump()
+        XCTAssertEqual(pair.doc, text.replacingOccurrences(of: "- [ ] todo", with: "todo"), "Delete removes the task marker")
+        pair.undo()
+        XCTAssertEqual(pair.doc, text, "undo restores the bytes")
+
+        guard (try? await MarkdownRenderer.render("x")) != nil else { throw XCTSkip("Pandoc not installed") }
+        let html = try await MarkdownRenderer.render(text)
+        XCTAssertTrue(html.contains("quoted line - continues the paragraph") || html.contains("quoted line\n- continues the paragraph"), html)
+        XCTAssertTrue(MarkdownRenderer.css.contains("li > ul, li > ol { margin-top:0; margin-bottom:0; }"), "nested lists stay tight in Read")
+    }
+
+    /// Typing stays fast on a 1 MiB document full of lists, tasks, quotes and rules.
+    func testBlockVisualsTypingLatencyOnOneMiB() {
+        var big = ""
+        while big.utf8.count < 1 << 20 { big += "Para.\n\n- a\n  - b\n1. c\n\n- [ ] t\n- [x] d\n\n> q\n>\n> - qi\n\n***\n\n" }
+        let pair = Pair(big)
+        defer { pair.window.close() }
+        pair.wv.setSelectedRange(NSRange(location: 500_000, length: 0))
+        pair.key(pair.wv, "w")
+        var worst: Duration = .zero
+        for c in ["a", "-", " ", ">", "\r"] {
+            let start = ContinuousClock.now
+            pair.key(pair.wv, c, code: c == "\r" ? 36 : 0, settle: false)
+            pair.wv.layoutManager?.ensureLayout(forCharacterRange: pair.wv.selectedRange())
+            worst = max(worst, ContinuousClock.now - start)
+            pair.pump()
+        }
+        XCTAssertLessThan(worst, .milliseconds(100), "worst keystroke \(worst)")
+        XCTAssertEqual(pair.wv.string, pair.doc)
     }
 
     /// Moving the caret onto a hidden fence line reveals it without moving the text below.

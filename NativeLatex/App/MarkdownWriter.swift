@@ -5,6 +5,83 @@ import SwiftUI
 extension NSAttributedString.Key {
     /// Markup characters drawn as nothing (null glyphs) in the Write view. The text itself is untouched.
     static let markdownHidden = NSAttributedString.Key("LibreWeaveMarkdownHidden")
+    /// Block markup kept as (clear) glyphs and drawn over by `MarkdownLayoutManager` (bullets, task boxes,
+    /// rules). The caret treats it like hidden markup: one stop after it, Delete removes it whole.
+    static let markdownAtomic = NSAttributedString.Key("LibreWeaveMarkdownAtomic")
+    /// What `MarkdownLayoutManager` draws for a range: a `MarkdownDecoration` raw value.
+    static let markdownDecoration = NSAttributedString.Key("LibreWeaveMarkdownDecoration")
+    /// Quote depth of a line (Int): that many accent bars at its left edge.
+    static let markdownQuote = NSAttributedString.Key("LibreWeaveMarkdownQuote")
+}
+
+/// Block visuals Write draws where Read's CSS would: list bullets (disc, circle, square by depth), task
+/// boxes and thematic rules.
+enum MarkdownDecoration: String {
+    case disc, circle, square, task, taskDone, rule
+}
+
+/// Draws quote bars and `MarkdownDecoration`s behind the text. Only drawing: glyphs, layout, selection
+/// and the text itself are the standard TextKit ones.
+final class MarkdownLayoutManager: NSLayoutManager {
+    /// Read: `blockquote { border-left: 3px; padding-left: 1em }`, so each level indents 18 pt.
+    static let quoteIndent: CGFloat = 18, quoteBar: CGFloat = 3
+
+    override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
+        super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
+        guard let storage = textStorage, let container = textContainers.first else { return }
+        let chars = characterRange(forGlyphRange: glyphsToShow, actualGlyphRange: nil)
+        let accent = NSColor(Theme.accent), secondary = NSColor(Theme.secondary), line = NSColor(Theme.line)
+        let padding = container.lineFragmentPadding
+        storage.enumerateAttribute(.markdownQuote, in: chars) { value, range, _ in
+            guard let depth = value as? Int else { return }
+            accent.setFill()
+            enumerateLineFragments(forGlyphRange: glyphRange(forCharacterRange: range, actualCharacterRange: nil)) { rect, _, _, _, _ in
+                for level in 0..<depth {
+                    NSRect(x: origin.x + rect.minX + padding + CGFloat(level) * Self.quoteIndent, y: origin.y + rect.minY,
+                           width: Self.quoteBar, height: rect.height).fill()
+                }
+            }
+        }
+        storage.enumerateAttribute(.markdownDecoration, in: chars) { value, range, _ in
+            guard let raw = value as? String, let decoration = MarkdownDecoration(rawValue: raw) else { return }
+            let glyphs = glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            guard glyphs.length > 0 else { return }
+            let fragment = lineFragmentRect(forGlyphAt: glyphs.location, effectiveRange: nil)
+            let baseline = origin.y + fragment.minY + location(forGlyphAt: glyphs.location).y
+            let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont ?? .systemFont(ofSize: MarkdownStyler.bodySize)
+            let box = boundingRect(forGlyphRange: glyphs, in: container).offsetBy(dx: origin.x, dy: origin.y)
+            switch decoration {
+            case .rule:
+                line.setFill()
+                NSRect(x: origin.x + fragment.minX + padding, y: (origin.y + fragment.minY + font.ascender - font.descender).rounded() - 0.5,
+                       width: fragment.width - 2 * padding, height: 1).fill()
+            case .disc, .circle, .square:
+                let d: CGFloat = 5.5
+                let dot = NSRect(x: box.midX - d / 2, y: baseline - font.xHeight / 2 - d / 2, width: d, height: d)
+                (storage.attribute(.markdownQuote, at: range.location, effectiveRange: nil) == nil ? NSColor(Theme.foreground) : secondary).set()
+                switch decoration {
+                case .disc: NSBezierPath(ovalIn: dot).fill()
+                case .circle: let p = NSBezierPath(ovalIn: dot.insetBy(dx: 0.5, dy: 0.5)); p.lineWidth = 1; p.stroke()
+                default: dot.insetBy(dx: 0.25, dy: 0.25).fill()
+                }
+            case .task, .taskDone:
+                let side: CGFloat = 13
+                let square = NSRect(x: box.midX - side / 2, y: baseline - font.capHeight / 2 - side / 2, width: side, height: side)
+                let path = NSBezierPath(roundedRect: square.insetBy(dx: 0.5, dy: 0.5), xRadius: 3, yRadius: 3)
+                if decoration == .taskDone {
+                    accent.setFill(); path.fill()
+                    let check = NSBezierPath()
+                    check.move(to: NSPoint(x: square.minX + 3.2, y: square.midY))
+                    check.line(to: NSPoint(x: square.minX + 5.6, y: square.maxY - 3.4)) // flipped view: maxY is the bottom
+                    check.line(to: NSPoint(x: square.maxX - 3, y: square.minY + 3.4))
+                    check.lineWidth = 1.8; check.lineCapStyle = .round; check.lineJoinStyle = .round
+                    NSColor.white.setStroke(); check.stroke()
+                } else {
+                    secondary.setStroke(); path.lineWidth = 1; path.stroke()
+                }
+            }
+        }
+    }
 }
 
 /// Styles Markdown source so it reads like the rendered document: headings, emphasis, code, links,
@@ -43,8 +120,12 @@ enum MarkdownStyler {
     }
     private static let heading = regex(#"^ {0,3}(#{1,6})([ \t]+|$)"#)
     private static let quote = regex(#"^ {0,3}(>[ \t]?)+"#)
-    private static let list = regex(#"^[ \t]*([-*+]|\d{1,9}[.)])[ \t]+(\[[ xX]\][ \t]+)?"#)
-    private static let literalLine = regex(#"^ {0,3}(\||\$\$|<|---[ \t]*$|\+\+\+).*$"#)
+    /// Groups: quote prefix, indentation, marker, task box.
+    private static let list = regex(#"^((?: {0,3}>[ \t]?)*)([ \t]*)([-*+]|\d{1,9}[.)])[ \t]+(\[[ xX]\][ \t]+)?"#)
+    private static let setext = regex(#"^ {0,3}(=+|-+)[ \t]*$"#)
+    private static let hardBreak = regex(#"(?<!\\)\\$"#)
+    private static let rule = regex(#"^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$"#)
+    private static let literalLine = regex(#"^ {0,3}(\||\$\$|<|\+\+\+).*$"#)
     /// Longest inline span (emphasis, link, image, math) the Write view styles, in UTF-16 units. Unbounded
     /// lazy spans made a long line of unmatched markers quadratic: a 24 KB line of `*a ` cost seconds per
     /// keystroke. Bounded, each marker scans at most this far, so styling stays linear in the line length.
@@ -96,7 +177,60 @@ enum MarkdownStyler {
     /// Restyles `limit` (whole paragraphs; all of `storage` if nil). Hidden markup stays hidden everywhere;
     /// only fence lines inside `reveal` (the caret's lines) turn from clear to dim, which never moves text. Code fences are found over the whole text, since an opening fence
     /// anywhere above changes what follows; a fence block touching `limit` is restyled whole.
-    static func apply(to storage: NSTextStorage, reveal: NSRange, in limit: NSRange? = nil, fences known: [(range: NSRange, markers: [NSRange])]? = nil) {
+    /// `range` plus the lines around it: a line's look depends on its neighbours (`---` under text is a heading
+    /// underline, not a rule; a lazy line continues the quote above), so an edit restyles them too.
+    /// Plain paragraph text (could sit above a setext underline): not blank, a heading, quote, list item or fence.
+    static func isParagraphText(_ line: String) -> Bool {
+        !line.allSatisfy(\.isWhitespace) && line.firstMatch(of: #/^ {0,3}(#|>|```|~~~|[-*+][ \t]|\d{1,9}[.)][ \t])/#) == nil
+    }
+
+    /// Width of a task box with its gap, as Read's checkbox CSS: 13 px + `margin-right: .5em`.
+    static let taskWidth: CGFloat = 13 + 0.5 * bodySize
+
+    /// Pandoc needs a blank line (or a block boundary) before a list: `- x` right under paragraph text is
+    /// more of that paragraph. A marker line starts or continues a list after a blank line, another item,
+    /// an indented line (item content), a heading, or at the top. Quote markers are ignored on both lines.
+    static func startsList(_ m: NSTextCheckingResult, in text: NSString) -> Bool {
+        let line = m.range.location
+        guard line > 0 else { return true }
+        let previous = text.substring(with: text.lineRange(for: NSRange(location: line - 1, length: 0)))
+        let unquoted = m.range(at: 1).length > 0 ? String(previous.trimmingPrefix(#/(?: {0,3}>[ \t]?)*/#)) : previous
+        if unquoted.allSatisfy(\.isWhitespace) || unquoted.first == " " || unquoted.first == "\t" { return true }
+        return unquoted.firstMatch(of: #/^(?:[-*+]|\d{1,9}[.)])[ \t]|^ {0,3}#{1,6}([ \t]|$)/#) != nil
+    }
+
+    /// Lines styled from context (a lazy line continues the quote any number of lines above it; a list needs a
+    /// blank line or another item above) depend on their whole block, so an edit restyles out to the blank
+    /// lines around it.
+    // ponytail: at most `maxBlockLines` each way, so a 1 MiB text without blank lines stays cheap per keystroke;
+    // a lazy quote run longer than that can keep stale styling until the next full restyle.
+    static let maxBlockLines = 200
+    static func block(around range: NSRange, in text: NSString) -> NSRange {
+        func blank(_ line: NSRange) -> Bool { text.substring(with: line).allSatisfy(\.isWhitespace) }
+        var start = range.location, end = NSMaxRange(range)
+        for _ in 0..<maxBlockLines where start > 0 {
+            let line = text.lineRange(for: NSRange(location: start - 1, length: 0))
+            if blank(line) { break }
+            start = line.location
+        }
+        for _ in 0..<maxBlockLines where end < text.length {
+            let line = text.lineRange(for: NSRange(location: end, length: 0))
+            if blank(line) { break }
+            end = NSMaxRange(line)
+        }
+        return NSRange(location: start, length: end - start)
+    }
+
+    static func withNextLine(_ range: NSRange, in text: NSString) -> NSRange {
+        var r = NSMaxRange(range) < text.length ? NSUnionRange(range, text.lineRange(for: NSRange(location: NSMaxRange(range), length: 0))) : range
+        // And the line before: a setext underline changes the line above it.
+        if r.location > 0 { r = NSUnionRange(r, text.lineRange(for: NSRange(location: r.location - 1, length: 0))) }
+        return r
+    }
+
+    /// Returns the range actually restyled (whole blocks around `limit`), for the caller to redisplay.
+    @discardableResult
+    static func apply(to storage: NSTextStorage, reveal: NSRange, in limit: NSRange? = nil, fences known: [(range: NSRange, markers: [NSRange])]? = nil) -> NSRange {
         let text = storage.string as NSString
         let all = NSRange(location: 0, length: text.length)
         let blocks = known ?? fences(text)
@@ -104,12 +238,13 @@ enum MarkdownStyler {
         // first line instead of the last after a delete at the end of the text.
         var target = limit.map { r -> NSRange in
             let lo = min(max(0, r.location), text.length), hi = min(max(lo, NSMaxRange(r)), text.length)
-            return text.paragraphRange(for: NSRange(location: lo, length: hi - lo))
+            return withNextLine(text.paragraphRange(for: NSRange(location: lo, length: hi - lo)), in: text)
         } ?? all
         for block in blocks where NSIntersectionRange(block.range, target).length > 0 || NSLocationInRange(target.location, block.range) {
             target = NSUnionRange(target, text.paragraphRange(for: block.range))
         }
         if let matter = frontMatter(text), target.location <= NSMaxRange(matter) { target = NSUnionRange(target, text.paragraphRange(for: matter)) }
+        if limit != nil { target = block(around: target, in: text) }
         let fg = NSColor(Theme.foreground), secondary = NSColor(Theme.secondary), accent = NSColor(Theme.accentText)
         let body = NSFont.systemFont(ofSize: bodySize)
         let mono = NSFont.monospacedSystemFont(ofSize: bodySize - 2, weight: .regular)
@@ -128,6 +263,15 @@ enum MarkdownStyler {
         func hide(_ range: NSRange) {
             guard range.length > 0 else { return }
             storage.addAttribute(.markdownHidden, value: true, range: range)
+        }
+        /// Line-start markup before indented text: clear glyphs kerned to zero width, not null glyphs. After
+        /// leading null glyphs TextKit lays the line out at `headIndent`, ignoring `firstLineHeadIndent`.
+        func collapse(_ range: NSRange) {
+            storage.addAttributes([.foregroundColor: NSColor.clear, .markdownAtomic: true], range: range)
+            for i in range.location..<NSMaxRange(range) {
+                let width = (text.substring(with: NSRange(location: i, length: 1)) as NSString).size(withAttributes: [.font: body]).width
+                storage.addAttribute(.kern, value: -width, range: NSRange(location: i, length: 1))
+            }
         }
         func isProtected(_ range: NSRange) -> Bool { protected.intersects(integersIn: range.location..<NSMaxRange(range)) }
         func protect(_ range: NSRange) { protected.insert(integersIn: range.location..<NSMaxRange(range)) }
@@ -164,25 +308,98 @@ enum MarkdownStyler {
         }
         // Front matter at the very top stays literal.
         if let matter = frontMatter(text), NSIntersectionRange(matter, target).length > 0 { monoLiteral(matter) }
+        // Pandoc: a rule needs a blank line (or the top) above it. Under paragraph text, `---` / `===` make that
+        // line a setext heading (h2 / h1); `***` or `- - -` there are just more paragraph text.
+        for m in matches(setext) where !isProtected(m.range) {
+            guard m.range.location > 0 else { continue }
+            let previous = text.lineRange(for: NSRange(location: m.range.location - 1, length: 0))
+            guard !isProtected(previous), isParagraphText(text.substring(with: previous)) else { continue }
+            let level = text.character(at: m.range(at: 1).location) == 0x3D ? 1 : 2
+            storage.addAttributes(headingStyles[level - 1], range: previous)
+            storage.addAttributes([.foregroundColor: NSColor.clear, .markdownAtomic: true], range: m.range)
+            protect(m.range)
+        }
+        for m in matches(rule) where !isProtected(m.range) {
+            let previous = m.range.location > 0 ? text.substring(with: text.lineRange(for: NSRange(location: m.range.location - 1, length: 0))) : ""
+            guard previous.allSatisfy(\.isWhitespace) else { continue }
+            storage.addAttributes([.foregroundColor: NSColor.clear, .markdownAtomic: true, .markdownDecoration: MarkdownDecoration.rule.rawValue], range: m.range)
+            protect(m.range)
+        }
         for m in matches(literalLine) where !isProtected(m.range) { monoLiteral(m.range) }
 
         for m in matches(heading) where !isProtected(m.range) {
             let line = text.lineRange(for: m.range)
             storage.addAttributes(headingStyles[m.range(at: 1).length - 1], range: line)
             hide(m.range)
+            storage.addAttribute(.markdownAtomic, value: true, range: m.range) // block marker: caret after it
         }
         for m in matches(quote) where !isProtected(m.range) {
             let line = text.lineRange(for: m.range)
-            storage.addAttribute(.foregroundColor, value: secondary, range: line)
+            let depth = text.substring(with: m.range).filter { $0 == ">" }.count
             let indented = paragraph.mutableCopy() as! NSMutableParagraphStyle
-            indented.firstLineHeadIndent = 16; indented.headIndent = 16
-            storage.addAttribute(.paragraphStyle, value: indented, range: line)
-            hide(m.range)
+            indented.firstLineHeadIndent = CGFloat(depth) * MarkdownLayoutManager.quoteIndent; indented.headIndent = indented.firstLineHeadIndent
+            storage.addAttributes([.foregroundColor: secondary, .paragraphStyle: indented], range: line)
+            storage.addAttribute(.markdownQuote, value: depth, range: line)
+            collapse(m.range)
         }
-        for m in matches(list) where !isProtected(m.range) {
-            storage.addAttribute(.foregroundColor, value: accent, range: m.range) // markers stay visible, like bullets
+        // Lazy continuation: a non-blank line right under quoted text is more of that quote in Pandoc, even
+        // without `>` (and even `- b`). Lines are walked in order so a run of lazy lines follows the quote.
+        var lazy = target.location
+        while lazy < NSMaxRange(target) {
+            let line = text.lineRange(for: NSRange(location: lazy, length: 0))
+            lazy = NSMaxRange(line)
+            guard line.location > 0, storage.attribute(.markdownQuote, at: line.location, effectiveRange: nil) == nil, !isProtected(line),
+                  let depth = storage.attribute(.markdownQuote, at: line.location - 1, effectiveRange: nil) as? Int else { continue }
+            let content = text.substring(with: line)
+            let above = text.substring(with: text.lineRange(for: NSRange(location: line.location - 1, length: 0)))
+            guard !content.allSatisfy(\.isWhitespace), !above.drop(while: { $0 == ">" || $0 == " " || $0 == "\t" }).allSatisfy(\.isWhitespace),
+                  content.firstMatch(of: #/^ {0,3}(#|```|~~~)/#) == nil else { continue }
+            let style = storage.attribute(.paragraphStyle, at: line.location - 1, effectiveRange: nil) ?? paragraph
+            storage.addAttributes([.foregroundColor: secondary, .paragraphStyle: style, .markdownQuote: depth], range: line)
+        }
+        // Lists: text starts where Read's starts (40 pt per level; task lists 18 pt, box inline), wrapped lines
+        // align under it. Bullets and task boxes are drawn over their clear marker glyphs; numbers stay text.
+        for m in matches(list) where !isProtected(NSRange(location: m.range(at: 3).location, length: NSMaxRange(m.range) - m.range(at: 3).location))
+            && startsList(m, in: text) {
+            let line = text.lineRange(for: m.range)
+            let marker = m.range(at: 3), task = m.range(at: 4)
+            let atomic = NSRange(location: marker.location, length: NSMaxRange(m.range) - marker.location)
+            let indent = text.substring(with: m.range(at: 2)).reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
+            // ponytail: nesting depth from indentation (2 columns a level), not Pandoc's exact list-item rules.
+            let depth = indent / 2
+            storage.addAttribute(.markdownAtomic, value: true, range: atomic)
+            var visible = text.substring(with: m.range(at: 2))
+            if task.location != NSNotFound {
+                collapse(NSRange(location: marker.location, length: task.location - marker.location))
+                let box = NSRange(location: task.location, length: 3)
+                let done = text.character(at: task.location + 1) != 0x20
+                storage.addAttributes([.foregroundColor: NSColor.clear, .markdownDecoration: (done ? MarkdownDecoration.taskDone : .task).rawValue], range: box)
+                // `[ ]` and `[x]` take Read's checkbox width (13 pt box + .4em margin) whatever their glyphs.
+                let natural = (text.substring(with: task) as NSString).size(withAttributes: [.font: body]).width
+                storage.addAttribute(.kern, value: taskWidth - natural, range: NSRange(location: task.location + 2, length: 1))
+            } else if text.character(at: marker.location) > 0x39 || text.character(at: marker.location) < 0x30 {
+                let shape: [MarkdownDecoration] = [.disc, .circle, .square]
+                storage.addAttributes([.foregroundColor: NSColor.clear, .markdownDecoration: shape[depth % 3].rawValue], range: marker)
+                visible += text.substring(with: NSRange(location: marker.location, length: NSMaxRange(m.range) - marker.location))
+            } else {
+                visible += text.substring(with: NSRange(location: marker.location, length: NSMaxRange(m.range) - marker.location))
+            }
+            let quoted = (storage.attribute(.paragraphStyle, at: line.location, effectiveRange: nil) as? NSParagraphStyle)?.headIndent ?? 0
+            let width = (visible as NSString).size(withAttributes: [.font: body]).width
+            let style = paragraph.mutableCopy() as! NSMutableParagraphStyle
+            if task.location != NSNotFound {
+                // Read: `ul.task-list { padding-left: 1.2em }`, the box inline before the text.
+                style.firstLineHeadIndent = max(quoted, quoted + CGFloat(depth + 1) * 18 - width)
+                style.headIndent = style.firstLineHeadIndent + width + taskWidth
+            } else {
+                style.headIndent = quoted + CGFloat(depth + 1) * 40 // Read: `ul, ol { padding-left: 40px }`, marker outside
+                style.firstLineHeadIndent = max(quoted, style.headIndent - width)
+            }
+            storage.addAttribute(.paragraphStyle, value: style, range: line)
+            protect(atomic)
         }
 
+        for m in matches(hardBreak) where !isProtected(m.range) { hide(m.range) } // Shift-Return's `\`
         for m in matches(code) where !isProtected(m.range) {
             storage.addAttributes([.font: mono, .backgroundColor: codeBackground], range: m.range(at: 2))
             hide(m.range(at: 1))
@@ -209,6 +426,7 @@ enum MarkdownStyler {
             hide(m.range(at: 1))
             hide(m.range(at: 3))
         }
+        return target
     }
 }
 
@@ -510,6 +728,9 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
             MainActor.assumeIsolated { self?.centerColumn() }
         }
         centerColumn()
+        if let container = view.textContainer, !(view.layoutManager is MarkdownLayoutManager) {
+            container.replaceLayoutManager(MarkdownLayoutManager()) // draws bullets, task boxes, quote bars, rules
+        }
         view.layoutManager?.delegate = self // TextKit 1 for per-glyph hiding
         view.layoutManager?.allowsNonContiguousLayout = true // large files: lay out only what's visible
         // Reveal follows the caret only after a click or drag ends, so the line doesn't reflow under the mouse.
@@ -606,9 +827,12 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
         switch selector {
         case #selector(NSResponder.deleteBackward(_:)): return deleteAcrossHiddenMarkup(textView, forward: false)
         case #selector(NSResponder.deleteForward(_:)): return deleteAcrossHiddenMarkup(textView, forward: true)
+        case #selector(NSResponder.moveRight(_:)), #selector(NSResponder.moveForward(_:)): return moveCaret(textView, forward: true)
+        case #selector(NSResponder.moveLeft(_:)), #selector(NSResponder.moveBackward(_:)): return moveCaret(textView, forward: false)
         case #selector(NSResponder.insertLineBreak(_:)):
-            // Shift-Return: a plain newline, never NSTextView's U+2028 line separator, which isn't Markdown.
-            textView.insertText("\n", replacementRange: textView.selectedRange())
+            // Shift-Return: a Markdown hard line break (`\` + newline; the backslash is hidden), so Read breaks
+            // the line too instead of joining it. Never NSTextView's U+2028, which isn't Markdown.
+            textView.insertText("\\\n", replacementRange: textView.selectedRange())
             return true
         case #selector(NSResponder.insertNewline(_:)): break
         default: return false
@@ -624,7 +848,7 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
 
     /// The hidden-markup run touching `location` (a hidden character at or just before it), if any.
     private func hiddenRun(at location: Int, in storage: NSTextStorage) -> NSRange? {
-        func hidden(_ i: Int) -> Bool { i >= 0 && i < storage.length && storage.attribute(.markdownHidden, at: i, effectiveRange: nil) != nil }
+        func hidden(_ i: Int) -> Bool { i >= 0 && i < storage.length && Self.isMarkup(storage, i) }
         guard hidden(location) || hidden(location - 1) else { return nil }
         var a = hidden(location) ? location : location - 1, b = a + 1
         while hidden(a - 1) { a -= 1 }
@@ -633,42 +857,64 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
     }
 
     /// Every caret position in or at the edges of a hidden run draws at the same spot, so the run gets one
-    /// caret stop: its end, where the next character is visible (AppKit's own glyph moves misbehave from a
-    /// position before null glyphs). Typing there lands after the markup: in a heading after `# `, inside
-    /// `**bold` after its opener, and after (outside) a closing `**`.
-    private func caretStop(_ run: NSRange) -> Int { NSMaxRange(run) }
-
-    private func isLinePrefix(_ run: NSRange, in text: NSString) -> Bool {
-        run.location == text.lineRange(for: NSRange(location: run.location, length: 0)).location
+    /// caret stop. Block markup (`# `, `> `, a list marker or task box) stops after itself, so typing lands in
+    /// the heading or item. Inline markup stops before itself, like TextEdit: typing at the end of a bold word
+    /// or link continues it, and typing before one does not.
+    private func caretStop(_ run: NSRange, in storage: NSTextStorage) -> Int {
+        storage.attribute(.markdownAtomic, at: run.location, effectiveRange: nil) != nil ? NSMaxRange(run) : run.location
     }
 
-    /// Caret moves skip hidden markup: one key press always moves the caret on screen. Selections, and changes
-    /// made by an edit or a sync (attributes still stale), are left alone.
-    func textView(_ textView: NSTextView, willChangeSelectionFromCharacterRange old: NSRange, toCharacterRange new: NSRange) -> NSRange {
-        guard new.length == 0, !isUpdating, edited == nil, let storage = textView.textStorage,
-              let run = hiddenRun(at: new.location, in: storage) else { return new }
+    /// The caret position `location` draws as (its run's stop, or itself).
+    private func stop(_ location: Int, in storage: NSTextStorage) -> Int {
+        hiddenRun(at: location, in: storage).map { caretStop($0, in: storage) } ?? location
+    }
+
+    /// Hidden or atomic (drawn-over) markup: caret and Delete treat both as one unit.
+    private static func isMarkup(_ storage: NSTextStorage, _ i: Int) -> Bool {
+        storage.attribute(.markdownHidden, at: i, effectiveRange: nil) != nil || storage.attribute(.markdownAtomic, at: i, effectiveRange: nil) != nil
+    }
+
+    /// Left/Right move to the next position that draws somewhere else: one press, one visible step, across
+    /// hidden markup. (AppKit's own glyph moves get lost before null glyphs.) Selections use AppKit's moves.
+    private func moveCaret(_ view: NSTextView, forward: Bool) -> Bool {
+        let caret = view.selectedRange()
+        guard caret.length == 0, let storage = view.textStorage else { return false }
         let text = storage.string as NSString
-        let stop = caretStop(run)
-        guard old.length == 0, old.location != new.location, NSLocationInRange(old.location, NSRange(location: run.location, length: run.length + 1)) else {
-            return NSRange(location: stop, length: 0)
+        let current = stop(caret.location, in: storage)
+        var p = caret.location
+        while forward ? p < text.length : p > 0 {
+            p = forward ? NSMaxRange(text.rangeOfComposedCharacterSequence(at: p)) : text.rangeOfComposedCharacterSequence(at: p - 1).location
+            let next = stop(p, in: storage)
+            if next != current {
+                view.setSelectedRange(NSRange(location: next, length: 0))
+                view.scrollRangeToVisible(NSRange(location: next, length: 0))
+                return true
+            }
         }
-        // Leaving the run: go one visible character past it in the direction of travel.
-        // Moving right lands on the stop; moving left from it leaves the run past one visible character.
-        guard new.location < old.location, run.location > 0 else { return NSRange(location: stop, length: 0) }
-        return NSRange(location: text.rangeOfComposedCharacterSequence(at: run.location - 1).location, length: 0)
+        return true // already at the end: nothing visible to move past
+    }
+
+    /// Clicks, Up/Down, Home/End and programmatic moves land on the stop. Selections, and changes made by an
+    /// edit or a sync (attributes still stale), are left alone.
+    func textView(_ textView: NSTextView, willChangeSelectionFromCharacterRange old: NSRange, toCharacterRange new: NSRange) -> NSRange {
+        guard new.length == 0, !isUpdating, edited == nil, let storage = textView.textStorage else { return new }
+        return NSRange(location: stop(new.location, in: storage), length: 0)
     }
 
     /// Delete next to hidden markup removes what you see: a visible character past the markup, or, at the
-    /// start of a heading or quote, the whole `# ` / `> ` (the line becomes body text). Never one invisible marker.
+    /// start of a heading, quote or list item, its block marker (the line becomes body text). Never one
+    /// invisible inline marker.
     private func deleteAcrossHiddenMarkup(_ view: NSTextView, forward: Bool) -> Bool {
         let caret = view.selectedRange()
         guard caret.length == 0, let storage = view.textStorage else { return false }
         let text = storage.string as NSString
         let probe = forward ? caret.location : caret.location - 1
-        guard probe >= 0, probe < text.length, storage.attribute(.markdownHidden, at: probe, effectiveRange: nil) != nil,
+        guard probe >= 0, probe < text.length, Self.isMarkup(storage, probe),
               let run = hiddenRun(at: probe, in: storage) else { return false }
-        if !forward, isLinePrefix(run, in: text) {
-            view.insertText("", replacementRange: run)
+        if !forward, storage.attribute(.markdownAtomic, at: run.location, effectiveRange: nil) != nil {
+            var block = run.location
+            while block < NSMaxRange(run), storage.attribute(.markdownAtomic, at: block, effectiveRange: nil) != nil { block += 1 }
+            view.insertText("", replacementRange: NSRange(location: run.location, length: block - run.location))
             return true
         }
         let edge = forward ? NSMaxRange(run) : run.location - 1
@@ -716,7 +962,6 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
     func restyle(_ range: NSRange?, also: NSRange? = nil) {
         guard let view, let storage = view.textStorage else { return }
         let text = view.string as NSString
-        let all = NSRange(location: 0, length: text.length)
         let caret = text.lineRange(for: NSRange(location: min(view.selectedRange().location, text.length), length: 0))
         revealed = view.window?.firstResponder === view ? caret : NSRange(location: NSNotFound, length: 0)
         if range == nil { fences = MarkdownStyler.fences(text) }
@@ -732,8 +977,7 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
             .filter { $0.location != NSNotFound }
             .map { NSRange(location: min($0.location, text.length), length: max(0, min(NSMaxRange($0), text.length) - min($0.location, text.length))) }
         for limit in limits {
-            MarkdownStyler.apply(to: storage, reveal: revealed, in: limit, fences: fences)
-            let refreshed = limit.map { text.paragraphRange(for: $0) } ?? all
+            let refreshed = MarkdownStyler.apply(to: storage, reveal: revealed, in: limit, fences: fences)
             view.layoutManager?.invalidateGlyphs(forCharacterRange: refreshed, changeInLength: 0, actualCharacterRange: nil)
             view.layoutManager?.invalidateLayout(forCharacterRange: refreshed, actualCharacterRange: nil)
         }
