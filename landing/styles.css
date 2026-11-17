@@ -46,9 +46,8 @@ code { font-family: var(--mono); font-size: .9em; }
 .site-nav a:hover, .site-footer a:hover { color: var(--accent); }
 html[data-theme="dark"] .site-nav a:hover, html[data-theme="dark"] .site-footer a:hover { color: var(--fg); }
 
-/* BB-8: artwork untouched; just size, outline, and a focusable checkbox (bb8.css hides it with display:none) */
-.bb8-toggle { --toggle-size: 5.6px; flex: none; }
-.bb8-toggle__container { box-shadow: 0 0 0 2px var(--fg); }
+/* BB-8: artwork untouched and unframed (no outline, like the app); just size and a focusable checkbox (bb8.css hides it with display:none) */
+.bb8-toggle { --toggle-size: 6.3px; flex: none; }
 .bb8-toggle__checkbox { display: block !important; position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .bb8-toggle__checkbox:focus-visible + .bb8-toggle__container { outline: 3px solid var(--ring); outline-offset: 4px; }
 
@@ -101,7 +100,7 @@ html[data-theme="dark"] .step-number { color: var(--fg); }
   .site-header { gap: var(--s3); min-height: 64px; }
   .site-nav { display: none; }
   /* padding grows the tap target to 44px; negative margin keeps the artwork in place */
-  .bb8-toggle { --toggle-size: 5.2px; margin: -8px -8px -8px auto; padding: 8px; }
+  .bb8-toggle { --toggle-size: 5.8px; margin: -8px -8px -8px auto; padding: 8px; }
   .hero { padding: 64px 0 var(--s7); }
   .preview { margin-top: var(--s7); }
   .preview-player { border-radius: 16px; }
