@@ -2,7 +2,7 @@ import AppKit
 import NativeLatexDesign
 import SwiftUI
 import XCTest
-@testable import LibreLeaf
+@testable import LibreWeave
 
 /// Hosts the real editor window content offscreen and reads its pixels in Light and Dark
 /// (the test shell can't take screenshots). PNGs go to $LIBREWEAVE_SNAPSHOT_DIR when set.
@@ -112,18 +112,18 @@ final class AppearanceTests: XCTestCase {
         }
         let legacy = try suite(), fresh = try suite(), chosen = try suite(), bogus = try suite()
         legacy.set("dark", forKey: "appearanceMode")
-        LibreLeafApp.migrateAppearance(into: fresh, legacy: legacy)
+        LibreWeaveApp.migrateAppearance(into: fresh, legacy: legacy)
         XCTAssertEqual(fresh.string(forKey: "appearanceMode"), "dark")
         XCTAssertEqual(legacy.string(forKey: "appearanceMode"), "dark", "old domain untouched")
 
         chosen.set("light", forKey: "appearanceMode")
-        LibreLeafApp.migrateAppearance(into: chosen, legacy: legacy)
+        LibreWeaveApp.migrateAppearance(into: chosen, legacy: legacy)
         XCTAssertEqual(chosen.string(forKey: "appearanceMode"), "light", "existing new choice wins")
 
         legacy.set("purple", forKey: "appearanceMode")
-        LibreLeafApp.migrateAppearance(into: bogus, legacy: legacy)
+        LibreWeaveApp.migrateAppearance(into: bogus, legacy: legacy)
         XCTAssertNil(bogus.object(forKey: "appearanceMode"), "unknown value not copied")
-        LibreLeafApp.migrateAppearance(into: bogus, legacy: nil)
+        LibreWeaveApp.migrateAppearance(into: bogus, legacy: nil)
         XCTAssertNil(bogus.object(forKey: "appearanceMode"))
     }
 }

@@ -1,6 +1,6 @@
 import PDFKit
 import XCTest
-@testable import LibreLeaf
+@testable import LibreWeave
 
 @MainActor
 final class BuildSafetyTests: XCTestCase {

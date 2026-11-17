@@ -4,7 +4,7 @@ import PDFKit
 import SwiftUI
 
 @main
-struct LibreLeafApp: App {
+struct LibreWeaveApp: App {
     init() {
         Self.migrateAppearance(into: .standard, legacy: UserDefaults(suiteName: BuildService.legacyDefaultsDomain))
         _ = AppearanceStore.shared // apply the saved appearance before the first window

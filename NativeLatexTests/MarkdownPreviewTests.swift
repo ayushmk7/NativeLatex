@@ -2,7 +2,7 @@ import AppKit
 import NativeLatexIntegrations
 import WebKit
 import XCTest
-@testable import LibreLeaf
+@testable import LibreWeave
 
 @MainActor
 final class MarkdownPreviewTests: XCTestCase {

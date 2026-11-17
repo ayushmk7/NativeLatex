@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import LibreLeaf
+@testable import LibreWeave
 
 /// File > New… (⌘N): format chooser, then an untitled document of that type.
 @MainActor

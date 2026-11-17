@@ -1,6 +1,6 @@
 import XCTest
 import NativeLatexIntegrations
-@testable import LibreLeaf
+@testable import LibreWeave
 
 /// App-level wiring of the Integrations package. Google uses a fake transport only;
 /// no real credentials exist anywhere in these tests.

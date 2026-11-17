@@ -4,7 +4,7 @@ Status: Mac-only implementation in progress · revised 2026-11-17. The app plan 
 
 **LibreWeave** is the working app name (product name, bundle `app.libreweave.LibreWeave`, scheme `LibreWeave`). **NativeLatex** remains the repository, Xcode project, folder, and Swift package name. Minimum macOS is **14.0** for the app and both packages.
 
-The previous working name, LibreLeaf, was dropped on 2026-11-17 because another LaTeX editor already uses it. Exact-name web and GitHub searches found no project called LibreWeave on that date. That is not a trademark search or clearance. Some names still say LibreLeaf on purpose until they are migrated: the build folder `.libreleaf-build/` and its `.libreleaf-owner` marker, the Swift module (`PRODUCT_MODULE_NAME = LibreLeaf`, so the tests' `@testable import LibreLeaf` keeps working), and some app source and test strings.
+The previous working name, LibreLeaf, was dropped on 2026-11-17 because another LaTeX editor already uses it. Exact-name web and GitHub searches found no project called LibreWeave on that date. That is not a trademark search or clearance. The app target, Swift module (`LibreWeave`), entry point (`LibreWeaveApp`) and user-facing text use the new name. These keep the old name on purpose, for migration: the old preferences domain `app.libreleaf.LibreLeaf` (read once for the build owner token and the BB-8 appearance), the build folder `.libreleaf-build/`, its `.libreleaf-owner` marker and the `LibreLeaf.log` file inside it, so existing build output stays owned.
 
 ## Start here
 
