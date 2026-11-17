@@ -3,119 +3,132 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="NativeLatex is a native Mac workspace for writing LaTeX and Markdown beside a rendered preview. Built for local files and focused work." />
-    <title>NativeLatex — write the source, see the page</title>
+    <meta name="description" content="LibreLeaf is a native Mac app in development for writing LaTeX and Markdown beside a rendered preview, using your local files." />
+    <title>LibreLeaf — write the source, see the page</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <script>
       try {
-        const saved = localStorage.getItem("nativelatex-theme");
+        const saved = localStorage.getItem("libreleaf-theme");
         document.documentElement.dataset.theme = saved === "light" || saved === "dark" ? saved : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       } catch {
         document.documentElement.dataset.theme = "light";
       }
     </script>
+    <link rel="stylesheet" href="./bb8.css" />
     <link rel="stylesheet" href="./styles.css" />
-    <script src="./script.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-    <div class="page-shell">
-      <header class="site-header">
-        <a class="brand" href="#top" aria-label="NativeLatex home">
-          <img src="./icon.svg" width="34" height="34" alt="" />
-          <span>NativeLatex</span>
-        </a>
-        <nav class="site-nav" aria-label="Primary navigation">
-          <a href="#workflow">Workflow</a>
-          <a href="#principles">Principles</a>
-          <a href="https://github.com/ayushmk7/NativeLatex">GitHub <span aria-hidden="true">↗</span></a>
-        </nav>
-        <button class="theme-toggle" id="theme-toggle" type="button" role="switch" aria-label="Dark appearance" aria-checked="false" title="Toggle light and dark appearance">
-          <span class="theme-toggle__sky" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="theme-toggle__droid" aria-hidden="true">
-            <span class="theme-toggle__head"><i></i></span>
-            <span class="theme-toggle__body"><i></i></span>
-          </span>
-        </button>
-      </header>
-
-      <main id="main">
-        <section class="hero" id="top" aria-labelledby="hero-title">
-          <div class="hero-copy">
-            <p class="eyebrow reveal">Native Mac app · In development</p>
-            <h1 id="hero-title" class="reveal reveal-2">Write the source.<br /><em>See the page.</em></h1>
-            <p class="hero-description reveal reveal-3">A focused desk for LaTeX and Markdown. Open the files you already have, edit in place, and keep the rendered result beside your words.</p>
-            <div class="hero-actions reveal reveal-4">
-              <a class="button button-primary" href="https://github.com/ayushmk7/NativeLatex">Follow the project <span aria-hidden="true">↗</span></a>
-              <a class="text-link" href="https://github.com/ayushmk7/NativeLatex/blob/main/docs/README.md">Read the plan <span aria-hidden="true">→</span></a>
+    <header class="site-header">
+      <a class="brand" href="#top">
+        <img src="./icon.svg" width="28" height="28" alt="" />
+        <span>LibreLeaf</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#workflow">Workflow</a>
+        <a href="#principles">Principles</a>
+        <a href="https://github.com/ayushmk7/NativeLatex">GitHub</a>
+      </nav>
+      <!-- BB-8 artwork: Uiverse.io by Galahhad (MIT), same markup as the owner's Website and Internship pages. Checked = dark. -->
+      <label class="bb8-toggle" title="Switch light and dark appearance">
+        <input class="bb8-toggle__checkbox" id="theme-toggle" type="checkbox" role="switch" aria-label="Dark mode" />
+        <div class="bb8-toggle__container" aria-hidden="true">
+          <div class="bb8-toggle__scenery">
+            <div class="bb8-toggle__star"></div><div class="bb8-toggle__star"></div><div class="bb8-toggle__star"></div>
+            <div class="bb8-toggle__star"></div><div class="bb8-toggle__star"></div><div class="bb8-toggle__star"></div>
+            <div class="bb8-toggle__star"></div>
+            <div class="tatto-1"></div><div class="tatto-2"></div>
+            <div class="gomrassen"></div><div class="hermes"></div><div class="chenini"></div>
+            <div class="bb8-toggle__cloud"></div><div class="bb8-toggle__cloud"></div><div class="bb8-toggle__cloud"></div>
+          </div>
+          <div class="bb8">
+            <div class="bb8__head-container">
+              <div class="bb8__antenna"></div><div class="bb8__antenna"></div><div class="bb8__head"></div>
             </div>
-            <p class="hero-note reveal reveal-4">The Mac app is being built. There is no download yet.</p>
+            <div class="bb8__body"></div>
           </div>
+          <div class="artificial__hidden"><div class="bb8__shadow"></div></div>
+        </div>
+      </label>
+      <!-- not deferred: sets the knob before first paint so it never rolls on load -->
+      <script src="./script.js"></script>
+    </header>
 
-          <div class="preview-frame reveal reveal-3" aria-label="Concept preview of the planned Mac app">
-            <div class="preview-caption"><span class="caption-mark"></span> Workspace concept <span>01 / 01</span></div>
-            <div class="app-window">
-              <div class="window-toolbar">
-                <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
-                <span>paper.tex</span>
-                <span class="build-chip"><span></span> Build</span>
+    <main id="main">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <p class="status"><span class="status-dot" aria-hidden="true"></span> Mac app · in development · no download yet</p>
+        <h1 id="hero-title">Write the source.<br /><span class="accent">See the page.</span></h1>
+        <p class="lede">A focused desk for LaTeX and Markdown. Open the files you already have, edit in place, and keep the rendered result beside your words.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/ayushmk7/NativeLatex">Follow on GitHub</a>
+          <a class="button" href="https://github.com/ayushmk7/NativeLatex/blob/main/docs/README.md">Read the plan</a>
+        </div>
+
+        <figure class="preview">
+          <div class="app-window" aria-hidden="true">
+            <div class="window-toolbar">
+              <div class="traffic-lights"><i></i><i></i><i></i></div>
+              <span class="window-title">paper.tex</span>
+              <span class="build-chip">Build</span>
+            </div>
+            <div class="window-content">
+              <div class="file-rail">
+                <p>Project</p>
+                <span class="active-file">paper.tex</span>
+                <span>notes.md</span>
+                <span>sources.bib</span>
+                <span>figures/</span>
               </div>
-              <div class="window-content">
-                <div class="file-rail" aria-hidden="true">
-                  <p>PROJECT</p>
-                  <span class="active-file">⌑ &nbsp; paper.tex</span>
-                  <span>⌑ &nbsp; notes.md</span>
-                  <span>⌑ &nbsp; sources.bib</span>
-                  <span>▧ &nbsp; figures</span>
-                </div>
-                <div class="source-pane" aria-hidden="true">
-                  <div class="pane-title">paper.tex <span>Source</span></div>
-                  <div class="code"><span>01</span><code>\documentclass{article}</code></div>
-                  <div class="code"><span>02</span><code>\begin{document}</code></div>
-                  <div class="code"><span>03</span><code>\title{The shape of an idea}</code></div>
-                  <div class="code"><span>04</span><code>\section{Introduction}</code></div>
-                  <div class="code"><span>05</span><code>Make space to think clearly.</code></div>
-                  <div class="code"><span>06</span><code>\[ E = mc^2 \]</code></div>
-                  <div class="code"><span>07</span><code>\end{document}</code></div>
-                  <div class="cursor-line"></div>
-                </div>
-                <div class="pdf-pane" aria-hidden="true">
-                  <div class="pane-title">Preview <span>1 / 1</span></div>
-                  <div class="paper-page">
-                    <p class="paper-title">The shape of an idea</p>
-                    <p class="paper-section">1 &nbsp; Introduction</p>
-                    <p>Make space to think clearly.</p>
-                    <p class="paper-equation">E = mc²</p>
-                    <div class="paper-line"></div><div class="paper-line short"></div>
-                  </div>
+              <div class="source-pane">
+                <div class="code"><span>1</span><code>\documentclass{article}</code></div>
+                <div class="code"><span>2</span><code>\begin{document}</code></div>
+                <div class="code"><span>3</span><code>\title{The shape of an idea}</code></div>
+                <div class="code"><span>4</span><code>\section{Introduction}</code></div>
+                <div class="code"><span>5</span><code class="hl">Make space to think clearly.</code></div>
+                <div class="code"><span>6</span><code>\[ E = mc^2 \]</code></div>
+                <div class="code"><span>7</span><code>\end{document}</code></div>
+              </div>
+              <div class="pdf-pane">
+                <div class="paper-page">
+                  <p class="paper-title">The shape of an idea</p>
+                  <p class="paper-section">1&nbsp;&nbsp;Introduction</p>
+                  <p>Make space to think clearly.</p>
+                  <p class="paper-equation">E = mc²</p>
+                  <div class="paper-line"></div><div class="paper-line short"></div>
                 </div>
               </div>
             </div>
-            <p class="concept-label">Interface illustration · final app may differ</p>
           </div>
-        </section>
+          <figcaption>Concept illustration. The finished app may look different.</figcaption>
+        </figure>
+      </section>
 
-        <section class="section workflow" id="workflow" aria-labelledby="workflow-title">
-          <div class="section-heading"><p class="eyebrow">The workflow</p><h2 id="workflow-title">A shorter path from draft to page.</h2></div>
-          <div class="steps">
-            <article><span class="step-number">01</span><h3>Open your folder.</h3><p>Work with ordinary <code>.tex</code>, <code>.md</code>, bibliography, and image files. Your project stays yours.</p></article>
-            <article><span class="step-number">02</span><h3>Write with room to focus.</h3><p>Move between source, problems, and preview without juggling separate tools or losing your place.</p></article>
-            <article><span class="step-number">03</span><h3>Build locally.</h3><p>Use the TeX tools installed on your Mac. Markdown preview works without a TeX installation.</p></article>
-          </div>
-        </section>
+      <section class="section" id="workflow" aria-labelledby="workflow-title">
+        <p class="eyebrow">Planned workflow</p>
+        <h2 id="workflow-title">A shorter path from draft to page.</h2>
+        <ol class="steps">
+          <li><span class="step-number">01</span><h3>Open your folder</h3><p>Work with ordinary <code>.tex</code>, <code>.md</code>, bibliography, and image files. Your project stays yours.</p></li>
+          <li><span class="step-number">02</span><h3>Write with room to focus</h3><p>Move between source, problems, and preview without juggling separate tools or losing your place.</p></li>
+          <li><span class="step-number">03</span><h3>Build locally</h3><p>Use the TeX tools installed on your Mac. Markdown preview is planned to work without a TeX installation.</p></li>
+        </ol>
+      </section>
 
-        <section class="section principles" id="principles" aria-labelledby="principles-title">
-          <div><p class="eyebrow">Designed to stay out of the way</p><h2 id="principles-title">Your files.<br /><em>Your flow.</em></h2></div>
-          <div class="principle-list">
-            <p><span>Native on Mac</span> Familiar windows, menus, keyboard paths, and a real PDF preview.</p>
-            <p><span>Local by default</span> Editing and builds do not need an account or an internet connection.</p>
-            <p><span>More than one project</span> Keep separate workspaces open without mixing roots or results.</p>
-          </div>
-        </section>
-      </main>
+      <section class="section" id="principles" aria-labelledby="principles-title">
+        <p class="eyebrow">Design principles</p>
+        <h2 id="principles-title">Your files. <span class="accent">Your flow.</span></h2>
+        <dl class="principle-list">
+          <div><dt>Native on Mac</dt><dd>Familiar windows, menus, keyboard paths, and a real PDF preview.</dd></div>
+          <div><dt>Local by default</dt><dd>Editing and builds are designed to need no account and no internet connection.</dd></div>
+          <div><dt>More than one project</dt><dd>Keep separate workspaces open without mixing roots or results.</dd></div>
+        </dl>
+      </section>
+    </main>
 
-      <footer class="site-footer"><span>NativeLatex <span class="footer-dot">·</span> Made for the Mac</span><a href="https://github.com/ayushmk7/NativeLatex">Project on GitHub ↗</a></footer>
-    </div>
+    <footer class="site-footer">
+      <span>LibreLeaf · Made for the Mac</span>
+      <a href="https://github.com/ayushmk7/NativeLatex">Project on GitHub</a>
+    </footer>
   </body>
 </html>

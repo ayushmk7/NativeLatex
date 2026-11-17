@@ -1,16 +1,25 @@
+// Loaded right after the BB-8 switch (not deferred) so the knob matches the theme before first paint.
 const toggle = document.getElementById("theme-toggle");
+const themeColor = document.querySelector('meta[name="theme-color"]');
 
-function syncToggle() {
+function sync() {
   const dark = document.documentElement.dataset.theme === "dark";
-  toggle.setAttribute("aria-checked", String(dark));
-  document.querySelector('meta[name="theme-color"]').content = dark ? "#000000" : "#ffffff";
+  toggle.checked = dark;
+  themeColor.content = dark ? "#000000" : "#ffffff";
 }
 
-toggle.addEventListener("click", () => {
-  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+toggle.addEventListener("change", () => {
+  const next = toggle.checked ? "dark" : "light";
   document.documentElement.dataset.theme = next;
-  try { localStorage.setItem("nativelatex-theme", next); } catch {}
-  syncToggle();
+  try { localStorage.setItem("libreleaf-theme", next); } catch {}
+  sync();
 });
 
-syncToggle();
+// Follow live OS appearance changes until the visitor picks a theme themselves.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+  try { if (localStorage.getItem("libreleaf-theme")) return; } catch {}
+  document.documentElement.dataset.theme = e.matches ? "dark" : "light";
+  sync();
+});
+
+sync();
