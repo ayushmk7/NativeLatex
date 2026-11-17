@@ -1,13 +1,21 @@
 import AppKit
+import NativeLatexDesign
 import PDFKit
 import SwiftUI
 
 @main
 struct LibreLeafApp: App {
+    init() { _ = AppearanceStore.shared } // apply the saved appearance before the first window
+
     var body: some Scene {
         DocumentGroup(newDocument: TextDocument()) { file in
             EditorView(document: file.$document, fileURL: file.fileURL)
         }
+        .commands {
+            AppearanceCommands()
+            ConvertCommands()
+        }
+        Settings { AppearanceSettingsView() }
     }
 }
 
@@ -15,81 +23,154 @@ struct EditorView: View {
     @Binding var document: TextDocument
     let fileURL: URL?
     @StateObject private var builder = BuildService()
+    @StateObject private var editor = TextViewHandle()
     @State private var pdfData: Data?
+    @State private var builtText: String?
     @State private var isStale = false
+    @State private var lastFailed = false
+    @State private var lastBuild: Duration?
     @State private var log = ""
     @State private var diagnostics: [Diagnostic] = []
     @State private var error: String?
     @State private var showLog = false
+    @State private var showPreview = true
+    @State private var showProblems = false
+    @State private var line = 1
+    @State private var column = 1
 
-    private var isTeX: Bool { fileURL?.pathExtension.lowercased() == "tex" }
+    private var isTeX: Bool { BuildService.rootExtensions.contains(fileURL?.pathExtension.lowercased() ?? "") }
     private var isMarkdown: Bool { ["md", "markdown"].contains(fileURL?.pathExtension.lowercased() ?? "") }
 
+    private var buildState: BuildState {
+        if builder.isRunning { return .building }
+        if isStale { return .stale }
+        if lastFailed { return .failed }
+        return pdfData == nil ? .idle : .succeeded
+    }
+
+    private var problems: [Problem] {
+        diagnostics.map { Problem(id: $0.id, severity: $0.isWarning ? .warning : .error, message: $0.message,
+                                  file: $0.file?.lastPathComponent, line: $0.line) }
+    }
+
     var body: some View {
-        HSplitView {
-            TextEditor(text: $document.text)
-                .font(.system(.body, design: .monospaced))
-                .autocorrectionDisabled()
-                .frame(minWidth: 320)
-            if isMarkdown {
-                MarkdownPreview(text: document.text).frame(minWidth: 280)
-            } else if isTeX {
-                texPane.frame(minWidth: 280)
-            }
-        }
-        .frame(minWidth: 640, minHeight: 420)
-        .task { reopenSymlinkAtTarget() }
-        .toolbar {
-            if isTeX {
-                if builder.isRunning {
-                    Button("Cancel", systemImage: "stop.fill") { builder.cancel() }
-                } else {
-                    Button("Build", systemImage: "play.fill") { Task { await build() } }
-                        .keyboardShortcut("b")
+        VStack(spacing: 0) {
+            VSplitView {
+                HSplitView {
+                    SourceTextView(text: $document.text, handle: editor) { line = $0; column = $1 }
+                        .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+                    if showPreview, isMarkdown {
+                        MarkdownPreview(text: document.text).frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+                    } else if showPreview, isTeX {
+                        texPreview.frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
-                Button("Log", systemImage: "doc.plaintext") { showLog.toggle() }
-                    .disabled(log.isEmpty)
+                .frame(minHeight: 200, maxHeight: .infinity)
+                .layoutPriority(1)
+                if showProblems, isTeX {
+                    ProblemList(problems: problems, onSelect: reveal)
+                        .frame(minHeight: 80, idealHeight: 140, maxHeight: 400)
+                }
+            }
+            StatusBar(status: ShellStatus(errors: diagnostics.filter { !$0.isWarning }.count,
+                                          warnings: diagnostics.filter(\.isWarning).count,
+                                          line: line, column: column, lastBuild: lastBuild),
+                      showPanel: $showProblems)
+        }
+        .libreLeafTheme()
+        .frame(minWidth: 640, minHeight: 420)
+        .focusedSceneValue(\.documentFileURL, fileURL)
+        .task { reopenSymlinkAtTarget() }
+        .onChange(of: document.text) {
+            // The PDF shows the text as of the last successful build; any other text makes it stale.
+            if pdfData != nil, !lastFailed { isStale = document.text != builtText }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if isTeX {
+                    if builder.isRunning {
+                        Button("Cancel", systemImage: "stop.fill") { builder.cancel() }
+                            .keyboardShortcut(".")
+                            .help("Cancel Build (⌘.)")
+                    } else {
+                        Button("Build", systemImage: "hammer") { Task { await build() } }
+                            .keyboardShortcut("b")
+                            .help("Build (⌘B)")
+                    }
+                    BuildStatusBadge(state: buildState)
+                    Button("Log", systemImage: "doc.plaintext") { showLog.toggle() }
+                        .disabled(log.isEmpty)
+                        .help("Show Build Log")
+                }
+                if isTeX || isMarkdown {
+                    Toggle(isOn: $showPreview) { Label("Preview", systemImage: "sidebar.right") }
+                        .help(showPreview ? "Hide Preview" : "Show Preview")
+                }
+                Menu { ConvertMenuItems(fileURL: fileURL) } label: { Label("Convert", systemImage: "arrow.left.arrow.right") }
+                    .help("Import or export a copy")
+                BB8Toggle()
             }
         }
         .sheet(isPresented: $showLog) {
             ScrollView { Text(log).font(.system(.caption, design: .monospaced)).textSelection(.enabled).padding() }
                 .frame(minWidth: 600, minHeight: 400)
+                .libreLeafTheme()
                 .toolbar { Button("Done") { showLog = false } }
         }
         .alert("Build", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
         } message: { Text(error ?? "") }
     }
 
-    private var texPane: some View {
-        VStack(spacing: 0) {
+    private var texPreview: some View {
+        Group {
             if let pdfData {
                 PDFPreview(data: pdfData)
                     .overlay(alignment: .topTrailing) {
-                        if isStale { Text("Stale").font(.caption).padding(4).background(.yellow, in: .capsule).padding(8) }
+                        if isStale {
+                            Label("Preview out of date", systemImage: "exclamationmark.triangle.fill")
+                                .font(Theme.captionFont)
+                                .foregroundStyle(Theme.foreground)
+                                .padding(.horizontal, Theme.s2).padding(.vertical, Theme.s1)
+                                .background(Theme.surface, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Theme.warning))
+                                .padding(Theme.s2)
+                        }
                     }
             } else {
-                ContentUnavailableView("No PDF yet", systemImage: "doc.richtext", description: Text("Build (⌘B) compiles this file locally."))
+                ContentUnavailableView("No PDF yet", systemImage: "doc.richtext",
+                                       description: Text("Build (⌘B) compiles this file locally."))
+                    .background(Theme.surface)
             }
-            if !diagnostics.isEmpty {
-                List(diagnostics) { d in
-                    Label("\(d.file?.lastPathComponent ?? "?"):\(d.line ?? 0) \(d.message)",
-                          systemImage: d.isWarning ? "exclamationmark.triangle" : "xmark.octagon")
-                        .textSelection(.enabled)
-                }
-                .frame(height: 120)
-            }
+        }
+    }
+
+    private func reveal(_ problem: Problem) {
+        guard let diagnostic = diagnostics.first(where: { $0.id == problem.id }), let file = diagnostic.file else { return }
+        if file.resolvingSymlinksInPath() == fileURL?.resolvingSymlinksInPath() {
+            editor.reveal(line: diagnostic.line ?? 1)
+        } else {
+            NSDocumentController.shared.openDocument(withContentsOf: file, display: true) { _, _, _ in }
         }
     }
 
     private func build() async {
         guard let fileURL else { error = "Save this file before building."; return }
         do {
-            try await saveIfNeeded(fileURL)
+            try await NSDocument.saveEditedDocuments(under: fileURL.deletingLastPathComponent())
+            guard document.matchesDisk(at: fileURL) else {
+                error = "“\(fileURL.lastPathComponent)” on disk is not what this window shows; another app may have replaced it. Nothing was built or overwritten. Use File ▸ Revert To to load the disk version, or File ▸ Save As to keep yours as a new file."
+                return
+            }
+            let source = document.text
+            let start = ContinuousClock.now
             let result = try await builder.build(root: fileURL)
+            lastBuild = .now - start
             log = result.log
             diagnostics = result.diagnostics
-            if let data = result.pdfData { pdfData = data; isStale = false } else { isStale = pdfData != nil }
-            if !result.succeeded && diagnostics.isEmpty { error = "Build failed. See Log for details." }
+            lastFailed = !result.succeeded
+            if let data = result.pdfData { pdfData = data; builtText = source }
+            isStale = pdfData != nil && (lastFailed || document.text != builtText)
+            if !result.succeeded { if diagnostics.isEmpty { error = "Build failed. See Log for details." } else { showProblems = true } }
         } catch BuildError.cancelled {
             isStale = pdfData != nil
         } catch {
@@ -104,18 +185,6 @@ struct EditorView: View {
         NSDocumentController.shared.openDocument(withContentsOf: fileURL.resolvingSymlinksInPath(), display: true) { doc, _, _ in
             if doc != nil, !linkDoc.isDocumentEdited { linkDoc.close() }
         }
-    }
-
-    /// Saves through the window's NSDocument so autosave, versions and conflict handling stay in charge.
-    private func saveIfNeeded(_ url: URL) async throws {
-        guard let doc = NSDocumentController.shared.document(for: url), doc.isDocumentEdited else { return }
-        // Refuse to overwrite a file another app changed since we loaded it.
-        let onDisk = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-        if let known = doc.fileModificationDate, let onDisk, onDisk > known {
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSLocalizedDescriptionKey:
-                "This file changed outside LibreLeaf. Use File ▸ Revert To or Save As before building."])
-        }
-        try await doc.save(to: url, ofType: doc.fileType ?? "public.plain-text", for: .saveOperation)
     }
 }
 
@@ -136,43 +205,83 @@ struct PDFPreview: NSViewRepresentable {
     }
 }
 
-/// Native Markdown preview: headings, fences and inline styles. Code is displayed, never run.
+/// Native Markdown preview: headings, fences, lists, quotes and inline styles. Code is displayed, never run.
 struct MarkdownPreview: View {
     let text: String
+
+    enum Block: Equatable {
+        case heading(Int, String), paragraph(String), code(String)
+        /// `marker` is "•" or the original number ("2."), so ordered lists keep their numbering.
+        case listItem(depth: Int, marker: String, text: String)
+        case quote(String)
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in block }
+                ForEach(Array(Self.blocks(text).enumerated()), id: \.offset) { _, block in render(block) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
+            .padding(Theme.s4)
             .textSelection(.enabled)
         }
+        .background(Theme.background)
+        .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
     }
 
-    // ponytail: line-based block parser; tables/images/math need Pandoc later.
-    private var blocks: [Text] {
-        var result: [Text] = []
+    // ponytail: line-based parser; tables/images/math/nested quotes need Pandoc later.
+    static func blocks(_ text: String) -> [Block] {
+        // Lone CR (classic Mac) and CRLF both end lines.
+        let lines = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false)
+        var result: [Block] = []
         var fence: [Substring]?
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            if line.hasPrefix("```") {
-                if let code = fence { result.append(Text(code.joined(separator: "\n")).font(.system(.body, design: .monospaced))); fence = nil }
-                else { fence = [] }
+        for line in lines {
+            let trimmed = line.drop { $0 == " " || $0 == "\t" }
+            let indent = line.count - trimmed.count
+            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                if let code = fence { result.append(.code(code.joined(separator: "\n"))); fence = nil } else { fence = [] }
             } else if fence != nil {
                 fence?.append(line)
-            } else if let level = line.firstIndex(where: { $0 != "#" }).map({ line.distance(from: line.startIndex, to: $0) }),
-                      (1...6).contains(level), line.dropFirst(level).first == " " {
-                result.append(inline(line.dropFirst(level + 1)).font([.largeTitle, .title, .title2, .title3, .headline, .headline][level - 1]).bold())
-            } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {
-                result.append(inline(line))
+            } else if let match = trimmed.wholeMatch(of: /(#{1,6}) +(.*)/), indent < 4 {
+                result.append(.heading(match.1.count, String(match.2)))
+            } else if let match = trimmed.wholeMatch(of: /> ?(.*)/) {
+                result.append(.quote(String(match.1)))
+            } else if let match = trimmed.wholeMatch(of: /([-*+]|\d{1,9}[.)]) +(.*)/) {
+                let marker = match.1.first!.isNumber ? String(match.1) : "•"
+                result.append(.listItem(depth: indent / 2, marker: marker, text: String(match.2)))
+            } else if !trimmed.isEmpty {
+                result.append(.paragraph(String(line)))
             }
         }
-        if let code = fence { result.append(Text(code.joined(separator: "\n")).font(.system(.body, design: .monospaced))) }
+        if let code = fence { result.append(.code(code.joined(separator: "\n"))) }
         return result
     }
 
-    private func inline(_ line: Substring) -> Text {
-        Text((try? AttributedString(markdown: String(line))) ?? AttributedString(String(line)))
+    @ViewBuilder private func render(_ block: Block) -> some View {
+        switch block {
+        case let .heading(level, text):
+            inline(text).font([.largeTitle, .title, .title2, .title3, .headline, .headline][level - 1]).bold()
+        case let .paragraph(text):
+            inline(text)
+        case let .code(text):
+            Text(text).font(Theme.editorFont)
+        case let .listItem(depth, marker, text):
+            HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
+                Text(marker).foregroundStyle(Theme.secondary).monospacedDigit()
+                inline(text)
+            }
+            .padding(.leading, CGFloat(depth) * Theme.s5)
+        case let .quote(text):
+            inline(text)
+                .foregroundStyle(Theme.secondary)
+                .padding(.leading, Theme.s3)
+                .overlay(alignment: .leading) { Rectangle().fill(Theme.accent).frame(width: 3) }
+                .accessibilityLabel("Quote: \(text)")
+        }
+    }
+
+    private func inline(_ line: String) -> Text {
+        Text((try? AttributedString(markdown: line)) ?? AttributedString(line))
     }
 }

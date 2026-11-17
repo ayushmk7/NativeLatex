@@ -21,13 +21,17 @@ enum BuildError: LocalizedError, Equatable {
     case unsafeName(String)
     case unownedOutputDirectory(String)
     case cancelled
+    case logTooLarge(Int)
+    case unsafeFolder(String)
 
     var errorDescription: String? {
         switch self {
         case .missingTeX: "No LaTeX engine (latexmk, pdflatex, xelatex or lualatex) was found. Install MacTeX or BasicTeX, then try Build again."
-        case .unsafeName(let name): "“\(name)” can’t be built safely. Rename it using only letters, digits, spaces, “.”, “_” and “-” (not starting with “-” or “.”), ending in .tex."
+        case .unsafeName(let name): "“\(name)” can’t be built safely. Rename it using only letters, digits, spaces, “.”, “_” and “-” (not starting with “-” or “.”), ending in .tex, .ltx or .latex."
         case .unownedOutputDirectory(let path): "\(path) was not created by LibreLeaf on this Mac, or contains links. Nothing was changed; remove or rename it to build."
         case .cancelled: "Build cancelled."
+        case .unsafeFolder(let path): "LibreLeaf can’t build in “\(path)”: its path contains a character TeX treats as special ($ ; : { } ` \\ % \" or !!), which breaks bibliography and input lookup. Move or rename the folder, then build again."
+        case .logTooLarge(let bytes): "The build was stopped after writing \(bytes / (1 << 20)) MB of log output, which usually means a runaway loop in the document. Check the start of the log, fix the source, then build again."
         }
     }
 }
@@ -37,6 +41,12 @@ final class BuildService: ObservableObject {
     nonisolated static let buildFolderName = ".libreleaf-build"
     nonisolated static let engines = ["latexmk", "pdflatex", "xelatex", "lualatex"]
     nonisolated static let logTailLimit = 1 << 20
+    /// Registered LaTeX extensions (LibreLeaf-Info.plist, org.tug.tex).
+    nonisolated static let rootExtensions = ["tex", "ltx", "latex"]
+    /// On-disk log cap: a looping document can print tens of MB per second.
+    var logLimit = 32 << 20
+    /// Tests only: run this executable instead of the discovered TeX engine.
+    var engineOverride: URL?
 
     /// Per-install secret written into folders we create; a project can't ship a forged marker.
     nonisolated static var ownerToken: String {
@@ -48,15 +58,29 @@ final class BuildService: ObservableObject {
 
     @Published private(set) var isRunning = false
     private var process: Process?
-    private var running: Task<(Data, Process.TerminationReason, Int32), Never>?
+    private var running: Task<(Data, Process.TerminationReason, Int32, Bool), Never>?
     private var generation = 0
+    /// Generation the user cancelled. A cancelled build throws `.cancelled` even if the engine
+    /// traps SIGTERM and exits with an ordinary status.
+    private var cancelledGeneration: Int?
 
-    func cancel() { if let process { Self.terminateTree(process.processIdentifier) } }
+    func cancel() {
+        cancelledGeneration = generation
+        // isRunning stays true until Foundation reaps the child, so the PID can't have been reused.
+        if let process, process.isRunning { Self.terminateTree(process.processIdentifier) }
+    }
+
+    /// kpathsea splits search paths on `:`/`;` and expands `$`, `{}`, `!!`; latexmk feeds the
+    /// absolute folder into BIBINPUTS and friends, so those characters can't be quoted away.
+    nonisolated static func isSafeFolderPath(_ path: String) -> Bool {
+        !path.contains(where: { "$;:{}`\\%\"".contains($0) }) && !path.contains("!!")
+    }
 
     /// latexmk interpolates file names into shell commands, so even "./" can't neutralise
     /// backticks or `$()`. Allow only a conservative character set.
     nonisolated static func isSafeRootName(_ name: String) -> Bool {
-        guard name.lowercased().hasSuffix(".tex"), let first = name.first, first != "-", first != "." else { return false }
+        guard rootExtensions.contains((name as NSString).pathExtension.lowercased()),
+              let first = name.first, first != "-", first != "." else { return false }
         return name.allSatisfy { $0.isLetter || $0.isNumber || " ._-".contains($0) }
     }
 
@@ -84,7 +108,7 @@ final class BuildService: ObservableObject {
         for url in [parent, folder] where isSymlink(url) { throw refuse }
         if fm.fileExists(atPath: folder.path) {
             guard !isSymlink(marker), (try? String(contentsOf: marker, encoding: .utf8)) == ownerToken,
-                  try fm.contentsOfDirectory(atPath: folder.path).allSatisfy({ !isSymlink(folder.appendingPathComponent($0)) })
+                  try isPlainTree(folder)
             else { throw refuse }
         } else {
             try fm.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -95,12 +119,14 @@ final class BuildService: ObservableObject {
 
     func build(root: URL) async throws -> BuildResult {
         guard Self.isSafeRootName(root.lastPathComponent) else { throw BuildError.unsafeName(root.lastPathComponent) }
-        guard let executable = Self.findEngine() else { throw BuildError.missingTeX }
+        let folderPath = root.deletingLastPathComponent().path
+        guard Self.isSafeFolderPath(folderPath) else { throw BuildError.unsafeFolder(folderPath) }
+        guard let executable = engineOverride ?? Self.findEngine() else { throw BuildError.missingTeX }
 
         // One build per window: a new request stops the old one and waits for it to exit.
+        if let process, process.isRunning { Self.terminateTree(process.processIdentifier) }
         generation += 1
         let mine = generation
-        cancel()
         _ = await running?.value
         guard mine == generation else { throw BuildError.cancelled }
 
@@ -125,27 +151,36 @@ final class BuildService: ObservableObject {
         try task.run()
         process = task
         isRunning = true
+        if cancelledGeneration == mine { cancel() } // Cancel pressed while the engine was starting
 
         // Full log goes to disk as it streams; memory keeps a bounded tail.
-        let limit = Self.logTailLimit
-        let reader = Task.detached { () -> (Data, Process.TerminationReason, Int32) in
-            var tail = Data()
+        let limit = Self.logTailLimit, diskLimit = logLimit
+        let reader = Task.detached { () -> (Data, Process.TerminationReason, Int32, Bool) in
+            var tail = Data(), written = 0, overflow = false
             while true {
                 let chunk = pipe.fileHandleForReading.availableData
                 if chunk.isEmpty { break }
-                logFile.write(chunk)
-                tail.append(chunk)
+                if overflow { continue } // drain until the killed tree closes the pipe
+                let kept = chunk.prefix(diskLimit - written)
+                logFile.write(kept)
+                written += kept.count
+                tail.append(kept)
                 if tail.count > limit { tail.removeFirst(tail.count - limit) }
+                if written >= diskLimit {
+                    overflow = true
+                    if task.isRunning { Self.terminateTree(task.processIdentifier) }
+                }
             }
             try? logFile.close()
             task.waitUntilExit()
-            return (tail, task.terminationReason, task.terminationStatus)
+            return (tail, task.terminationReason, task.terminationStatus, overflow)
         }
         running = reader
-        let (output, reason, status) = await reader.value
+        let (output, reason, status, overflow) = await reader.value
         if mine == generation { process = nil; running = nil; isRunning = false }
+        if overflow, mine == generation { throw BuildError.logTooLarge(logLimit) }
 
-        guard mine == generation, reason == .exit else { throw BuildError.cancelled }
+        guard mine == generation, cancelledGeneration != mine, reason == .exit else { throw BuildError.cancelled }
         let log = String(decoding: output, as: UTF8.self)
         let pdfURL = outputDirectory.appendingPathComponent(root.deletingPathExtension().lastPathComponent + ".pdf")
         let pdfData = status == 0 ? try? Data(contentsOf: pdfURL) : nil
@@ -175,6 +210,25 @@ final class BuildService: ObservableObject {
         let count = proc_listchildpids(pid, &children, Int32(children.count * MemoryLayout<pid_t>.size))
         for child in children.prefix(max(0, Int(count))) where child > 0 { terminateTree(child) }
         kill(pid, SIGTERM)
+    }
+
+    /// True if nothing anywhere under `folder` is a symlink or a hard-linked file. TeX and latexmk
+    /// write into subfolders (`\include`, minted, aux dirs), so a link at any depth could redirect a write.
+    nonisolated static func isPlainTree(_ folder: URL) throws -> Bool {
+        let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isRegularFileKey]
+        // The enumerator does not descend through symlinked folders; it reports the link itself.
+        guard let items = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: keys, options: [],
+                                                         errorHandler: { _, _ in false }) else { return false }
+        for case let url as URL in items {
+            let values = try url.resourceValues(forKeys: Set(keys))
+            if values.isSymbolicLink == true { return false }
+            // A hard link shares the inode with a file outside the tree; truncating it writes through.
+            if values.isRegularFile == true,
+               let links = try FileManager.default.attributesOfItem(atPath: url.path)[.referenceCount] as? Int, links > 1 {
+                return false
+            }
+        }
+        return true
     }
 
     nonisolated private static func isSymlink(_ url: URL) -> Bool {
