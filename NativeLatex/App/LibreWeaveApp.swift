@@ -209,7 +209,7 @@ struct EditorView: View {
                         Text("Write").tag(Bool?.some(true))
                     }
                     .pickerStyle(.segmented)
-                    .help("Read: the Pandoc rendering beside or instead of the source. Write: edit the formatted document full width with markup hidden; tables, math and images stay as Markdown (⌥⌘E). Read or Source Only (⌥⌘1) leaves Write.")
+                    .help("Read: the Pandoc rendering beside or instead of the source. Write: edit the formatted document full width with markup hidden; tables and local images are drawn, math stays as TeX source (⌥⌘E). Read or Source Only (⌥⌘1) leaves Write.")
                     .accessibilityLabel("Document Mode")
                 }
                 if !isNarrow { // narrow toolbars keep room for the labeled Preview toggle and BB-8; File ▸ Convert stays
@@ -278,7 +278,8 @@ struct EditorView: View {
                         .background(Theme.surface)
                     HandleTextView(text: $document.text, handle: writer, label: "Write") { line = $0; column = $1 }
                         // Tables and local images drawn in place (text untouched; math stays source).
-                        .task(id: fileURL) { MarkdownObjects.attach(to: writer.view, folder: fileURL?.deletingLastPathComponent()) }
+                        .task(id: fileURL) { MarkdownObjects.attach(to: writer.view, folder: fileURL?.deletingLastPathComponent(),
+                                                                     bodyFont: .systemFont(ofSize: MarkdownStyler.bodySize), bodyColor: NSColor(Theme.foreground)) }
                 }
                 .background(Theme.background)
             }

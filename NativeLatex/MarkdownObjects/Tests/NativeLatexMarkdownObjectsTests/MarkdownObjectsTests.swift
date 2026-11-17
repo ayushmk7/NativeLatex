@@ -114,6 +114,32 @@ final class MarkdownObjectsTests: XCTestCase {
 
     // MARK: Tables
 
+    /// A text view's `font` and `textColor` are its first character's. A document that opens with a heading
+    /// (or a quote) must not give its tables 30 pt bold (or grey) cells: the host's body style wins.
+    func testTableCellsUseTheHostBodyStyleNotTheFirstCharacter() {
+        let scroll = NSTextView.scrollableTextView()
+        let view = scroll.documentView as! NSTextView
+        view.frame = NSRect(x: 0, y: 0, width: 700, height: 800)
+        view.isRichText = false
+        view.string = "# Title\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"
+        let manager = HostLayoutManager()
+        view.textContainer!.replaceLayoutManager(manager)
+        manager.delegate = hostDelegate
+        restyle(view, nil)
+        let heading = NSFont.boldSystemFont(ofSize: 30)
+        view.textStorage!.addAttributes([.font: heading, .foregroundColor: NSColor.gray], range: NSRange(location: 0, length: 7))
+        XCTAssertEqual(view.font?.pointSize, 30, "precondition: the view's font is the heading's")
+        let body = NSFont.systemFont(ofSize: 15)
+        XCTAssertNotNil(MarkdownObjects.attach(to: view, folder: nil, bodyFont: body, bodyColor: .textColor))
+        let text = view.string as NSString
+        for cell in ["a", "1"] {
+            let i = text.range(of: cell, options: .backwards).location
+            let font = view.textStorage!.attribute(.font, at: i, effectiveRange: nil) as? NSFont
+            XCTAssertEqual(font?.pointSize, 15, "cell \(cell) in the body size")
+            XCTAssertEqual(view.textStorage!.attribute(.foregroundColor, at: i, effectiveRange: nil) as? NSColor, .textColor, "cell \(cell) in the body colour")
+        }
+    }
+
     func testTableColumnsAlignAndRightAlignmentEndsTogether() {
         let source = "| Name | Qty |\n|:-----|----:|\n| apple pie | 3 |\n| fig | 1200 |\n"
         let (view, _) = make(source)

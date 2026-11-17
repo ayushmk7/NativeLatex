@@ -54,8 +54,10 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     private var flushScheduled = false
     private var inFlight = Set<String>()
     private var ownEdit = false
-    /// Body font for table cells (the view's font).
+    /// Body font and colour for table cells. A text view's `font`/`textColor` are its first character's, which
+    /// is a heading or quote in many documents, so the host passes its body style.
     private var bodyFont = NSFont.systemFont(ofSize: 15)
+    private var bodyColor: NSColor?
 
     static let maxBlockLines = 400, maxTableRows = 300, maxTableColumns = 40, maxImageHeight: CGFloat = 800
     static let cellPad: CGFloat = 9
@@ -65,7 +67,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     /// `boundingBox`, and its layout manager `draw`. Until the delegate sizes control glyphs (implements
     /// `layoutManager(_:boundingBoxForControlGlyphAt:…)`) this does nothing, so the text stays as it is.
     @discardableResult
-    public static func attach(to view: NSTextView?, folder: URL?) -> MarkdownObjects? {
+    public static func attach(to view: NSTextView?, folder: URL?, bodyFont: NSFont? = nil, bodyColor: NSColor? = nil) -> MarkdownObjects? {
         guard let view, let storage = view.textStorage,
               let delegate = view.layoutManager?.delegate,
               delegate.responds(to: #selector(NSLayoutManagerDelegate.layoutManager(_:boundingBoxForControlGlyphAt:for:proposedLineFragment:glyphPosition:characterIndex:)))
@@ -77,7 +79,8 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         let objects = MarkdownObjects()
         objects.view = view
         objects.folder = folder
-        objects.bodyFont = view.font ?? objects.bodyFont
+        objects.bodyFont = bodyFont ?? view.font ?? objects.bodyFont
+        objects.bodyColor = bodyColor
         objects.revealRange = { [weak view] in
             guard let view, view.window?.firstResponder === view else { return nil }
             return (view.string as NSString).lineRange(for: view.selectedRange())
@@ -200,7 +203,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     private func layOut(_ table: MarkdownSyntax.Table, in storage: NSTextStorage, revealed: (NSRange) -> Bool) {
         let n = table.alignments.count
         guard n > 0, n <= Self.maxTableColumns, table.rows.count <= Self.maxTableRows else { return }
-        let fg = view?.textColor ?? .textColor
+        let fg = bodyColor ?? view?.textColor ?? .textColor
         let bold = NSFontManager.shared.convert(bodyFont, toHaveTrait: .boldFontMask)
         // Cells in the body font (the Write view shows pipe-table lines as literal mono); code spans keep theirs.
         for (index, row) in table.rows.enumerated() where index != 1 {
