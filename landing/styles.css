@@ -8,7 +8,7 @@
   --solid: #f5f5f7;
   --line: rgba(0, 0, 0, .10);
   --accent: #2563eb;
-  --fill: #2563eb;
+  --fill: var(--accent);
   --ring: var(--accent);
   --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 96px;
   --h: 44px;
@@ -22,8 +22,6 @@ html[data-theme="dark"] {
   --muted: #98989d;
   --solid: #141416;
   --line: rgba(255, 255, 255, .14);
-  --accent: #2563eb;
-  --fill: #2563eb;
 }
 
 * { box-sizing: border-box; }
