@@ -4,7 +4,7 @@ Status: planning only · 2026-11-16
 
 ## Product promise
 
-Write LaTeX in ordinary folders on the Mac, compile with a local TeX installation, and inspect the PDF and errors in the same window. A workspace is a folder; a project is a root `.tex` file and the files it includes. The app can have several workspace windows open at once. Source files remain usable from Finder, Git, and other editors.
+Open LaTeX or Markdown files directly, write in ordinary folders on the Mac, and inspect the rendered output beside the source. LaTeX uses a local TeX installation; Markdown has a local preview. A workspace is a folder; a LaTeX project is a root `.tex` file and the files it includes. The app can have several workspace windows open at once. Source files remain usable from Finder, Git, and other editors.
 
 This follows the macOS expectation that documents are accessible from Finder and through standard File menu commands, while making room for multiple windows and keyboard use. [Apple file management](https://developer.apple.com/design/human-interface-guidelines/file-management), [Apple macOS design](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos).
 
@@ -14,8 +14,8 @@ This follows the macOS expectation that documents are accessible from Finder and
 | --- | --- | --- |
 | Workspace | A named folder/window with a file tree, open tabs, editor, and preview | Each open workspace has its own window and selected build root. Opening an already open folder focuses its window. |
 | Project | A root `.tex` file inside a workspace | The user chooses it explicitly when the folder has more than one plausible root. Its name appears beside Build. |
-| Document | A `.tex`, `.bib`, or plain text file | Files are edited in place and saved with macOS document conventions. Unsaved changes are shown clearly. |
-| Build | A local compile of the selected root | The result belongs to that workspace and root. A failed build retains the last successful PDF, clearly labeled as stale. |
+| Document | A `.tex`, `.md`, `.bib`, or other decodable text file | Files are edited in place and saved with macOS document conventions. Unsaved changes are shown clearly. |
+| Build/Render | A local compile of the selected TeX root, or preview of the active Markdown file | The result belongs to that workspace and target. A failed TeX build retains the last successful PDF, clearly labeled as stale. |
 
 The app should remember recent workspaces and each workspace's selected root and pane layout. A workspace does not require a proprietary project file. Any app-specific metadata should live in app settings unless a future feature genuinely needs to travel with the folder.
 
@@ -23,9 +23,9 @@ The app should remember recent workspaces and each workspace's selected root and
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ Folder / root title                 Build   status    Preview   Inspector │
+│ Folder / target title           Build/Render status    Preview Inspector │
 ├──────────────┬────────────────────────────┬────────────────────────────────┤
-│ Files        │ Tabs: main.tex  refs.bib    │ PDF preview                    │
+│ Files        │ Tabs: main.tex  notes.md    │ PDF or Markdown preview        │
 │ + outline    │                            │ page / zoom / search           │
 │              │ Source editor              │                                │
 │              │                            │                                │
@@ -36,7 +36,7 @@ The app should remember recent workspaces and each workspace's selected root and
 
 - Leading sidebar: workspace files, followed by a collapsible outline for the active `.tex` document. Keep file hierarchy readable; hide the sidebar on small windows or by command. Apple recommends a hideable sidebar and standard View menu commands. [Apple sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars).
 - Center: source tabs, monospaced editor, line numbers, search, and an obvious active cursor. Split the editor only if users later need simultaneous source files; the PDF split solves the first need.
-- Trailing pane: PDF preview, detachable into a second window for two-display work. The preview has fit width/page, zoom, page navigation, and find.
+- Trailing pane: PDF preview for LaTeX or rendered Markdown for `.md`; detachable into a second window for two-display work. PDF has fit width/page, zoom, page navigation, and find.
 - Bottom panel: Problems by default after a failed build; a Log tab exposes full output. Its height is resizable and it can be closed without losing errors. The toolbar stays sparse: sidebar, root title, Build, build state, preview, and inspector. [Apple toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars), [Apple split views](https://developer.apple.com/design/human-interface-guidelines/split-views).
 - A narrow window prioritizes the editor. Preview becomes a toggle, not a compressed second column; problems become a drawer/panel.
 
@@ -44,17 +44,26 @@ The app should remember recent workspaces and each workspace's selected root and
 
 ### First launch and first PDF
 
-1. Start screen offers **New Workspace**, **Open Folder**, and recent workspaces. No account or cloud setup.
-2. New Workspace asks for a folder location, name, and a blank article or minimal template. It creates ordinary files and opens the new workspace window.
+1. Start screen offers **New Workspace**, **Open File**, **Open Folder**, and recent workspaces. Opening `.tex`, `.md`, or `.markdown` from Finder/Open With opens its containing folder as a workspace and selects the file. The app registers these types without changing the user's default app choice. [Apple document type registration](https://developer.apple.com/documentation/SwiftUI/DocumentGroup).
+2. New Workspace asks for a folder location, name, and a blank LaTeX article or Markdown note. It creates ordinary files and opens the new workspace window.
 3. On first Build, check for a usable local TeX engine. If missing, show the detected state and a path to install/configure one; keep the draft editable. Never silently install a multi-gigabyte toolchain.
 4. Build saves current source files, shows progress, then opens the PDF. Errors appear with file, line, severity, and a concise message. A click opens the source and selects the line.
 5. Closing and reopening the app restores recent folders and per-window context, subject to the user's macOS window restoration setting.
 
 Success criterion: a user with TeX installed can create an article, change its title, compile, and see the new PDF without leaving the app.
 
+### Open and render Markdown
+
+1. Open a `.md` or `.markdown` file directly or select one in a workspace. The active file becomes the render target; no TeX root selection is needed.
+2. **Render** creates a local basic Markdown preview even without TeX or Pandoc. Show links, headings, lists, emphasis, and code fences as content; never execute code fences. For images, tables, math, or raw HTML that the basic renderer cannot display, show a visible limitation and offer the richer Pandoc route when installed.
+3. When Pandoc is installed, **Export** can produce an HTML or PDF copy with a conversion log. Missing Pandoc affects export, not basic editing and preview.
+4. Switching between a `.tex` and `.md` tab switches the action label between Build and Render and shows the matching preview. If an older preview is shown after a failed render, label it stale.
+
+Success criterion: a user can double-click a Markdown file, edit it, press ⌘B, and see an updated local preview without another installation.
+
 ### Existing multi-file project
 
-1. **Open Folder** uses a standard folder picker. Show the actual tree, including `.tex`, `.bib`, images, and included files; filter noisy build artifacts from the tree by default, with a reveal option.
+1. **Open Folder** uses a standard folder picker. Show the actual tree, including `.tex`, `.md`, `.bib`, images, and included files; filter noisy build artifacts from the tree by default, with a reveal option.
 2. If one obvious root is found, suggest it. If ambiguous, ask the user to choose from `.tex` files; do not guess and compile the wrong paper.
 3. Opening another folder makes another workspace window. The Window menu switches between them. Each window keeps its own root, tabs, PDF, problems, and layout.
 4. Renaming or moving a source file in the sidebar updates the tree and open tab. The app warns when the selected root or an open file is removed externally. It never silently overwrites external edits.
@@ -75,7 +84,7 @@ Success criterion: a broken `\\ref` or missing package is diagnosable from a cli
 
 - Dragging an image into a workspace copies it into a user-chosen folder (default `figures/`) and inserts a relative `\\includegraphics` path. Ask before replacing an existing file. Plain drag into the editor may insert a relative path without moving the file.
 - `.bib` is edited as text in the first release. Citation completion can index keys from workspace `.bib` files later; never mutate a bibliography entry to perform a lookup.
-- New document templates are tiny, readable `.tex` files. Start with blank article and report; the picker can grow only after demand. Project files remain plain LaTeX.
+- New document templates are tiny, readable `.tex` or `.md` files. Start with a blank article, report and Markdown note; the picker can grow only after demand. Project files remain plain source files.
 - Export the generated PDF through a standard Save/Share flow. Source remains available as the workspace folder; a **Reveal in Finder** action locates either source or PDF.
 
 ## Interchange and integrations
@@ -99,7 +108,7 @@ Do not place provider-specific buttons in the main toolbar before any integratio
 | New workspace | ⌘N | File |
 | Open folder | ⌘O | File |
 | Save active file | ⌘S | File |
-| Build root | ⌘B | Build |
+| Build TeX / Render Markdown | ⌘B | Build |
 | Find in active file | ⌘F | Edit |
 | Quick open file | ⌘⇧O | File |
 | Show/hide sidebar | ⌘⌥S | View |
@@ -123,7 +132,7 @@ Shortcuts are proposals to validate against macOS and editor conflicts; every ac
 
 | Milestone | User-visible scope | Exit check |
 | --- | --- | --- |
-| 1. Reliable local loop | Multi-workspace windows; folder tree; `.tex`/`.bib` editing; explicit root; local compile; PDF preview; linked errors; standard save/open/recent; PDF export | Two independent workspaces compile correctly; failed build marks previous PDF stale; external edits do not get silently overwritten. |
+| 1. Reliable local loop | Multi-workspace windows; direct `.tex`/`.md` open; source editing; explicit TeX root; local compile; PDF and Markdown previews; linked errors; standard save/open/recent; PDF export | Two independent workspaces compile correctly; Markdown renders without TeX; failed build marks previous PDF stale; external edits do not get silently overwritten. |
 | 2. Writing speed | Outline, templates, image insertion, project search, citation key completion, SyncTeX jumps, preview detach | Real multi-file paper remains responsive and jumps resolve to the right source. |
 | 3. Interchange | Proven DOCX import/export; Google Docs and LibreTexts paths only after capability and loss audits | No source replacement, clear conversion report, and documented unsupported cases. |
 

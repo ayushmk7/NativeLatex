@@ -1,6 +1,6 @@
 # NativeLatex planning workspace
 
-Status: planning only · 2026-11-16. No app source has been created.
+Status: planning only · 2026-11-16. The app plan covers LaTeX, Markdown, and other readable files; no app source has been created.
 
 ## Start here
 

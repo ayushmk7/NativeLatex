@@ -4,7 +4,7 @@ Status: planning only · 2026-11-16
 
 ## Product promise
 
-NativeLatex is a native macOS app for writing LaTeX in ordinary folders, compiling with the Mac's TeX installation, and reviewing the PDF and errors beside the source. It works without an account or network connection. Each folder opens as its own workspace window, so several papers or books can be open and compiled independently.
+NativeLatex is a native macOS app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. It works without an account or network connection. Each folder opens as its own workspace window, so several papers, notes or books can be open independently.
 
 The app is for authors who want a faster local editing loop than switching among a text editor, terminal, PDF viewer and Finder. It should handle a single article quickly and remain dependable on multi-file projects with images and bibliographies.
 
@@ -13,9 +13,9 @@ The app is for authors who want a faster local editing loop than switching among
 | Question | Decision | Reason |
 | --- | --- | --- |
 | Native implementation | SwiftUI window and commands, AppKit source editor, PDFKit preview | Use mature macOS editing and PDF components. |
-| Project format | Ordinary `.tex`, `.bib`, images and related files in a folder | Keep projects portable to TeX, Git and other editors. |
+| Project format | Ordinary `.tex`, `.md`, `.bib`, images and related files in a folder | Keep projects portable to TeX, Git and other editors. |
 | Workspace | One folder per window, several windows open at once | Separate build root, state and outputs clearly. |
-| Build root | Explicitly selected `.tex` file per workspace | Avoid compiling the wrong document in a multi-file folder. |
+| Render target | An opened `.md` file, or an explicitly selected root `.tex` file per workspace | Render the active note by default without guessing a multi-file TeX root. |
 | Build engine | Installed `latexmk`, with pdfLaTeX first and XeLaTeX/LuaLaTeX next | Let TeX tooling handle passes and bibliography work. |
 | Preview | PDFKit; retain the last successful PDF with a stale label on failure | Prevent old output from looking current. |
 | Local data | Source stays in the chosen folder; UI state lives in Application Support | Avoid a proprietary project database. |
@@ -26,15 +26,26 @@ Technical detail and source references are in the [architecture](workspaces/back
 
 ## First usable release
 
-1. Open or create a folder workspace. Support multiple windows and recent folders. Show a file tree and source tabs for `.tex`, `.bib`, `.sty`, `.cls` and other text assets.
+1. Open a `.tex`, `.md` or `.markdown` file directly from Finder/Open With or File > Open, or open/create a folder workspace. A direct file opens its containing folder as a workspace and selects that file. Support multiple windows, recent folders, a file tree and source tabs for text assets. Register these types as openable; the user chooses whether macOS makes NativeLatex their default app. [Apple document type registration](https://developer.apple.com/documentation/SwiftUI/DocumentGroup).
 2. Provide a strong editor: undo/redo, syntax color, matching delimiters, line numbers, find/replace, comment toggle, indentation and standard macOS keyboard/menu behavior.
 3. Save safely. Detect changes made by Finder, Git, cloud file providers or another editor; never silently overwrite a dirty buffer.
-4. Choose a root `.tex` file and Build explicitly. Detect local TeX, show progress/cancel, retain the full log and link reliable errors to source lines.
-5. Show the PDF beside source with zoom, page navigation and search. Retain the last successful PDF on failure and mark it stale.
+4. Build a selected root `.tex` file with local TeX, or Render the active Markdown file locally. The same keyboard command chooses the action from the file type. Show progress/cancel; retain TeX logs and link reliable errors to source lines.
+5. Show PDF beside LaTeX or rendered Markdown beside its source. Markdown gets a native basic preview without extra tools; installed Pandoc enables richer HTML/PDF export. Retain the last successful TeX PDF on failure and mark it stale. [Apple Markdown parsing](https://developer.apple.com/documentation/foundation/attributedstring), [Pandoc formats](https://pandoc.org/MANUAL.html).
 6. Export or reveal the PDF and project folder. No account is required.
 7. Make the main flow work with keyboard navigation, VoiceOver, system appearance, high contrast and reduced motion.
 
 The first release should work on a real multi-file project before advanced completion or cloud exchange arrives. Its exit checks are in the [delivery plan](delivery-plan.md).
+
+## Default file behavior
+
+| File type | Open | Default action | Output |
+| --- | --- | --- | --- |
+| `.tex` | Source editor; choose root if needed | Build with `latexmk` | PDF, log and problems |
+| `.md`, `.markdown` | Source editor | Render the active file locally | Markdown preview; optional Pandoc HTML/PDF export |
+| `.bib`, `.sty`, `.cls`, `.txt` and other decodable text | Source editor | Save/edit; no automatic execution | Original text file |
+| `.pdf` and images | Read-only viewer/asset inspector | Open/preview | Original file |
+
+Opening a file does not execute its contents. **Build/Render** is a deliberate user action. Unknown binary formats are shown in Finder or an appropriate external app rather than interpreted as code. Additional formats can be added when their renderer and safety contract are defined; code fences inside Markdown are displayed, not executed.
 
 ## Power features after the core loop
 
@@ -62,14 +73,15 @@ The scope excludes a collaboration server, bundled TeX distribution, package man
 
 ## Product success checks
 
-1. A person with TeX installed creates a folder, edits an article, builds it and sees the PDF without opening Terminal.
-2. Two workspace windows build distinct roots concurrently without mixing files, errors or output.
-3. A multi-file paper with an image and bibliography builds; clicking a reported error opens the correct file and line.
-4. If an external editor changes an open file, NativeLatex never silently replaces that edit.
-5. If a build fails, the PDF remains available and is unmistakably marked as previous output.
-6. With TeX absent, a user can still edit and save, and Build gives actionable setup guidance.
-7. These flows can be completed by keyboard; essential state and errors are announced to VoiceOver.
-8. Every shipped import/export format has a conversion report and leaves the original untouched.
+1. A person opens a `.tex` file from Finder, edits it, builds it and sees the PDF without opening Terminal.
+2. A person opens a `.md` file from Finder, edits it and sees a local rendered preview without installing TeX or Pandoc.
+3. Two workspace windows build distinct roots concurrently without mixing files, errors or output.
+4. A multi-file paper with an image and bibliography builds; clicking a reported error opens the correct file and line.
+5. If an external editor changes an open file, NativeLatex never silently replaces that edit.
+6. If a build fails, the PDF remains available and is unmistakably marked as previous output.
+7. With TeX absent, a user can still edit and save, and Build gives actionable setup guidance.
+8. These flows can be completed by keyboard; essential state and errors are announced to VoiceOver.
+9. Every shipped import/export format has a conversion report and leaves the original untouched.
 
 ## Limits to validate during implementation
 

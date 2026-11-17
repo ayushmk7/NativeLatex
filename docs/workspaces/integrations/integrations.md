@@ -4,7 +4,7 @@ Status: planning only · 2026-11-16
 
 ## Principle
 
-The `.tex` project folder is the source of truth. Compile and edit work offline. Every conversion creates a separate copy, shows a result summary, and leaves the original untouched. A cloud account is required only when the user chooses a cloud action. Do not claim bidirectional sync until there is a reliable conflict and fidelity model.
+The local `.tex` or `.md` file and its project folder are the source of truth. Compile/render and edit work offline. Every conversion creates a separate copy, shows a result summary, and leaves the original untouched. A cloud account is required only when the user chooses a cloud action. Do not claim bidirectional sync until there is a reliable conflict and fidelity model.
 
 The name “libretext” is interpreted here as **LibreTexts**, the education publishing platform. **LibreOffice Writer** is covered separately through ODT. Confirm the intended product before implementing a provider-specific connector.
 

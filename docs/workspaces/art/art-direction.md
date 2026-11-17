@@ -4,7 +4,7 @@ Status: planning. **NativeLatex** is a working name; the mark must also work wit
 
 ## Art objective
 
-Create one recognizable macOS Dock icon for a local LaTeX editor: source becomes a polished document. The mark should read at small sizes, sit comfortably among current macOS app icons, and be usable in Finder, Spotlight, and the app's About window. The brand system is deliberately small: the app icon, its central mark, and a restrained wordmark. Interface styling is secondary.
+Create one recognizable macOS Dock icon for a local LaTeX and Markdown editor: source becomes a polished document. The mark should read at small sizes, sit comfortably among current macOS app icons, and be usable in Finder, Spotlight, and the app's About window. The brand system is deliberately small: the app icon, its central mark, and a restrained wordmark. Interface styling is secondary.
 
 ## Concept exploration
 
