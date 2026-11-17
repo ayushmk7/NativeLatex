@@ -1,6 +1,6 @@
-/* Black/white with one royal-blue accent. Neutrals follow the Internship page and the app's Theme.swift (same Apple greys);
-   royal blue is the app/icon brand blue, sitting between Internship #0066CC and Website #0F2BFF.
-   Contrast: #4169E1 on white 4.85:1 (also white text on it); #8BA6FF on black 9.0:1. */
+/* Black/white with one electric-blue accent, the Website's body.opt7 values (src/pages/index.astro).
+   Neutrals follow the Internship page (Apple greys).
+   Contrast: #0F2BFF on white 7.47:1 (also white text on it); dark: #7A93FF text on black 7.45:1, white on #2438FF 6.81:1. */
 :root {
   color-scheme: light;
   --bg: #ffffff;
@@ -8,9 +8,8 @@
   --muted: #6e6e73;
   --solid: #f5f5f7;
   --line: rgba(0, 0, 0, .10);
-  --accent: #4169e1;      /* blue as text, links, focus */
-  --fill: #4169e1;        /* filled button, white text */
-  --fill-hover: #3155c4;
+  --accent: #0f2bff;      /* blue as text, links, focus */
+  --fill: #0f2bff;        /* filled button, white text */
   --ring: var(--accent);  /* own name: bb8.css redefines --accent (orange) inside the toggle */
   --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 96px;
   --h: 44px;
@@ -24,7 +23,8 @@ html[data-theme="dark"] {
   --muted: #98989d;
   --solid: #141416;
   --line: rgba(255, 255, 255, .14);
-  --accent: #8ba6ff;
+  --accent: #7a93ff;
+  --fill: #2438ff;
 }
 
 * { box-sizing: border-box; }
@@ -63,7 +63,7 @@ h1 { margin: var(--s5) 0; font-size: clamp(40px, 7vw, 80px); font-weight: 800; l
 .button { display: inline-flex; align-items: center; min-height: var(--h); padding: 0 22px; border: 1px solid var(--line); border-radius: 999px; font-size: 15px; font-weight: 600; transition: background-color .2s, border-color .2s; }
 .button:hover { border-color: var(--fg); }
 .button.primary { background: var(--fill); border-color: transparent; color: #fff; }
-.button.primary:hover { background: var(--fill-hover); }
+.button.primary:hover { filter: brightness(.9); }
 
 .preview { margin-top: var(--s8); text-align: left; }
 .preview figcaption { margin-top: var(--s3); font-size: 13px; color: var(--muted); text-align: center; }
@@ -88,7 +88,6 @@ h1 { margin: var(--s5) 0; font-size: clamp(40px, 7vw, 80px); font-weight: 800; l
 .paper-line.short { width: 65%; }
 
 .section { padding: var(--s8) 0; border-top: 1px solid var(--line); }
-.eyebrow { margin-bottom: var(--s3); color: var(--accent); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
 h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 48px); font-weight: 800; line-height: 1.08; letter-spacing: -.03em; }
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s6); margin-top: var(--s7); padding: 0; list-style: none; }
 .steps li { padding-top: var(--s4); border-top: 2px solid var(--fg); }
@@ -130,8 +129,8 @@ h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 48px); font-weight: 800; lin
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
-/* Increase Contrast: same values as the app's Theme.swift */
+/* Increase Contrast: stronger greys and dividers; the blues already pass at 6.8:1 or more */
 @media (prefers-contrast: more) {
-  :root { --line: #8e8e93; --muted: #3a3a3c; --accent: #1e3fb8; --fill: #1e3fb8; --fill-hover: #1e3fb8; }
-  html[data-theme="dark"] { --line: #8e8e93; --muted: #c7c7cc; --accent: #b4c6ff; --fill: #2f55d4; --fill-hover: #2f55d4; }
+  :root { --line: #8e8e93; --muted: #3a3a3c; }
+  html[data-theme="dark"] { --line: #8e8e93; --muted: #c7c7cc; }
 }
