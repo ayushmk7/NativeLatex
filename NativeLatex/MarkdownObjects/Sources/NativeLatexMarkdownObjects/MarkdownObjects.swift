@@ -17,14 +17,24 @@ let writerHiddenKey = NSAttributedString.Key("LibreWeaveMarkdownHidden")
 public final class MarkdownObjectBox: NSObject {
     enum Content {
         /// A table separator: whitespace up to `edge` (x in the line), with a hairline `pad` before it (the column start less the cell padding).
-        case edge(CGFloat, pad: CGFloat, rule: Bool)
+        case edge(CGFloat, row: TableRow?)
         /// The delimiter row: a horizontal rule `width` wide.
-        case rule(CGFloat)
+        case rule(CGFloat, row: TableRow)
         /// A local image.
         case image(NSImage, size: NSSize)
     }
     let content: Content
     init(_ content: Content) { self.content = content }
+}
+
+/// One table row's grid, like Read's `th, td { border: 1px solid var(--line) }` and shaded `th`: column
+/// boundaries in glyph-position x (the same space as edges), drawn from the row's first separator glyph.
+struct TableRow {
+    let bounds: [CGFloat]
+    /// Header and delimiter rows: the header shade.
+    let shaded: Bool
+    /// A line along the top (every row but the delimiter) / bottom (the last row).
+    let top: Bool, bottom: Bool
 }
 
 /// A finished render.
@@ -227,10 +237,14 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         for c in 0..<n { starts[c] = x; x += widths[c] + 2 * pad }
         let total = x - pad
         guard total <= availableWidth else { return } // too wide: stays literal
+        let bounds = [starts[0] - pad] + (1..<n).map { starts[$0] - pad } + [starts[n - 1] + widths[n - 1] + pad]
+        func frame(_ index: Int) -> TableRow {
+            TableRow(bounds: bounds, shaded: index < 2, top: index != 1, bottom: index == table.rows.count - 1)
+        }
         for (index, row) in table.rows.enumerated() {
             if index == 1 {
                 guard !revealed(row.line) else { continue }
-                storage.addAttribute(.markdownObject, value: MarkdownObjectBox(.rule(total)), range: NSRange(location: row.line.location, length: 1))
+                storage.addAttribute(.markdownObject, value: MarkdownObjectBox(.rule(total, row: frame(index))), range: NSRange(location: row.line.location, length: 1))
                 if row.line.length > 1 { storage.addAttribute(.markdownObjectHidden, value: true, range: NSRange(location: row.line.location + 1, length: row.line.length - 1)) }
                 let style = NSMutableParagraphStyle(); style.minimumLineHeight = 5; style.maximumLineHeight = 5
                 storage.addAttribute(.paragraphStyle, value: style, range: row.line)
@@ -239,14 +253,13 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
             for gap in row.padding where gap.length > 0 { storage.addAttribute(.markdownObjectHidden, value: true, range: gap) }
             for (k, pipe) in row.pipes.enumerated() {
                 let cell = k + (row.leading ? 0 : 1) // the cell that follows this pipe
-                var edge = total, shift: CGFloat = 0
+                var edge = total
                 if cell < n, cell < row.cells.count {
                     let slack = widths[cell] - cellWidths[index][cell]
-                    shift = switch table.alignments[cell] { case .right: slack; case .center: (slack / 2).rounded(); default: 0 }
+                    let shift: CGFloat = switch table.alignments[cell] { case .right: slack; case .center: (slack / 2).rounded(); default: 0 }
                     edge = starts[cell] + shift
                 }
-                // The hairline sits `pad` before the column start, not before this row's aligned text.
-                storage.addAttribute(.markdownObject, value: MarkdownObjectBox(.edge(edge, pad: pad + shift, rule: k > 0 || !table.leadingPipe)),
+                storage.addAttribute(.markdownObject, value: MarkdownObjectBox(.edge(edge, row: k == 0 ? frame(index) : nil)),
                                      range: NSRange(location: pipe, length: 1))
             }
         }
@@ -322,8 +335,8 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     public nonisolated static func boundingBox(at index: Int, in storage: NSAttributedString, glyphPosition position: NSPoint) -> NSRect? {
         guard index < storage.length, let box = storage.attribute(.markdownObject, at: index, effectiveRange: nil) as? MarkdownObjectBox else { return nil }
         let width: CGFloat = switch box.content {
-        case let .edge(edge, _, _): max(2, edge - position.x)
-        case let .rule(width): width
+        case let .edge(edge, _): max(2, edge - position.x)
+        case let .rule(width, _): width
         case let .image(_, size): size.width
         }
         return NSRect(x: position.x, y: 0, width: width, height: 1)
@@ -338,6 +351,26 @@ public extension MarkdownObjects {
 }
 
 extension NSLayoutManager {
+    /// Read's colours: `--line` rgba(0,0,0,.12) / rgba(255,255,255,.16), `th` background `--code` #F5F5F7 / #141416.
+    fileprivate func drawGrid(_ row: TableRow, line: NSRect, offset: CGFloat) {
+        guard let left = row.bounds.first, let right = row.bounds.last else { return }
+        let dark = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let x0 = (offset + left).rounded(), x1 = (offset + right).rounded()
+        if row.shaded {
+            // Drawn after the text, so blended: darken (light) / lighten (dark) tints the background and leaves the
+            // text's own colour exactly as it was, like a background behind it.
+            (dark ? NSColor(srgbRed: 0x14 / 255, green: 0x14 / 255, blue: 0x16 / 255, alpha: 1)
+                  : NSColor(srgbRed: 0xF5 / 255, green: 0xF5 / 255, blue: 0xF7 / 255, alpha: 1)).setFill()
+            NSRect(x: x0, y: line.minY.rounded(), width: x1 - x0, height: line.maxY.rounded() - line.minY.rounded()).fill(using: dark ? .lighten : .darken)
+        }
+        (dark ? NSColor(white: 1, alpha: 0.16) : NSColor(white: 0, alpha: 0.12)).setFill()
+        // Whole-point rects: crisp at 1x and 2x. Verticals stop short of the top line so corners aren't drawn twice.
+        let top = line.minY.rounded(), bottom = line.maxY.rounded()
+        for b in row.bounds { NSRect(x: (offset + b).rounded(), y: top + (row.top ? 1 : 0), width: 1, height: bottom - top - (row.top ? 1 : 0)).fill(using: .sourceOver) }
+        if row.top { NSRect(x: x0, y: top, width: x1 - x0 + 1, height: 1).fill(using: .sourceOver) }
+        if row.bottom { NSRect(x: x0, y: bottom, width: x1 - x0 + 1, height: 1).fill(using: .sourceOver) }
+    }
+
     fileprivate func drawObjects(_ glyphs: NSRange, _ origin: NSPoint) {
         guard let storage = textStorage else { return }
         let chars = characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
@@ -349,13 +382,11 @@ extension NSLayoutManager {
             let cell = boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container).offsetBy(dx: origin.x, dy: origin.y)
             let baseline = line.minY + location(forGlyphAt: glyph).y
             switch box.content {
-            case let .edge(_, pad, rule):
-                guard rule else { return }
-                NSColor.separatorColor.setFill()
-                NSRect(x: (cell.maxX - pad).rounded() - 0.5, y: line.minY, width: 1, height: line.height).fill()
-            case let .rule(width):
-                NSColor.separatorColor.setFill()
-                NSRect(x: cell.minX, y: line.midY.rounded() - 0.5, width: width, height: 1).fill()
+            case let .edge(edge, row):
+                // The edge glyph ends at `edge`, which maps position x to view x.
+                if let row { drawGrid(row, line: line, offset: cell.maxX - edge) }
+            case let .rule(_, row):
+                drawGrid(row, line: line, offset: cell.minX)
             case let .image(image, size):
                 image.draw(in: NSRect(x: cell.minX, y: baseline - size.height, width: size.width, height: size.height),
                            from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)

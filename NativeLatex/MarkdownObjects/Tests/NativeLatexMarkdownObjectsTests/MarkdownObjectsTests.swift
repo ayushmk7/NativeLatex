@@ -160,27 +160,58 @@ final class MarkdownObjectsTests: XCTestCase {
         if case .rule = box(view, at: start("|:-"))?.content {} else { XCTFail("delimiter row is not a rule") }
     }
 
-    /// Where each row draws its column hairlines (the separator before each cell), from the drawn geometry.
-    private func hairlines(_ view: NSTextView, row: String) -> [CGFloat] {
-        let lm = view.layoutManager!, storage = view.textStorage!
-        lm.ensureLayout(for: view.textContainer!)
-        let line = (storage.string as NSString).lineRange(for: NSRange(location: (storage.string as NSString).range(of: row).location, length: 0))
-        var xs: [CGFloat] = []
-        storage.enumerateAttribute(.markdownObject, in: line) { value, range, _ in
-            guard case let .edge(_, pad, rule)? = (value as? MarkdownObjectBox)?.content, rule else { return }
-            let cell = lm.boundingRect(forGlyphRange: NSRange(location: lm.glyphIndexForCharacter(at: range.location), length: 1), in: view.textContainer!)
-            xs.append((cell.maxX - pad).rounded())
-        }
-        return xs
-    }
-
-    func testColumnHairlinesLineUpInEveryRowWhateverTheAlignment() {
-        let source = "| Name | Qty | Mid |\n|:-----|----:|:---:|\n| apple pie | 3 | x |\n| fig | 1200 | wider cell |\n"
+    /// Read's table, drawn offscreen in light mode: the same vertical grid lines in every row, a horizontal
+    /// line on every row's top and the table's bottom, the header shaded #F5F5F7, body white, text still black.
+    func testTableGridAndHeaderShadeMatchRead() {
+        let source = "| Name | Qty | Mid |\n|:-----|----:|:---:|\n| apple pie | 3 | x |\n| fig | 1200 | wider cell |\n\nafter\n"
         let (view, _) = make(source)
-        let header = hairlines(view, row: "| Name"), first = hairlines(view, row: "| apple"), second = hairlines(view, row: "| fig")
-        XCTAssertEqual(header.count, 3)
-        XCTAssertEqual(header, first, "header and body separators at the same x")
-        XCTAssertEqual(header, second)
+        view.appearance = NSAppearance(named: .aqua)
+        view.backgroundColor = .white
+        view.textColor = .black
+        let lm = view.layoutManager!, text = source as NSString
+        lm.ensureLayout(for: view.textContainer!)
+        let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        NSAppearance(named: .aqua)!.performAsCurrentDrawingAppearance { view.cacheDisplay(in: view.bounds, to: rep) }
+        let scale = CGFloat(rep.pixelsWide) / view.bounds.width
+        func line(_ s: String) -> NSRect {
+            lm.lineFragmentRect(forGlyphAt: lm.glyphIndexForCharacter(at: text.range(of: s).location), effectiveRange: nil)
+                .offsetBy(dx: view.textContainerOrigin.x, dy: view.textContainerOrigin.y)
+        }
+        func pixel(_ x: CGFloat, _ y: CGFloat) -> NSColor { rep.colorAt(x: Int(x * scale), y: Int(y * scale))!.usingColorSpace(.sRGB)! }
+        func gray(_ c: NSColor) -> CGFloat { (c.redComponent + c.greenComponent + c.blueComponent) / 3 }
+        /// x (pt) of vertical lines: pixel columns dark over the line's full height (text never spans all of it).
+        func verticals(_ s: String) -> [CGFloat] {
+            let r = line(s)
+            var xs: [CGFloat] = []
+            for px in 0..<rep.pixelsWide {
+                let x = CGFloat(px) / scale
+                let full = stride(from: r.minY.rounded() + 1.5, to: r.maxY.rounded() - 0.5, by: 1 / scale).allSatisfy { gray(pixel(x, $0)) < 0.93 }
+                if full, xs.last.map({ x - $0 > 3 }) ?? true { xs.append(x.rounded()) }
+            }
+            return xs
+        }
+        let header = verticals("| Name")
+        XCTAssertEqual(header.count, 4, "left border, two inner lines, right border: \(header)")
+        XCTAssertEqual(verticals("| apple"), header)
+        XCTAssertEqual(verticals("| fig"), header)
+        XCTAssertTrue(verticals("after").isEmpty, "no grid outside the table")
+        let inside = header[0] + 3
+        // Header shade (#F5F5F7 = 0.96), body white.
+        let shade = pixel(inside, line("| Name").midY)
+        XCTAssertEqual(shade.redComponent, 0xF5 / 255, accuracy: 0.02); XCTAssertEqual(shade.blueComponent, 0xF7 / 255, accuracy: 0.02)
+        XCTAssertGreaterThan(gray(pixel(inside, line("| apple").midY)), 0.99, "body cells unshaded")
+        // Header text keeps its colour: darken never lightens black glyphs.
+        let nameGlyphs = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: text.range(of: "Name"), actualCharacterRange: nil), in: view.textContainer!)
+            .offsetBy(dx: view.textContainerOrigin.x, dy: view.textContainerOrigin.y)
+        var darkest: CGFloat = 1
+        for y in stride(from: nameGlyphs.minY, to: nameGlyphs.maxY, by: 0.5) { for x in stride(from: nameGlyphs.minX, to: nameGlyphs.maxX, by: 0.5) { darkest = min(darkest, gray(pixel(x, y))) } }
+        XCTAssertLessThan(darkest, 0.2, "header text still drawn dark")
+        // Horizontal lines: header top, first body row top, table bottom; none below.
+        for (s, y) in [("| Name", line("| Name").minY), ("| apple", line("| apple").minY), ("| fig", line("| fig").maxY)] {
+            XCTAssertLessThan(gray(pixel(inside + 20, y.rounded() + 0.25)), 0.93, "horizontal line at \(s)")
+        }
+        XCTAssertGreaterThan(gray(pixel(inside + 20, line("| fig").maxY.rounded() + 3)), 0.99, "nothing below the table")
+        XCTAssertEqual(view.string, source)
     }
 
     func testTableEditRealignsOtherRows() {
