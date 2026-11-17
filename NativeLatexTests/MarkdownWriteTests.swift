@@ -169,7 +169,7 @@ final class MarkdownWriteTests: XCTestCase {
         writer.doCommand(by: #selector(NSResponder.insertNewline(_:)))
         writer.doCommand(by: #selector(NSResponder.insertNewline(_:))) // empty item ends the list
         type("Fresh paragraph.")
-        expected = expected.replacingOccurrences(of: "- item three", with: "- item three\nFresh paragraph.")
+        expected = expected.replacingOccurrences(of: "- item three", with: "- item three\n\nFresh paragraph.") // blank line: not a lazy continuation
         writer.setSelectedRange((writer.string as NSString).range(of: "Fresh"))
         MarkdownFormat.wrap(writer, marker: "**")
         expected = expected.replacingOccurrences(of: "Fresh paragraph.", with: "**Fresh** paragraph.")
@@ -779,6 +779,108 @@ final class MarkdownWriteTests: XCTestCase {
         pair.undo()
         XCTAssertEqual(pair.doc, text, "one undo step")
         XCTAssertEqual(Set(MarkdownFormat.Command.all.map(\.id)).count, MarkdownFormat.Command.all.count)
+    }
+
+    /// Arrow keys never stall on hidden markup: every press moves the caret on screen, and the caret never
+    /// rests inside a hidden run. Delete next to markup removes what is visible; source bytes and undo hold.
+    func testCaretSkipsHiddenMarkupAndDeleteRemovesVisibleText() {
+        let text = "Some **bold** and [link](https://x.org) end.\n# Head\n> quote *it*\n"
+        let pair = Pair(text)
+        defer { pair.window.close() }
+        let view = pair.wv, storage = view.textStorage!
+        pair.window.makeFirstResponder(view)
+        func hidden(_ i: Int) -> Bool { i >= 0 && i < storage.length && storage.attribute(.markdownHidden, at: i, effectiveRange: nil) != nil }
+        func spot(_ i: Int) -> NSPoint {
+            let layout = view.layoutManager!
+            layout.ensureLayout(for: view.textContainer!)
+            let glyph = layout.glyphIndexForCharacter(at: min(i, storage.length - 1))
+            return NSPoint(x: layout.location(forGlyphAt: glyph).x, y: layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil).minY)
+        }
+        func walk(_ step: () -> Void) -> [Int] {
+            var stops = [view.selectedRange().location]
+            for _ in 0..<200 {
+                step()
+                let now = view.selectedRange().location
+                if now == stops.last { break }
+                stops.append(now)
+            }
+            return stops
+        }
+        view.setSelectedRange(NSRange(location: 0, length: 0))
+        let right = walk { view.moveRight(nil) }
+        XCTAssertEqual(right.last, storage.length, "reaches the end of the text")
+        view.setSelectedRange(NSRange(location: storage.length, length: 0))
+        let left = walk { view.moveLeft(nil) }
+        XCTAssertEqual(left.last, 0)
+        XCTAssertEqual(Set(right), Set(left), "same stops both ways")
+        for stops in [right, left] {
+            for i in stops { XCTAssertFalse(hidden(i - 1) && hidden(i), "caret inside hidden markup at \(i)") }
+            for (a, b) in zip(stops, stops.dropFirst()) where spot(a) == spot(b) && a < storage.length - 1 && b < storage.length - 1 {
+                XCTFail("stall: \(a)→\(b) draw at the same spot")
+            }
+        }
+        let head = (text as NSString).range(of: "Head").location
+        XCTAssertTrue(right.contains(head) && !right.contains(head - 1) && !right.contains(head - 2), "heading's one stop is after `# `")
+        let opener = pair.location(of: "**bold")
+        XCTAssertTrue(right.contains(opener + 2) && !right.contains(opener) && !right.contains(opener + 1), "one stop at **|bold")
+
+        // Backspace at the heading's stop removes `# ` (TextEdit: delete at a heading's start makes it body text).
+        view.setSelectedRange(NSRange(location: head, length: 0))
+        view.doCommand(by: #selector(NSResponder.deleteBackward(_:))); pair.pump()
+        XCTAssertEqual(pair.doc, text.replacingOccurrences(of: "# Head", with: "Head"))
+        pair.undo()
+        XCTAssertEqual(pair.doc, text, "undo restores the bytes")
+        // Backspace after a closing ** deletes the visible "d", forward delete before ** deletes the visible "b".
+        view.setSelectedRange(NSRange(location: pair.location(of: "** and") + 2, length: 0))
+        view.doCommand(by: #selector(NSResponder.deleteBackward(_:))); pair.pump()
+        XCTAssertEqual(pair.doc, text.replacingOccurrences(of: "**bold**", with: "**bol**"))
+        pair.undo()
+        view.setSelectedRange(NSRange(location: pair.location(of: "**bold"), length: 0))
+        view.doCommand(by: #selector(NSResponder.deleteForward(_:))); pair.pump()
+        XCTAssertEqual(pair.doc, text.replacingOccurrences(of: "**bold**", with: "**old**"))
+        pair.undo()
+        XCTAssertEqual(pair.doc, text)
+    }
+
+    /// Return in prose makes a new paragraph (blank line) that Read renders as its own <p>; lists, quotes,
+    /// fenced code and table rows keep their Return. Each Return is one undo step back to the exact bytes.
+    func testReturnInProseStartsAParagraphReadShows() async throws {
+        func press(_ text: String, at needle: String, after: Bool = true, _ selector: Selector = #selector(NSResponder.insertNewline(_:))) -> String {
+            let pair = Pair(text)
+            defer { pair.window.close() }
+            let r = (text as NSString).range(of: needle)
+            pair.wv.setSelectedRange(NSRange(location: after ? NSMaxRange(r) : r.location, length: 0))
+            pair.wv.doCommand(by: selector); pair.pump()
+            let result = pair.doc
+            pair.undo()
+            XCTAssertEqual(pair.doc, text, "undo after Return in \(text.debugDescription)")
+            return result
+        }
+        XCTAssertEqual(press("One two.", at: "One"), "One\n\n two.")
+        XCTAssertEqual(press("One.\n\nTwo.", at: "One."), "One.\n\n\n\nTwo.")
+        XCTAssertEqual(press("# Head", at: "Head"), "# Head\n\n")
+        XCTAssertEqual(press("Para.", at: "Para", after: false), "\nPara.", "at a line start: plain newline")
+        XCTAssertEqual(press("- a", at: "a"), "- a\n- ")
+        XCTAssertEqual(press("- a\n- ", at: "- a\n- "), "- a\n\n", "ending a list leaves a blank line")
+        XCTAssertEqual(press("> q", at: "q"), "> q\n> ")
+        XCTAssertEqual(press("```\nlet x\n```", at: "let x"), "```\nlet x\n\n```")
+        XCTAssertEqual(press("| a | b |", at: "| a | b |"), "| a | b |\n")
+        XCTAssertEqual(press("a | b\n--|--\n1 | 2", at: "1 | 2"), "a | b\n--|--\n1 | 2\n", "pipe table without outer pipes")
+        XCTAssertEqual(press("a | b\n--|--", at: "a | b"), "a | b\n\n--|--", "header row")
+        XCTAssertEqual(press("Either a | b here.", at: "a | b"), "Either a | b\n\n here.", "a pipe in prose is still prose")
+        // Return on a 1 MiB block of pipe lines (no delimiter) stays a single bounded scan.
+        let pipes = String(repeating: "a | b\n", count: (1 << 20) / 6) + "end | x"
+        let start = ContinuousClock.now
+        XCTAssertFalse(MarkdownFormat.isTableRow((pipes as NSString).lineRange(for: NSRange(location: (pipes as NSString).length - 1, length: 0)), in: pipes as NSString))
+        XCTAssertLessThan(ContinuousClock.now - start, .milliseconds(30), "bounded table scan")
+        XCTAssertEqual(press("---\ntitle: x\n---\n", at: "title: x"), "---\ntitle: x\n\n---\n")
+        XCTAssertEqual(press("One two.", at: "One", #selector(NSResponder.insertLineBreak(_:))), "One\n two.", "Shift-Return: \\n, never U+2028")
+
+        guard (try? await MarkdownRenderer.render("x")) != nil else { throw XCTSkip("Pandoc not installed") }
+        let prose = try await MarkdownRenderer.render(press("First line of prose", at: "First line") + "next")
+        XCTAssertEqual(prose.components(separatedBy: "<p>").count - 1, 2, "two paragraphs in Read: \(prose)")
+        let list = try await MarkdownRenderer.render(press(press("- item", at: "item"), at: "- item\n- ") + "next")
+        XCTAssertTrue(list.contains("<p>next</p>"), "text after an ended list is its own paragraph: \(list)")
     }
 
     /// Moving the caret onto a hidden fence line reveals it without moving the text below.

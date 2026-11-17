@@ -391,8 +391,11 @@ enum MarkdownFormat {
         let wholeLine = text.substring(with: lineRange).trimmingCharacters(in: .newlines)
         let rest = wholeLine.dropFirst(line.count)
         if line.count == m.output.0.count, rest.allSatisfy({ $0 == " " || $0 == "\t" }) {
-            // Empty item (at most spaces after the caret): end the list, trailing spaces included.
-            view.insertText("", replacementRange: NSRange(location: lineRange.location, length: (wholeLine as NSString).length))
+            // Empty item (at most spaces after the caret): end the list, trailing spaces included. After an
+            // item, leave a blank line too, or the next text would continue that item (lazy continuation in Read).
+            let previous = lineRange.location > 0 ? text.substring(with: text.lineRange(for: NSRange(location: lineRange.location - 1, length: 0))) : ""
+            let separate = previous.firstMatch(of: #/^[ \t]*(?:[-*+]|\d{1,9}[.)]|>)[ \t]*\S/#) != nil
+            view.insertText(separate ? "\n" : "", replacementRange: NSRange(location: lineRange.location, length: (wholeLine as NSString).length))
             return true
         }
         var marker = String(m.output.1)
@@ -403,6 +406,47 @@ enum MarkdownFormat {
         if m.output.7 != nil { marker += "[ ] " }
         view.insertText("\n" + marker, replacementRange: caret)
         return true
+    }
+
+    /// Return in prose starts a new paragraph (a blank line), so Read shows it as a separate paragraph, not
+    /// a line joined to the one above. Table rows, display math, HTML and front matter keep a plain newline,
+    /// as does Return at the start of a line. Returns false when a plain newline is right.
+    static func paragraphBreak(_ view: NSTextView) -> Bool {
+        let text = view.string as NSString
+        let caret = view.selectedRange()
+        let line = text.lineRange(for: NSRange(location: caret.location, length: 0))
+        let before = text.substring(with: NSRange(location: line.location, length: caret.location - line.location))
+        guard !before.allSatisfy(\.isWhitespace), before.firstMatch(of: #/^ {0,3}(\||\$\$|<|---|\+\+\+)/#) == nil,
+              !isTableRow(line, in: text) else { return false }
+        if text.hasPrefix("---\n"), let end = text.range(of: "\n---", range: NSRange(location: 3, length: text.length - 3)).nonEmpty,
+           caret.location <= end.location { return false } // front matter
+        view.insertText("\n\n", replacementRange: caret)
+        return true
+    }
+
+    private static let tableDelimiter = #/^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/#
+
+    /// A pipe-table row, with or without outer pipes (`a | b`): the line has a `|` and a delimiter row
+    /// (`---|:-:`) is the line itself, the next line (a header row), or above it through lines that all have `|`
+    /// (every pipe-table row does). Prose with a `|` stops at the first line without one.
+    // ponytail: walks at most `maxTableScan` lines, so a keystroke never scans a whole 1 MiB block; a row more
+    // than that far below its delimiter gets a paragraph break. Track table spans in the styler if that matters.
+    static let maxTableScan = 1000
+    static func isTableRow(_ line: NSRange, in text: NSString) -> Bool {
+        func has(_ r: NSRange) -> Bool { text.range(of: "|", options: .literal, range: r).location != NSNotFound }
+        func isDelimiter(_ r: NSRange) -> Bool {
+            r.length < 1000 && has(r) && text.substring(with: r).trimmingCharacters(in: .newlines).wholeMatch(of: tableDelimiter) != nil
+        }
+        guard has(line) else { return false }
+        if isDelimiter(line) { return true }
+        if NSMaxRange(line) < text.length, isDelimiter(text.lineRange(for: NSRange(location: NSMaxRange(line), length: 0))) { return true }
+        var up = line
+        for _ in 0..<maxTableScan where up.location > 0 {
+            up = text.lineRange(for: NSRange(location: up.location - 1, length: 0))
+            if isDelimiter(up) { return true }
+            if !has(up) { return false }
+        }
+        return false
     }
 
     private static func selectedLines(_ view: NSTextView) -> (range: NSRange, text: String) {
@@ -533,13 +577,78 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
     }
 
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        guard selector == #selector(NSResponder.insertNewline(_:)) else { return false }
+        switch selector {
+        case #selector(NSResponder.deleteBackward(_:)): return deleteAcrossHiddenMarkup(textView, forward: false)
+        case #selector(NSResponder.deleteForward(_:)): return deleteAcrossHiddenMarkup(textView, forward: true)
+        case #selector(NSResponder.insertLineBreak(_:)):
+            // Shift-Return: a plain newline, never NSTextView's U+2028 line separator, which isn't Markdown.
+            textView.insertText("\n", replacementRange: textView.selectedRange())
+            return true
+        case #selector(NSResponder.insertNewline(_:)): break
+        default: return false
+        }
         // Inside fenced code, Return is a plain newline: `- ` or `> ` there is code (a diff, YAML, a shell prompt).
         let caret = textView.selectedRange().location
-        if MarkdownStyler.fences(textView.string as NSString).contains(where: { caret > $0.range.location && caret <= NSMaxRange($0.range) }) {
+        // The cached blocks are current between edits (kept by noteEdit/restyle), so no rescan per keystroke.
+        if fences.contains(where: { caret > $0.range.location && caret <= NSMaxRange($0.range) }) {
             return false
         }
-        return MarkdownFormat.continueBlock(textView)
+        return MarkdownFormat.continueBlock(textView) || MarkdownFormat.paragraphBreak(textView)
+    }
+
+    /// The hidden-markup run touching `location` (a hidden character at or just before it), if any.
+    private func hiddenRun(at location: Int, in storage: NSTextStorage) -> NSRange? {
+        func hidden(_ i: Int) -> Bool { i >= 0 && i < storage.length && storage.attribute(.markdownHidden, at: i, effectiveRange: nil) != nil }
+        guard hidden(location) || hidden(location - 1) else { return nil }
+        var a = hidden(location) ? location : location - 1, b = a + 1
+        while hidden(a - 1) { a -= 1 }
+        while hidden(b) { b += 1 }
+        return NSRange(location: a, length: b - a)
+    }
+
+    /// Every caret position in or at the edges of a hidden run draws at the same spot, so the run gets one
+    /// caret stop: its end, where the next character is visible (AppKit's own glyph moves misbehave from a
+    /// position before null glyphs). Typing there lands after the markup: in a heading after `# `, inside
+    /// `**bold` after its opener, and after (outside) a closing `**`.
+    private func caretStop(_ run: NSRange) -> Int { NSMaxRange(run) }
+
+    private func isLinePrefix(_ run: NSRange, in text: NSString) -> Bool {
+        run.location == text.lineRange(for: NSRange(location: run.location, length: 0)).location
+    }
+
+    /// Caret moves skip hidden markup: one key press always moves the caret on screen. Selections, and changes
+    /// made by an edit or a sync (attributes still stale), are left alone.
+    func textView(_ textView: NSTextView, willChangeSelectionFromCharacterRange old: NSRange, toCharacterRange new: NSRange) -> NSRange {
+        guard new.length == 0, !isUpdating, edited == nil, let storage = textView.textStorage,
+              let run = hiddenRun(at: new.location, in: storage) else { return new }
+        let text = storage.string as NSString
+        let stop = caretStop(run)
+        guard old.length == 0, old.location != new.location, NSLocationInRange(old.location, NSRange(location: run.location, length: run.length + 1)) else {
+            return NSRange(location: stop, length: 0)
+        }
+        // Leaving the run: go one visible character past it in the direction of travel.
+        // Moving right lands on the stop; moving left from it leaves the run past one visible character.
+        guard new.location < old.location, run.location > 0 else { return NSRange(location: stop, length: 0) }
+        return NSRange(location: text.rangeOfComposedCharacterSequence(at: run.location - 1).location, length: 0)
+    }
+
+    /// Delete next to hidden markup removes what you see: a visible character past the markup, or, at the
+    /// start of a heading or quote, the whole `# ` / `> ` (the line becomes body text). Never one invisible marker.
+    private func deleteAcrossHiddenMarkup(_ view: NSTextView, forward: Bool) -> Bool {
+        let caret = view.selectedRange()
+        guard caret.length == 0, let storage = view.textStorage else { return false }
+        let text = storage.string as NSString
+        let probe = forward ? caret.location : caret.location - 1
+        guard probe >= 0, probe < text.length, storage.attribute(.markdownHidden, at: probe, effectiveRange: nil) != nil,
+              let run = hiddenRun(at: probe, in: storage) else { return false }
+        if !forward, isLinePrefix(run, in: text) {
+            view.insertText("", replacementRange: run)
+            return true
+        }
+        let edge = forward ? NSMaxRange(run) : run.location - 1
+        guard edge >= 0, edge < text.length else { return true } // only markup on that side: nothing visible to delete
+        view.insertText("", replacementRange: text.rangeOfComposedCharacterSequence(at: edge))
+        return true
     }
 
     /// Fence structure can change only if a fence run is typed/removed, the edit touches a fence line, or an
