@@ -20,7 +20,7 @@ The app is for authors who want a faster local editing loop than switching among
 | Build engine | Installed `latexmk`, with pdfLaTeX first and XeLaTeX/LuaLaTeX next | Let TeX tooling handle passes and bibliography work. |
 | Preview | PDFKit; retain the last successful PDF with a stale label on failure | Prevent old output from looking current. |
 | Local data | Source stays in the chosen folder; UI state lives in Application Support | Avoid a proprietary project database. |
-| Appearance | Black/white light and dark themes with the Internship UI's blue accent (`#0066CC` light; `#0071E3` dark fill, `#0A84FF` dark text) and a native BB-8 inspired switch | Follow the requested visual direction while keeping editor and PDF readable. |
+| Appearance | Black/white light and dark themes with one `#2563EB` blue accent and a native BB-8 inspired switch | Follow the requested visual direction while keeping editor and PDF readable. |
 | Distribution | Local Debug first; Developer ID signed and notarized ZIP for public download | Support local TeX tools and ordinary folders. |
 | External formats | Non-destructive, reviewable import/export copies | The [conversion test](research/conversion-test-2026-11-17.md) found silent reference and citation changes. |
 
@@ -36,7 +36,7 @@ Technical detail and source references are in the [architecture](workspaces/back
 6. Export or reveal the PDF and project folder. No account is required.
 7. Make the main flow work with keyboard navigation, VoiceOver, system appearance, high contrast and reduced motion.
 
-The visual system uses white and black surfaces, the Internship UI's blue accent (`#0066CC` light; `#0071E3` dark fill, `#0A84FF` dark text), and the native BB-8 inspired appearance switch described in the [art](workspaces/art/art-direction.md) and [UX](workspaces/ux/ux-plan.md) plans. The switch follows the Mac's effective appearance until the user chooses an explicit Light or Dark override.
+The visual system uses white and black surfaces, one `#2563EB` blue accent from the Website base theme, and the native BB-8 inspired appearance switch described in the [art](workspaces/art/art-direction.md) and [UX](workspaces/ux/ux-plan.md) plans. Small dark-mode text uses neutral white for contrast. The switch follows the Mac's effective appearance until the user chooses an explicit Light or Dark override.
 
 The first release should work on a real multi-file project before advanced completion or cloud exchange arrives. Its exit checks are in the [delivery plan](delivery-plan.md).
 

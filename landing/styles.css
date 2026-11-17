@@ -81,7 +81,6 @@ html[data-theme="dark"] .preview video { box-shadow: 0 24px 64px -16px rgba(0, 0
 
 .section { padding: var(--s8) 0; }
 h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 52px); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; }
-#workflow-title { max-width: none; }
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s6); margin-top: var(--s7); padding: 0; list-style: none; }
 .steps li { padding-top: var(--s4); }
 .step-number { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); }

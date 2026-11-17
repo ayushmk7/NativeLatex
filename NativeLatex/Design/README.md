@@ -2,12 +2,7 @@
 
 SwiftUI design system for the LibreWeave Mac app (code paths keep the `NativeLatex` name). macOS 14+, Swift 6, no dependencies.
 
-Sources of the look: the Internship tracker (`~/Downloads/Internship/frontend/src/style.css`: white/black, hairlines, pill controls, one blue) and the website's BB-8 switch (`~/Downloads/Website/src/components/pro/opt4/bb8.css`). Rules come from `docs/workspaces/ux/ux-plan.md` → *Appearance and BB-8 control*.
-
-| Light | Dark |
-| --- | --- |
-| ![](Screenshots/shell-light.png) | ![](Screenshots/shell-dark.png) |
-| ![](Screenshots/bb8-light.png) | ![](Screenshots/bb8-dark.png) |
+Sources of the look: the Internship tracker (`~/Downloads/Internship/frontend/src/style.css`: white/black and pill controls), the Website base blue `#2563EB`, and the website's BB-8 switch (`~/Downloads/Website/src/components/pro/opt4/bb8.css`). Rules come from `docs/workspaces/ux/ux-plan.md` → *Appearance and BB-8 control*.
 
 ## Integrate
 
@@ -69,12 +64,12 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 | surface | `#F5F5F7` | `#141416` |
 | foreground | `#0A0A0A` | `#F5F5F7` |
 | secondary | `#6E6E73` | `#98989D` |
-| accent (fill, white text) | `#0066CC` (5.57:1) | `#0071E3` (4.70:1) |
-| accentText | `#0066CC` (5.57:1 on white) | `#0A84FF` (5.76:1 on black) |
-| accent, Increase Contrast | `#004F9E` (8.04:1) | `#005BB5` (6.64:1) |
-| accentText, Increase Contrast | `#004F9E` | `#66B2FF` (9.38:1 on black) |
+| accent (fill, white text) | `#2563EB` (5.17:1) | `#2563EB` (5.17:1) |
+| accentText | `#2563EB` (5.17:1 on white) | neutral `#F5F5F7` for small text |
+| accent, Increase Contrast | `#2563EB` | `#2563EB` |
+| accentText, Increase Contrast | neutral `#0A0A0A` | neutral `#FFFFFF` |
 
-The base values match the Internship tracker's blue tokens. Increase Contrast deepens fills and lightens dark text. The Markdown preview CSS uses the same values, with `prefers-contrast: more` for Increase Contrast. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors; like the landing switch, its pill has an outline in `foreground` (1.5pt, 2.5pt with Increase Contrast) so the sky stays distinct from light and dark toolbars.
+`#2563EB` is the only brand blue in every appearance. On black it is below 4.5:1 for small text, so small links and labels use neutral white while blue remains on fills, focus rings and larger accents. The Markdown preview CSS follows the same rule. Increase Contrast changes neutral text only. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors; like the landing switch, its pill has an outline in `foreground` (1.5pt, 2.5pt with Increase Contrast) so the sky stays distinct from light and dark toolbars.
 
 ## Check
 
@@ -83,9 +78,9 @@ cd NativeLatex/Design
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 swift test                                                  # 4 XCTest cases
 swift run NativeLatexDesignDemo                             # LibreWeave sample window
-swift run NativeLatexDesignDemo --snapshot "$PWD/Screenshots"  # regenerate the PNGs above
+swift run NativeLatexDesignDemo --snapshot "$PWD/Screenshots"  # optional snapshots (opens a window)
 ```
 
-Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears the override; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent hex values match the Internship palette; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ; rendered BB-8 pixels show a dark outline on light and a light outline on dark, and a focus ring that is a clean capsule (empty bounding-box corners) within the control bounds, absent when unfocused, with no layout change on focus. Set `BB8_RENDER_DIR` to save those renders as PNGs.
+Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears the override; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent is always `#2563EB`; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ; rendered BB-8 pixels show a dark outline on light and a light outline on dark, and a focus ring that is a clean capsule (empty bounding-box corners) within the control bounds, absent when unfocused, with no layout change on focus. Set `BB8_RENDER_DIR` to save those renders as PNGs.
 
 Still to check by hand in the real app: VoiceOver reading, Full Keyboard Access, Reduce Motion, and switching macOS appearance while two windows are open.
