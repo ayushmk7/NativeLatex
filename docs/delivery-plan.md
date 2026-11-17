@@ -10,6 +10,7 @@ Status: planning and conversion validation · revised 2026-11-17 · Mac only. No
 | UX | [UX plan](workspaces/ux/ux-plan.md) | Flows, menus, keyboard paths, empty/error states and accessibility checks. |
 | Backend | [Architecture](workspaces/backend/architecture.md) | Swift app shell, file safety, compiler process, PDF preview, SyncTeX and release. |
 | Integrations | [Integration plan](workspaces/integrations/integrations.md) | Conversion corpus, non-destructive DOCX/ODT exchange, provider feasibility. |
+| Landing | [Landing plan](workspaces/landing/landing-plan.md) | Static page, light/dark design, honest development status, Vercel preview. |
 | Release | [Deployment plan](deployment-plan.md) | Developer ID signing, notarization, AWS artifact hosting, optional Vercel landing page. |
 
 One coordinator keeps shared decisions in the [product plan](product-plan.md). Changes to document ownership, file safety and main window commands need cross-workstream review.

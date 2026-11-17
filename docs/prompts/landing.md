@@ -1,0 +1,3 @@
+# Landing workspace brief
+
+Maintain the static `landing/` page using `docs/workspaces/landing/landing-plan.md`, the Downloads frontend design guide, and the user's Website BB-8 toggle as visual references. Keep the page black/white with a royal-blue accent, responsive and accessible in both appearances. The app illustration must remain labeled as a concept, and the call to action must point to the project while no signed Mac release exists. Test desktop and narrow viewports, theme persistence, reduced motion, and local links. Work on the Landing branch; connect Vercel only when the owner chooses to publish.

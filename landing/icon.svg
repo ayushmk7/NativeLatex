@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NativeLatex source to page mark">
+  <rect width="64" height="64" rx="14" fill="#fff"/>
+  <path d="M42 10H24v44h22V22L42 10Z" fill="#101010"/>
+  <path d="M42 10v12h12" fill="none" stroke="#4169e1" stroke-width="4"/>
+  <path d="M16 19c-6 0-6 4-6 7v3c0 3-2 4-5 4 3 0 5 1 5 4v3c0 3 0 7 6 7" fill="none" stroke="#4169e1" stroke-width="5" stroke-linecap="round"/>
+  <path d="M31 32h9M31 39h9" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+</svg>

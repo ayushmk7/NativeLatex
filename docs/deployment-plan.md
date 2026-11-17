@@ -1,6 +1,6 @@
 # Mac release and deployment plan
 
-Status: planning and readiness checks · 2026-11-17. No app, release artifact, AWS resource, or landing page has been deployed.
+Status: planning and readiness checks · 2026-11-17. A static landing page exists in `landing/`; no app, release artifact, AWS resource, or website has been deployed.
 
 ## What needs hosting
 
@@ -21,7 +21,7 @@ Vercel documents the [Hobby restriction](https://vercel.com/docs/plans/hobby). C
 2. **Signing gate:** set the bundle identifier, version, minimum macOS, app icon, signing team, and Hardened Runtime. Obtain a valid Developer ID Application identity in the keychain. Archive Release and use Xcode Organizer's Developer ID/direct distribution workflow to notarize. This Developer ID release route requires signing and notarization under Apple's [notarization guide](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution/). Apple lists its Developer Program at US $99/year, subject to local pricing. [Apple enrollment](https://developer.apple.com/help/account/membership/program-enrollment/).
 3. **Artifact gate:** staple the notarization ticket to the app, package a versioned ZIP, and record SHA-256. Verify `codesign --verify --deep --strict`, `xcrun stapler validate`, and `spctl --assess --type execute` on the exported app. Download the ZIP to a clean Mac and repeat the launch/build/open checks. The [backend plan](workspaces/backend/architecture.md) has the exact Mac release path.
 4. **AWS gate:** authenticate to the intended AWS account, choose the CloudFront plan, create the private S3 origin and distribution with Origin Access Control, upload only the verified ZIP/checksum, then download and hash the public artifact. Set a budget or usage alert for any paid resources. Publish no user project files.
-5. **Landing gate, if wanted:** publish a one-page static site on Vercel with the app name, Mac requirements, local-TeX prerequisite, version, download link, checksum, and privacy statement. It can use a `vercel.app` address; a custom domain is a separate decision. Update the download link only after the artifact gate passes.
+5. **Landing gate:** the [static page](../landing/README.md) can publish to Vercel now with an honest in-development message and repository link. It can use a `vercel.app` address; a custom domain is a separate decision. Add a version, download link, checksum, and Mac requirements only after the artifact gate passes.
 
 ## Current readiness on this Mac
 
@@ -31,7 +31,7 @@ Vercel documents the [Hobby restriction](https://vercel.com/docs/plans/hobby). C
 | Local TeX and converter | `latexmk` and Pandoc are present; [DOCX/ODT conversion was tested](research/conversion-test-2026-11-17.md). |
 | Apple signing | `notarytool` and `stapler` are available, but the current keychain reports **0 valid code-signing identities**. |
 | AWS | CLI is installed, but the default profile did not have a valid `sts get-caller-identity` session during this check. |
-| Vercel | CLI is not installed; no landing page project exists in this repository. |
+| Vercel | CLI is not installed; the static `landing/` page is built and locally previewed but has not been connected to a Vercel account or deployed. |
 | App artifact | No Xcode project or app executable exists yet, so signing, notarization, and public deployment cannot be run. |
 
 The next executable milestone is a local Debug build, followed by the signing gate. Do not create a download URL for a nonexistent release.
