@@ -1,6 +1,6 @@
 # Delivery plan and acceptance gates
 
-Status: planning and conversion validation · revised 2026-11-17 · Mac only. No app implementation is part of this pass.
+Status: gates in progress · revised 2026-11-17 · Mac only. Gate 0 is mostly met: the `LibreLeaf` scheme builds and its tests pass on this Mac; a missing-TeX run has not been checked. Gate 1 is partial: direct file open, edit and save work one file per window; folder windows, tree, tabs and recent folders are not built. Gate 2 is partial: a local `latexmk` build, log, diagnostics, PDF preview, cancel, stale badge and a basic Markdown preview exist, without root selection. Details: [Implemented on main](README.md#implemented-on-main-checked-2026-11-17).
 
 ## Workstreams
 
@@ -38,7 +38,7 @@ Gates 1–4 form the first useful Mac release. Gates 5–7 can follow without ch
 - `thesis`: nested include paths and two plausible roots to test root choice.
 - `broken`: missing package, bad reference, malformed environment and a previously successful PDF.
 - `external-change`: a second editor modifies a clean and then a dirty file.
-- `conversion`: start with the [tested samples](research/conversion-test-2026-11-17.md), then add math-heavy, citation-heavy and image-heavy user documents for DOCX/ODT review.
+- `conversion`: the Integrations package tests already read `docs/research/conversion-fixtures` directly. Start with the [tested samples](research/conversion-test-2026-11-17.md), then add math-heavy, citation-heavy and image-heavy user documents for DOCX/ODT review.
 
 Keep fixtures small and representative. Test trust boundaries and data-loss risks: save conflicts, build-generation ordering, process cancellation, diagnostic path resolution and conversion copy semantics. Avoid tests that only mirror static view code.
 

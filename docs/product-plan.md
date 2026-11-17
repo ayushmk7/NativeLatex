@@ -1,10 +1,10 @@
 # NativeLatex Mac product plan
 
-Status: planning and conversion validation · revised 2026-11-17 · Mac only
+Status: plan, with a first implementation on main · revised 2026-11-17 · Mac only. **LibreLeaf** is the working app name; NativeLatex remains the repository and project path. What is built today is listed under [Implemented on main](README.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
 
 ## Product promise
 
-NativeLatex is planned as a native Mac app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
+LibreLeaf (repository: NativeLatex) is planned as a native Mac app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
 
 The app is for authors who want a faster local editing loop than switching among a text editor, terminal, PDF viewer and Finder. It should handle a single article quickly and remain dependable on multi-file projects with images and bibliographies.
 
@@ -12,9 +12,10 @@ The app is for authors who want a faster local editing loop than switching among
 
 | Question | Decision | Reason |
 | --- | --- | --- |
-| Native implementation | SwiftUI window and commands, AppKit source editor, PDFKit preview | Use mature macOS editing and PDF components. |
+| Native implementation | SwiftUI window and commands, AppKit source editor, PDFKit preview | Use mature macOS editing and PDF components. The current build uses SwiftUI `TextEditor`; the AppKit editor is still planned. |
+| Minimum macOS | 14.0 (app target, Design and Integrations packages) | Matches `MACOSX_DEPLOYMENT_TARGET` and package platforms. |
 | Project format | Ordinary `.tex`, `.md`, `.bib`, images and related files in a folder | Keep projects portable to TeX, Git and other editors. |
-| Workspace | One folder per window, several windows open at once | Separate build root, state and outputs clearly. |
+| Workspace | One folder per window, several windows open at once | Separate build root, state and outputs clearly. **Planned.** The current build is a `DocumentGroup` app with one file per window and no folder tree. |
 | Render target | An opened `.md` file, or an explicitly selected root `.tex` file per workspace | Render the active note by default without guessing a multi-file TeX root. |
 | Build engine | Installed `latexmk`, with pdfLaTeX first and XeLaTeX/LuaLaTeX next | Let TeX tooling handle passes and bibliography work. |
 | Preview | PDFKit; retain the last successful PDF with a stale label on failure | Prevent old output from looking current. |
@@ -74,7 +75,7 @@ The first release excludes a collaboration server, bundled TeX distribution, pac
 
 “Docs” means Google Docs here; “libretext” is treated as LibreTexts, with LibreOffice Writer covered too because the term could refer to it. Word and Writer exchange use reviewable DOCX/ODT copies. Google Docs begins with manual exchange and can gain a narrow, opt-in Drive connector for the owner's account. LibreTexts begins as a reviewed publishing handoff until its supported API and author workflow are verified. See the [integration evidence and limits](workspaces/integrations/integrations.md) and [conversion test](research/conversion-test-2026-11-17.md).
 
-AWS can serve the signed Mac download. A Vercel landing page is optional; the app itself needs no website. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
+AWS is planned to serve a signed Mac download once one exists. The landing page is live on [GitHub Pages](https://ayushmk7.github.io/NativeLatex/) with no download; Vercel remains optional; the app itself needs no website. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
 
 ## Product success checks
 

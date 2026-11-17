@@ -28,6 +28,10 @@ The Markdown note retained visible headings, emphasis, link, math, table, image,
 
 Pandoc emitted no conversion warning for the lost equation reference or changed citation style. A successful process exit therefore cannot be the app's fidelity report. The app must keep the source, create a copy, and flag at least cross-references, citations, custom macros/environments, captions, and code-language metadata for review. A simple export is useful; claiming editable round-trip parity is not justified by this test.
 
+## Automated follow-up
+
+The `NativeLatex/Integrations` package tests now read these fixtures directly and repeat the round trips: LaTeX and Markdown through DOCX and ODT, Markdown to LaTeX with the image copied next to the new file, and LibreOffice DOCX↔ODT and PDF export. They also check that existing copies are never overwritten and that arguments are not run through a shell. The converter fixes the `/tmp` image-path problem above by extracting media to `<name>_media/` beside the copy with relative links, and it attaches the review notes listed in the [integration plan](../workspaces/integrations/integrations.md#fidelity-notes-the-converter-reports). These tests prove behavior with this fixture on this Mac's Pandoc 3.13 and LibreOffice only; Word was still not tested.
+
 ## Release gate
 
 Before exposing DOCX/ODT as a reliable import/export action, repeat this test with a multi-file thesis, nested images, several citation styles, footnotes, complex tables, Unicode, and user-authored Word/LibreOffice files. Check the resulting document in Word as well as LibreOffice. For the first release, PDF export is the faithful LaTeX output; DOCX/ODT are explicitly reviewable copies.

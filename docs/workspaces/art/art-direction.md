@@ -1,6 +1,6 @@
 # Art direction: NativeLatex for Mac
 
-Status: planning · 2026-11-17. **NativeLatex** is a working name; the mark must work without a wordmark.
+Status: brief; first assets merged · 2026-11-17. **LibreLeaf** is the working app name (NativeLatex stays the repository and project path); the mark must work without a wordmark. The icon set and `AccentColor` are in `NativeLatex/Assets.xcassets` and pass `art/tools/validate.sh`; see [art/README](../../../art/README.md).
 
 ## Visual thesis
 

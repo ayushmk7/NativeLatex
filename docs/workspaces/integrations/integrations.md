@@ -1,6 +1,32 @@
 # Interchange and integration plan
 
-Status: planning and local conversion test · revised 2026-11-17 · Mac only
+Status: plan, with a local package implemented · revised 2026-11-17 · Mac only
+
+## Implemented in `NativeLatex/Integrations` (not yet wired into the app)
+
+The Swift package (macOS 14+) is described in its [README](../../../NativeLatex/Integrations/README.md). `swift test` on merged main: 17 tests pass and 1 live LibreTexts network test is skipped by default (opt in with `NATIVELATEX_LIVE_NETWORK=1`). Conversion tests use the real Pandoc and LibreOffice on this Mac and skip when a tool is absent.
+
+| Piece | Implemented behavior | Not done |
+| --- | --- | --- |
+| Local conversion | Pandoc: tex/md/html ↔ docx/odt/tex/md/html. LibreOffice: docx ↔ odt, docx/odt → pdf. Argument arrays, no shell, temp work dir, timeout. Always writes a new copy (`name 2.docx`), never touches the source or an existing copy. Images extracted to `<name>_media/` with relative links. | App menu/UI; Word itself never tested |
+| Google Docs | `GoogleDocsIntegration` behind a `GoogleDriveTransport` protocol. **No live transport ships**: status is `.disabled` or `.liveNotConfigured`. Only a fake transport is exercised in tests. No OAuth client, token, or Google API call exists. | Live sign-in, Drive upload/download |
+| LibreTexts | **Import only**, from the public Deki API without a key. Refuses pages without a reusable `license:` tag and adds attribution. | Publishing or export handoff to LibreTexts |
+| OneDrive | Nothing implemented. | Everything |
+
+### Fidelity notes the converter reports
+
+`LocalConverter` returns `reviewNotes` based on the source and target, because Pandoc exits successfully while losing content (see the [conversion test](../../research/conversion-test-2026-11-17.md)):
+
+- Cross-references (`\ref`, `\eqref`) become literal text or lose their targets.
+- Equation numbers are dropped.
+- Citations use Pandoc's default author-date style, not the document's bibliography style.
+- Custom macros and environments are expanded or flattened; their definitions are not kept.
+- Figure/table numbering and placement change; captions may become ordinary text.
+- Code block language tags are not kept in office formats.
+- Imported LaTeX does not reconstruct original macros, labels, equation numbering, or bibliography files.
+- Remote images are linked, not downloaded, and need network access to display.
+
+The sections below remain the plan.
 
 ## Principle
 

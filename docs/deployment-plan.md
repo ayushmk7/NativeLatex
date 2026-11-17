@@ -1,6 +1,6 @@
 # LibreLeaf Mac release and deployment plan
 
-Status: planning and readiness checks · 2026-11-17. A static landing page exists in `landing/`; no app, release artifact, AWS resource, or website has been deployed.
+Status: planning and readiness checks · 2026-11-17. The landing page is live on GitHub Pages at <https://ayushmk7.github.io/NativeLatex/>. A local, ad-hoc-signed Debug app builds from `NativeLatex.xcodeproj`; no signed or notarized release artifact, download, or AWS resource exists.
 
 ## What needs hosting
 
@@ -21,17 +21,17 @@ Vercel documents the [Hobby restriction](https://vercel.com/docs/plans/hobby). C
 2. **Signing gate:** set the bundle identifier, version, minimum macOS, app icon, signing team, and Hardened Runtime. Obtain a valid Developer ID Application identity in the keychain. Archive Release and use Xcode Organizer's Developer ID/direct distribution workflow to notarize. This Developer ID release route requires signing and notarization under Apple's [notarization guide](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution/). Apple lists its Developer Program at US $99/year, subject to local pricing. [Apple enrollment](https://developer.apple.com/help/account/membership/program-enrollment/).
 3. **Artifact gate:** staple the notarization ticket to the app, package a versioned ZIP, and record SHA-256. Verify `codesign --verify --deep --strict`, `xcrun stapler validate`, and `spctl --assess --type execute` on the exported app. Download the ZIP to a clean Mac and repeat the launch/build/open checks. The [backend plan](workspaces/backend/architecture.md) has the exact Mac release path.
 4. **AWS gate:** authenticate to the intended AWS account, choose the CloudFront plan, create the private S3 origin and distribution with Origin Access Control, upload only the verified ZIP/checksum, then download and hash the public artifact. Set a budget or usage alert for any paid resources. Publish no user project files.
-5. **Landing gate:** `.github/workflows/pages.yml` uploads `landing/` as-is and deploys it with the official Pages actions on pushes to `main` that touch `landing/` (or by manual dispatch). It stays inert until the owner sets **Settings → Pages → Source** to **GitHub Actions**; the first run before that fails at deploy. The [static page](../landing/README.md) can then serve an honest in-development message and repository link at the `github.io` address; a custom domain is a separate decision. Add a version, download link, checksum, and Mac requirements only after the artifact gate passes.
+5. **Landing gate:** `.github/workflows/pages.yml` uploads `landing/` as-is and deploys it with the official Pages actions on pushes to `main` that touch `landing/` (or by manual dispatch). Pages is enabled with **GitHub Actions** as its source, and the workflow run for the landing merge succeeded. The [static page](../landing/README.md) serves an honest in-development message and repository link at <https://ayushmk7.github.io/NativeLatex/> (HTTP 200); a custom domain is a separate decision. Add a version, download link, checksum, and Mac requirements only after the artifact gate passes.
 
 ## Current readiness on this Mac
 
 | Check | Result |
 | --- | --- |
 | Xcode | 27.2 works with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`; system `xcode-select` still points to Command Line Tools. |
-| Local TeX and converter | `latexmk` and Pandoc are present; [DOCX/ODT conversion was tested](research/conversion-test-2026-11-17.md). |
+| Local TeX and converter | Homebrew texlive provides `latexmk`, `pdflatex` and `synctex` in `/opt/homebrew/bin`. `/Library/TeX/texbin` is a broken symlink left from a removed MacTeX 2024 and holds no binaries. Pandoc 3.13 and LibreOffice are present; [DOCX/ODT conversion was tested](research/conversion-test-2026-11-17.md) and is covered by the Integrations package tests. |
 | Apple signing | `notarytool` and `stapler` are available, but the current keychain reports **0 valid code-signing identities**. |
 | AWS | CLI is installed, but the default profile did not have a valid `sts get-caller-identity` session during this check. |
-| Landing hosting | Pages workflow is committed and passes `actionlint` 1.7.12, but Pages is not enabled and nothing has been pushed or deployed. Vercel CLI is not installed. |
-| App artifact | No Xcode project or app executable exists yet, so signing, notarization, and public deployment cannot be run. |
+| Landing hosting | Live on GitHub Pages at <https://ayushmk7.github.io/NativeLatex/>; the `Deploy landing page` workflow succeeded and the URL returns HTTP 200. Vercel is not connected and its CLI is not installed. |
+| App artifact | `NativeLatex.xcodeproj` builds the `LibreLeaf` app (bundle `app.libreleaf.LibreLeaf`, version 0.1, macOS 14.0+, Hardened Runtime) with ad-hoc signing only. No Developer ID signature, notarization, ZIP, or download exists. |
 
-The next executable milestone is a local Debug build, followed by the signing gate. Do not create a download URL for a nonexistent release.
+The local Debug build exists. The next milestones are the rest of the local app gate (folder workspaces, Open With, two windows, TeX-absent Mac), then the signing gate. Do not create a download URL for a nonexistent release.
