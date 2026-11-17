@@ -1,4 +1,5 @@
-/* BB-8 dark-mode toggle, copied verbatim from Website/src/components/pro/opt4/bb8.css (Uiverse.io by Galahhad). Its art uses gradients by design. */
+/* BB-8 dark-mode toggle (Uiverse.io by Galahhad, MIT). Based on Website/src/components/pro/opt4/bb8.css, with the artwork unchanged. Changes from that file:
+   its header comment is replaced by this one, and ten rules are added after the :active rotation: seven .bb8-toggle__checkbox:hover rules for the head and antennae, then three .bb8:hover rules that reset them. Its art uses gradients by design. */
 /* ===== BB8 dark-mode toggle (Uiverse.io by Galahhad) ===== */
 .bb8-toggle {
   --toggle-size: 16px;

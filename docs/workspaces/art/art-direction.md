@@ -55,7 +55,7 @@ The landing favicon follows the same rule through `prefers-color-scheme`: black 
 
 The shipped switch is the user's Website BB-8 toggle, kept in its own orange and gradient colours. The rest of the app stays black, white and royal blue; this switch is the one deliberate exception.
 
-- **Landing page:** `landing/bb8.css` is a verbatim copy of `Website/src/components/pro/opt4/bb8.css`.
+- **Landing page:** `landing/bb8.css` is `Website/src/components/pro/opt4/bb8.css` with the artwork unchanged. It replaces that file's header comment and adds ten hover rules: seven `.bb8-toggle__checkbox:hover` rules for the head and antennae, then three `.bb8:hover` resets.
 - **Mac app:** `NativeLatexDesign/BB8Toggle.swift` draws the native version.
 - **Ownership:** Design and UX own the switch's code, behaviour and accessibility. Art supplies no separate switch artwork.
 - **Credit:** the source credits **Uiverse.io / Galahhad** (MIT terms per Uiverse's [gallery README](https://github.com/uiverse-io/galaxy)). Keep that notice wherever the artwork or code is copied.
