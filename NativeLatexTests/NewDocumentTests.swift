@@ -41,6 +41,16 @@ final class NewDocumentTests: XCTestCase {
         }
     }
 
+    /// Outside New… (e.g. a Dock-click New) the factory uses the controller's default type, the
+    /// same one NSDocument is given, so the window's tools match the Save panel's extension.
+    func testFactoryWithoutPendingKindUsesControllerDefaultType() throws {
+        let fallback = try XCTUnwrap(NSDocumentController.shared.defaultType)
+        XCTAssertEqual(NewDocument.makeDocument().contentType.identifier, fallback)
+        let markdown = try NewDocument.open(.markdown)
+        defer { markdown.close() }
+        XCTAssertEqual(NewDocument.makeDocument().contentType.identifier, fallback, "pending kind is cleared after open")
+    }
+
     /// Two new documents get two independent windows, like DocumentGroup's own New.
     func testNewDocumentsGetSeparateWindows() throws {
         let a = try NewDocument.open(.latex), b = try NewDocument.open(.markdown)

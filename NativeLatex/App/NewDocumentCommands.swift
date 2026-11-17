@@ -30,9 +30,13 @@ enum NewDocument {
 
     /// DocumentGroup's newDocument value. Without a pending kind (e.g. a Dock-click New), it uses
     /// the controller's default type, which is what NSDocument itself was given.
-    static func makeDocument() -> TextDocument {
-        let type = pendingType ?? NSDocumentController.shared.defaultType.flatMap { UTType($0) } ?? .plainText
-        return TextDocument(contentType: type)
+    /// Nonisolated because DocumentGroup's newDocument autoclosure is; AppKit calls it on the main
+    /// thread inside makeUntitledDocument(ofType:), and assumeIsolated traps if that ever changes.
+    nonisolated static func makeDocument() -> TextDocument {
+        MainActor.assumeIsolated {
+            let type = pendingType ?? NSDocumentController.shared.defaultType.flatMap { UTType($0) } ?? .plainText
+            return TextDocument(contentType: type)
+        }
     }
 
     /// Opens a new window with an untitled, never-saved document of `kind`. It has no file URL,
