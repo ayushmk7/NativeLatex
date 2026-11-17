@@ -43,7 +43,7 @@ public struct MarkdownRendered {
 /// source so it can be edited; anything that can't be rendered (no TeX, outside the folder, too wide) stays as
 /// the Write view styled it. Runs after each restyle via the text storage delegate.
 @MainActor
-public final class MarkdownObjects: NSObject, NSTextStorageDelegate, NSLayoutManagerDelegate {
+public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     public private(set) weak var view: NSTextView?
     /// Images resolve only inside this folder (the document's).
     public private(set) var folder: URL?
@@ -65,10 +65,16 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate, NSLayoutMan
     static let maxBlockLines = 400, maxTableRows = 300, maxTableColumns = 40, maxImageHeight: CGFloat = 800
     static let cellPad: CGFloat = 9
 
-    /// Installs (once per view) or updates the folder. Call after the view is made; safe to call again.
+    /// Starts presenting objects in `view` (once per view; again just updates the folder). The view's own layout
+    /// manager and delegate stay in charge: its delegate must call `glyphProperty`, `controlCharacterAction` and
+    /// `boundingBox`, and its layout manager `draw`. Until the delegate sizes control glyphs (implements
+    /// `layoutManager(_:boundingBoxForControlGlyphAt:…)`) this does nothing, so the text stays as it is.
     @discardableResult
     public static func attach(to view: NSTextView?, folder: URL?, renderMath: MathRenderer.Render? = MathRenderer.automatic) -> MarkdownObjects? {
-        guard let view, let storage = view.textStorage, let container = view.textContainer else { return nil }
+        guard let view, let storage = view.textStorage,
+              let delegate = view.layoutManager?.delegate,
+              delegate.responds(to: #selector(NSLayoutManagerDelegate.layoutManager(_:boundingBoxForControlGlyphAt:for:proposedLineFragment:glyphPosition:characterIndex:)))
+        else { return nil }
         if let existing = storage.delegate as? MarkdownObjects {
             if existing.folder != folder { existing.folder = folder; existing.cache = [:]; existing.reprocess(nil) }
             return existing
@@ -82,11 +88,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate, NSLayoutMan
             guard let view, view.window?.firstResponder === view else { return nil }
             return (view.string as NSString).lineRange(for: view.selectedRange())
         }
-        let old = view.layoutManager
-        let manager = ObjectLayoutManager()
-        manager.allowsNonContiguousLayout = old?.allowsNonContiguousLayout ?? true
-        container.replaceLayoutManager(manager)
-        manager.delegate = objects
+        guard storage.delegate == nil else { return nil } // ponytail: sole storage delegate; chain if the writer needs one
         storage.delegate = objects
         objects.reprocess(nil)
         return objects
@@ -349,42 +351,25 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate, NSLayoutMan
     /// Whether any render is queued or running.
     public var isRendering: Bool { flushScheduled || !inFlight.isEmpty || !queuedMath.isEmpty || !queuedImages.isEmpty }
 
-    // MARK: Glyphs
+    // MARK: Glyphs (called from the host's layout manager delegate)
 
-    public nonisolated func layoutManager(_ layoutManager: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
-                                          properties: UnsafePointer<NSLayoutManager.GlyphProperty>, characterIndexes: UnsafePointer<Int>,
-                                          font: NSFont, forGlyphRange range: NSRange) -> Int {
-        guard let storage = layoutManager.textStorage else { return 0 }
-        var changed = false
-        let props = UnsafeMutablePointer<NSLayoutManager.GlyphProperty>.allocate(capacity: range.length)
-        defer { props.deallocate() }
-        for i in 0..<range.length {
-            props[i] = properties[i]
-            let index = characterIndexes[i]
-            guard index < storage.length else { continue }
-            if storage.attribute(.markdownObject, at: index, effectiveRange: nil) != nil {
-                props[i] = .controlCharacter; changed = true
-            } else if storage.attribute(.markdownObjectHidden, at: index, effectiveRange: nil) != nil
-                        || storage.attribute(writerHiddenKey, at: index, effectiveRange: nil) != nil {
-                props[i].insert(.null); changed = true
-            }
-        }
-        guard changed else { return 0 }
-        layoutManager.setGlyphs(glyphs, properties: props, characterIndexes: characterIndexes, font: font, forGlyphRange: range)
-        return range.length
+    /// The glyph property for `index`: a control glyph for an object, null for its hidden rest; nil when not ours.
+    public nonisolated static func glyphProperty(at index: Int, in storage: NSAttributedString,
+                                                 proposed: NSLayoutManager.GlyphProperty) -> NSLayoutManager.GlyphProperty? {
+        guard index < storage.length else { return nil }
+        if storage.attribute(.markdownObject, at: index, effectiveRange: nil) != nil { return .controlCharacter }
+        if storage.attribute(.markdownObjectHidden, at: index, effectiveRange: nil) != nil { return proposed.union(.null) }
+        return nil
     }
 
-    public nonisolated func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction,
-                                          forControlCharacterAt index: Int) -> NSLayoutManager.ControlCharacterAction {
-        layoutManager.textStorage?.attribute(.markdownObject, at: index, effectiveRange: nil) != nil ? .whitespace : action
+    /// `.whitespace` for an object's control glyph (so it takes `boundingBox`'s width); nil when not ours.
+    public nonisolated static func controlCharacterAction(at index: Int, in storage: NSAttributedString) -> NSLayoutManager.ControlCharacterAction? {
+        index < storage.length && storage.attribute(.markdownObject, at: index, effectiveRange: nil) != nil ? .whitespace : nil
     }
 
-    public nonisolated func layoutManager(_ layoutManager: NSLayoutManager, boundingBoxForControlGlyphAt glyphIndex: Int,
-                                          for container: NSTextContainer, proposedLineFragment rect: NSRect,
-                                          glyphPosition position: NSPoint, characterIndex index: Int) -> NSRect {
-        guard let box = layoutManager.textStorage?.attribute(.markdownObject, at: index, effectiveRange: nil) as? MarkdownObjectBox else {
-            return NSRect(origin: position, size: .zero)
-        }
+    /// The box an object's control glyph occupies; nil when not ours.
+    public nonisolated static func boundingBox(at index: Int, in storage: NSAttributedString, glyphPosition position: NSPoint) -> NSRect? {
+        guard index < storage.length, let box = storage.attribute(.markdownObject, at: index, effectiveRange: nil) as? MarkdownObjectBox else { return nil }
         let width: CGFloat = switch box.content {
         case let .edge(edge, _, _): max(2, edge - position.x)
         case let .rule(width): width
@@ -394,10 +379,15 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate, NSLayoutMan
     }
 }
 
-/// Draws object glyphs (images, formulas, table rules) after the text.
-final class ObjectLayoutManager: NSLayoutManager {
-    override func drawGlyphs(forGlyphRange glyphs: NSRange, at origin: NSPoint) {
-        super.drawGlyphs(forGlyphRange: glyphs, at: origin)
+public extension MarkdownObjects {
+    /// Draws the objects in `glyphs`; call from the host layout manager's `drawGlyphs` after `super`.
+    nonisolated static func draw(_ manager: NSLayoutManager, glyphRange glyphs: NSRange, at origin: NSPoint) {
+        manager.drawObjects(glyphs, origin)
+    }
+}
+
+extension NSLayoutManager {
+    fileprivate func drawObjects(_ glyphs: NSRange, _ origin: NSPoint) {
         guard let storage = textStorage else { return }
         let chars = characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
         storage.enumerateAttribute(.markdownObject, in: chars) { value, range, _ in
@@ -417,12 +407,12 @@ final class ObjectLayoutManager: NSLayoutManager {
                 NSRect(x: cell.minX, y: line.midY.rounded() - 0.5, width: width, height: 1).fill()
             case let .image(image, size, descent, tint):
                 let rect = NSRect(x: cell.minX, y: baseline - size.height + descent, width: size.width, height: size.height)
-                Self.draw(image, in: rect, tint: tint ? storage.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? NSColor ?? .textColor : nil)
+                NSLayoutManager.drawImage(image, in: rect, tint: tint ? storage.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? NSColor ?? .textColor : nil)
             }
         }
     }
 
-    static func draw(_ image: NSImage, in rect: NSRect, tint: NSColor?) {
+    fileprivate static func drawImage(_ image: NSImage, in rect: NSRect, tint: NSColor?) {
         guard let tint, let context = NSGraphicsContext.current?.cgContext else {
             image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
             return

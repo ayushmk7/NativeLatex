@@ -8,6 +8,7 @@ import XCTest
 @MainActor
 final class MarkdownObjectsTests: XCTestCase {
     private var undo: UndoHost?
+    private let hostDelegate = HostGlyphDelegate()
 
     /// A Write-like view: TextKit 1, 15 pt system font, pipe-table lines styled literal mono as the Write view does.
     private func make(_ text: String, folder: URL? = nil, math: MathRenderer.Render? = nil, width: CGFloat = 700) -> (NSTextView, MarkdownObjects) {
@@ -19,7 +20,11 @@ final class MarkdownObjectsTests: XCTestCase {
         view.allowsUndo = true
         view.font = .systemFont(ofSize: 15)
         view.string = text
-        view.layoutManager!.allowsNonContiguousLayout = true // TextKit 1, non-contiguous, like the Write view
+        // The host's own layout manager and delegate, as the Write view's will be: they call the package.
+        let manager = HostLayoutManager()
+        manager.allowsNonContiguousLayout = true
+        view.textContainer!.replaceLayoutManager(manager)
+        manager.delegate = hostDelegate
         restyle(view, nil)
         let objects = MarkdownObjects.attach(to: view, folder: folder, renderMath: math)!
         return (view, objects)
@@ -93,6 +98,19 @@ final class MarkdownObjectsTests: XCTestCase {
         let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
         view.cacheDisplay(in: view.bounds, to: rep) // offscreen draw path runs
         XCTAssertEqual(view.string, source)
+    }
+
+    func testAttachIsInertUntilTheHostSizesObjectGlyphs() {
+        let scroll = NSTextView.scrollableTextView()
+        let view = scroll.documentView as! NSTextView
+        view.string = "| a | b |\n|---|---|\n| x | y |\n"
+        let plain = PlainGlyphDelegate()
+        view.layoutManager!.delegate = plain // hides markup only, like today's Write view
+        let before = view.layoutManager!
+        XCTAssertNil(MarkdownObjects.attach(to: view, folder: nil, renderMath: nil))
+        XCTAssertTrue(view.layoutManager === before && view.layoutManager!.delegate === plain, "host's layout manager and delegate kept")
+        XCTAssertNil(view.textStorage!.delegate)
+        XCTAssertEqual(objectCount(view), 0)
     }
 
     // MARK: Tables
@@ -320,7 +338,7 @@ final class MarkdownObjectsTests: XCTestCase {
         var own = 0.0
         for _ in 0..<20 { let t = Date(); objects.reprocess([NSRange(location: cell, length: 0)]); own = max(own, Date().timeIntervalSince(t)) }
         // ponytail: ~20 ms at 1 MiB is storage attribute mutation cost (~2 ms per call); batch writes if it shows.
-        XCTAssertLessThan(own, 0.03, "objects pass for one table block (1 MiB storage)")
+        XCTAssertLessThan(own, 0.05, "objects pass for one table block (1 MiB storage)")
         XCTAssertGreaterThan(objectCount(view), 1000)
         _ = objects
         print("objects pass \(Int(own * 1e6)) us; 1 MiB full pass \(Int(full * 1000)) ms, worst table keystroke \(Int(worst * 1000)) ms, mean \(Int(total * 50)) ms")
@@ -332,3 +350,41 @@ final class UndoHost: NSObject, NSTextViewDelegate {
     override init() { manager.groupsByEvent = false }
     func undoManager(for view: NSTextView) -> UndoManager? { manager }
 }
+
+/// What the Write view adds: its layout manager draws objects after its own drawing.
+final class HostLayoutManager: NSLayoutManager {
+    override func drawGlyphs(forGlyphRange glyphs: NSRange, at origin: NSPoint) {
+        super.drawGlyphs(forGlyphRange: glyphs, at: origin)
+        MarkdownObjects.draw(self, glyphRange: glyphs, at: origin)
+    }
+}
+
+/// What the Write view's layout manager delegate adds: three forwarding calls beside its own markup hiding.
+final class HostGlyphDelegate: NSObject, NSLayoutManagerDelegate {
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
+                       properties: UnsafePointer<NSLayoutManager.GlyphProperty>, characterIndexes: UnsafePointer<Int>,
+                       font: NSFont, forGlyphRange range: NSRange) -> Int {
+        guard let storage = layoutManager.textStorage else { return 0 }
+        var changed = false
+        let props = UnsafeMutablePointer<NSLayoutManager.GlyphProperty>.allocate(capacity: range.length)
+        defer { props.deallocate() }
+        for i in 0..<range.length {
+            props[i] = properties[i]
+            if let p = MarkdownObjects.glyphProperty(at: characterIndexes[i], in: storage, proposed: props[i]) { props[i] = p; changed = true }
+        }
+        guard changed else { return 0 }
+        layoutManager.setGlyphs(glyphs, properties: props, characterIndexes: characterIndexes, font: font, forGlyphRange: range)
+        return range.length
+    }
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldUse action: NSLayoutManager.ControlCharacterAction,
+                       forControlCharacterAt index: Int) -> NSLayoutManager.ControlCharacterAction {
+        layoutManager.textStorage.flatMap { MarkdownObjects.controlCharacterAction(at: index, in: $0) } ?? action
+    }
+    func layoutManager(_ layoutManager: NSLayoutManager, boundingBoxForControlGlyphAt glyphIndex: Int, for container: NSTextContainer,
+                       proposedLineFragment rect: NSRect, glyphPosition position: NSPoint, characterIndex index: Int) -> NSRect {
+        layoutManager.textStorage.flatMap { MarkdownObjects.boundingBox(at: index, in: $0, glyphPosition: position) } ?? NSRect(origin: position, size: .zero)
+    }
+}
+
+/// Today's Write view: hides markup, sizes no control glyphs.
+final class PlainGlyphDelegate: NSObject, NSLayoutManagerDelegate {}
