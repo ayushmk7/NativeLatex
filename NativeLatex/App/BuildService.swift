@@ -50,9 +50,21 @@ final class BuildService: ObservableObject {
 
     /// Per-install secret written into folders we create; a project can't ship a forged marker.
     nonisolated static var ownerToken: String {
-        if let token = UserDefaults.standard.string(forKey: "buildOwnerToken") { return token }
-        let token = UUID().uuidString
-        UserDefaults.standard.set(token, forKey: "buildOwnerToken")
+        ownerToken(in: .standard, legacy: UserDefaults(suiteName: legacyDefaultsDomain))
+    }
+
+    /// Preferences of the app's previous bundle ID; only read, never changed.
+    nonisolated static let legacyDefaultsDomain = "app.libreleaf.LibreLeaf"
+
+    /// Current token if set; else adopts the LibreLeaf-era token, so `.libreleaf-build` folders it
+    /// created stay owned after the bundle ID change; else a new random one.
+    nonisolated static func ownerToken(in defaults: UserDefaults, legacy: UserDefaults?) -> String {
+        let key = "buildOwnerToken"
+        if let token = defaults.string(forKey: key) { return token }
+        // Only a well-formed token migrates; a blank or odd value must not become a guessable owner.
+        let old = legacy?.string(forKey: key).flatMap { UUID(uuidString: $0) != nil ? $0 : nil }
+        let token = old ?? UUID().uuidString
+        defaults.set(token, forKey: key)
         return token
     }
 

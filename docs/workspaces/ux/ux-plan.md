@@ -116,6 +116,7 @@ Do not place provider-specific buttons in the main toolbar before any integratio
 | Action | Proposed shortcut | Menu location |
 | --- | --- | --- |
 | New workspace | ⌘N | File |
+| Open another app (Finder-style chooser, .app bundles only) | ⌘⇧N | File |
 | Open folder | ⌘O | File |
 | Save active file | ⌘S | File |
 | Build TeX / Render Markdown | ⌘B | Build |

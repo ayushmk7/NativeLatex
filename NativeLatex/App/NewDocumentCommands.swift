@@ -56,12 +56,52 @@ enum NewDocument {
     }
 }
 
+/// File > Open Another App… (⌘⇧N): a Finder-style chooser for .app bundles, then launches the pick.
+@MainActor
+enum OpenAnotherApp {
+    static func chooser() -> NSOpenPanel {
+        let panel = NSOpenPanel()
+        panel.title = "Open Another App"
+        panel.message = "Choose an app to open."
+        panel.prompt = "Open"
+        panel.allowedContentTypes = [.applicationBundle] // .app only: not .appex, not bare executables
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.treatsFilePackagesAsDirectories = false // apps are picked, not browsed into
+        panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        return panel
+    }
+
+    /// True only for what Launch Services identifies as an .app bundle (the panel's filter).
+    static func isApplication(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType)?.conforms(to: .applicationBundle) == true
+    }
+
+    static func choose() {
+        let panel = chooser()
+        guard panel.runModal() == .OK, let url = panel.url else { return } // Cancel: nothing happens
+        guard isApplication(url) else {
+            NSApp.presentError(CocoaError(.fileReadUnsupportedScheme, userInfo: [
+                NSLocalizedDescriptionKey: "“\(url.lastPathComponent)” is not an app.",
+                NSLocalizedRecoverySuggestionErrorKey: "Choose an application bundle (.app)."]))
+            return
+        }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+            guard let error else { return }
+            Task { @MainActor in NSApp.presentError(error) }
+        }
+    }
+}
+
 /// Replaces only DocumentGroup's New item; Open…, Open Recent, Save and the rest stay native.
 struct NewDocumentCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New…") { NewDocument.choose() }
                 .keyboardShortcut("n")
+            Button("Open Another App…") { OpenAnotherApp.choose() }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
         }
     }
 }

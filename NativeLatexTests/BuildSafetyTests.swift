@@ -147,6 +147,53 @@ final class BuildSafetyTests: XCTestCase {
         XCTAssertThrowsError(try BuildService.prepareOutputDirectory(for: other))
     }
 
+    /// After the bundle ID change, the LibreLeaf-era token is adopted (old folders stay owned and
+    /// untouched), the old domain is not changed, a current token wins, and a malformed one is ignored.
+    func testOwnerTokenMigratesFromLibreLeafDomain() throws {
+        func suite() -> (UserDefaults, String) {
+            let name = "libreweave.test.\(UUID().uuidString)"
+            return (UserDefaults(suiteName: name)!, name)
+        }
+        let (current, currentName) = suite(), (legacy, legacyName) = suite()
+        defer { current.removePersistentDomain(forName: currentName); legacy.removePersistentDomain(forName: legacyName) }
+        let old = UUID().uuidString
+        legacy.set(old, forKey: "buildOwnerToken")
+
+        XCTAssertEqual(BuildService.ownerToken(in: current, legacy: legacy), old)
+        XCTAssertEqual(current.string(forKey: "buildOwnerToken"), old, "migrated once, then read from the new domain")
+        XCTAssertEqual(legacy.string(forKey: "buildOwnerToken"), old, "old preferences are left as they were")
+        legacy.set(UUID().uuidString, forKey: "buildOwnerToken")
+        XCTAssertEqual(BuildService.ownerToken(in: current, legacy: legacy), old, "an existing new-domain token wins")
+
+        let (fresh, freshName) = suite()
+        defer { fresh.removePersistentDomain(forName: freshName) }
+        legacy.set("", forKey: "buildOwnerToken")
+        let made = BuildService.ownerToken(in: fresh, legacy: legacy)
+        XCTAssertNotNil(UUID(uuidString: made), "a blank legacy value is not adopted")
+        XCTAssertNotNil(UUID(uuidString: BuildService.ownerToken(in: suite().0, legacy: nil)))
+        XCTAssertEqual(BuildService.legacyDefaultsDomain, "app.libreleaf.LibreLeaf")
+    }
+
+    /// With the migrated token, a folder built by the old app is reused as-is and its output kept.
+    func testMigratedTokenKeepsExistingBuildFolderOwned() throws {
+        let defaults = UserDefaults.standard, key = "buildOwnerToken"
+        let saved = defaults.string(forKey: key)
+        defer { if let saved { defaults.set(saved, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        let root = try write("paper.tex", "x")
+        let built = try BuildService.prepareOutputDirectory(for: root) // "old app" builds
+        try "OLD".write(to: built.appendingPathComponent("paper.pdf"), atomically: true, encoding: .utf8)
+        let token = try XCTUnwrap(defaults.string(forKey: key))
+
+        let legacyName = "libreweave.test.\(UUID().uuidString)"
+        let legacy = try XCTUnwrap(UserDefaults(suiteName: legacyName))
+        defer { legacy.removePersistentDomain(forName: legacyName) }
+        legacy.set(token, forKey: key)
+        defaults.removeObject(forKey: key) // new bundle ID: empty preferences
+        XCTAssertEqual(BuildService.ownerToken(in: defaults, legacy: legacy), token)
+        XCTAssertEqual(try BuildService.prepareOutputDirectory(for: root), built)
+        XCTAssertEqual(try String(contentsOf: built.appendingPathComponent("paper.pdf"), encoding: .utf8), "OLD")
+    }
+
     /// latexmk skips an unchanged failed document and prints no file:line; the engine .log has them.
     func testFailedBuildRecoversDiagnosticsFromEngineLog() async throws {
         let engine = try write("latexmk", "#!/bin/sh\necho 'Latexmk: Nothing to do, previous errors'\nexit 12\n")

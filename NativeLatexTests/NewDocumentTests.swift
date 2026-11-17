@@ -56,7 +56,7 @@ final class NewDocumentTests: XCTestCase {
         XCTAssertEqual(buttons.last?.keyEquivalent, "\u{1b}", "Esc cancels")
     }
 
-    /// File menu: our New… owns ⌘N; Open…, Open Recent and Save stay native; nothing claims ⌘⇧N yet.
+    /// File menu: our New… owns ⌘N, Open Another App… owns ⌘⇧N; Open…, Open Recent and Save stay native.
     func testFileMenuKeepsNativeItems() throws {
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         let items = try XCTUnwrap(NSApp.mainMenu?.items.first { $0.title == "File" }?.submenu).items
@@ -71,6 +71,35 @@ final class NewDocumentTests: XCTestCase {
         let shiftN = allItems.filter { item in
             item.keyEquivalent.lowercased() == "n" && item.keyEquivalentModifierMask.contains([.command, .shift])
         }
-        XCTAssertEqual(shiftN.map { $0.title }, [], "⌘⇧N waits for the user's decision")
+        XCTAssertEqual(shiftN.map { $0.title }, ["Open Another App…"], "only Open Another App… claims ⌘⇧N")
+        XCTAssertTrue(items.contains { $0.title == "Open Another App…" }, "it lives in the File menu")
+    }
+
+    /// The chooser picks exactly one .app (not a folder, not a file inside a bundle), starting in
+    /// /Applications; validation accepts real apps only. Nothing is launched.
+    func testOpenAnotherAppChooserOnlyAcceptsApps() throws {
+        let panel = OpenAnotherApp.chooser()
+        XCTAssertEqual(panel.allowedContentTypes, [.applicationBundle])
+        XCTAssertTrue(panel.canChooseFiles)
+        XCTAssertFalse(panel.canChooseDirectories)
+        XCTAssertFalse(panel.allowsMultipleSelection)
+        XCTAssertFalse(panel.treatsFilePackagesAsDirectories)
+        XCTAssertEqual(panel.directoryURL?.path, "/Applications")
+        XCTAssertEqual(panel.prompt, "Open")
+
+        let calculator = try XCTUnwrap(NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.calculator"))
+        XCTAssertTrue(OpenAnotherApp.isApplication(calculator))
+        XCTAssertFalse(OpenAnotherApp.isApplication(calculator.appendingPathComponent("Contents/Info.plist")))
+        XCTAssertFalse(OpenAnotherApp.isApplication(URL(fileURLWithPath: "/Applications", isDirectory: true)))
+        XCTAssertFalse(OpenAnotherApp.isApplication(URL(fileURLWithPath: "/bin/ls")), "bare executables are not apps")
+        let plugIns = calculator.deletingLastPathComponent().appendingPathComponent("Home.app/Contents/PlugIns")
+        if let appex = try? FileManager.default.contentsOfDirectory(at: plugIns, includingPropertiesForKeys: nil)
+            .first(where: { $0.pathExtension == "appex" }) {
+            XCTAssertFalse(OpenAnotherApp.isApplication(appex), "app extensions are not apps")
+        }
+        let text = FileManager.default.temporaryDirectory.appendingPathComponent("not-an-app-\(UUID()).txt")
+        try "x".write(to: text, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: text) }
+        XCTAssertFalse(OpenAnotherApp.isApplication(text))
     }
 }
