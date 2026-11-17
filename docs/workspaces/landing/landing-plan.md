@@ -1,6 +1,6 @@
 # Landing workspace plan
 
-Status: deployed on GitHub Pages from `main` (default URL <https://ayushmk7.github.io/NativeLatex/>; `landing` branch changes appear after merge and push) · 2026-11-17. Custom domain `libreweave.ayushmadhav.com` is configured in GitHub Pages settings and in Vercel DNS (CNAME to `ayushmk7.github.io`), but its HTTPS certificate is still pending, so it is not verified live yet.
+Status: live on GitHub Pages at <https://libreweave.ayushmadhav.com/>, served from `main` over enforced HTTPS (`landing` branch changes appear after merge and push) · 2026-11-17
 
 The landing page is a single static page in [`landing/`](../../../landing/README.md), deployed to GitHub Pages by `.github/workflows/pages.yml`. Vercel holds only the domain's DNS record; Vercel hosting remains an unused alternative with that directory as the project root. It uses no framework, build service, account, analytics, or form. While no signed Mac release exists, its main action links to the GitHub project and clearly says there is no download. The window graphic is labeled as a concept preview.
 

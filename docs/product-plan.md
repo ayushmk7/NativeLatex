@@ -75,7 +75,7 @@ The first release excludes a collaboration server, bundled TeX distribution, pac
 
 “Docs” means Google Docs here; “libretext” is treated as LibreTexts, with LibreOffice Writer covered too because the term could refer to it. Word and Writer exchange use reviewable DOCX/ODT copies. Google Docs begins with manual exchange and can gain a narrow, opt-in Drive connector for the owner's account. LibreTexts begins as a reviewed publishing handoff until its supported API and author workflow are verified. See the [integration evidence and limits](workspaces/integrations/integrations.md) and [conversion test](research/conversion-test-2026-11-17.md).
 
-AWS is planned to serve a signed Mac download once one exists. The landing page is deployed on [GitHub Pages](https://ayushmk7.github.io/NativeLatex/) with no download. Custom domain `libreweave.ayushmadhav.com` is configured in GitHub Pages settings and in Vercel DNS (CNAME to `ayushmk7.github.io`), but its HTTPS certificate is still pending, so it is not verified live yet. The app itself runs locally and needs no website or server. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
+AWS is planned to serve a signed Mac download once one exists. The landing page is live on GitHub Pages at <https://libreweave.ayushmadhav.com/> with no download. The app itself runs locally and needs no website or server. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
 
 ## Product success checks
 
