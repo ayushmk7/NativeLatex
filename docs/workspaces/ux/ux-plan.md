@@ -1,6 +1,6 @@
 # NativeLatex Mac UX plan
 
-Status: plan · revised 2026-11-17 · Mac only. The `NativeLatex/Design` package (theme, BB-8 toggle with outlined pill and unclipped capsule focus ring, `WorkspaceShell`; 7 test cases) is linked into the LibreWeave app. The app uses its theme, BB-8 toggle, appearance menu and settings, problems list and status bar; `WorkspaceShell` is not used yet. The app currently opens one file per window. Implemented from this plan: under 760 pt the window shows source or preview at full width with a labeled Preview toggle (⌥⌘P); the disk-conflict banner spans the pane; stale output is shown once, by the toolbar badge; the Markdown preview states its limits and underlines links in brand blue.
+Status: plan and implementation record · revised 2026-11-17 · Mac only. The `NativeLatex/Design` package (theme, unframed BB-8 toggle with an unclipped focus ring, `WorkspaceShell`; 6 test cases) is linked into LibreWeave. The app uses its theme, BB-8 toggle, appearance menu and settings, problems list and status bar; `WorkspaceShell` is not used yet. The app currently opens one file per window. Implemented from this plan: under 760 pt the window shows source or preview at full width with a labeled Preview toggle (⌥⌘P); Markdown Write fills the window as an editable document; the disk-conflict banner spans the pane; stale output is shown once, by the toolbar badge; the Markdown preview states its limits and underlines links in brand blue.
 
 ## Product promise
 

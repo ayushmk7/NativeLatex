@@ -32,7 +32,7 @@ Technical detail and source references are in the [architecture](workspaces/back
 2. Provide a strong editor: undo/redo, syntax color, matching delimiters, line numbers, find/replace, comment toggle, indentation and standard macOS keyboard/menu behavior.
 3. Save safely. Detect changes made by Finder, Git, cloud file providers or another editor; never silently overwrite a dirty buffer.
 4. Build a selected root `.tex` file with local TeX, or Render the active Markdown file locally. The same keyboard command chooses the action from the file type. Show progress/cancel; retain TeX logs and link reliable errors to source lines.
-5. Show PDF beside LaTeX or rendered Markdown beside its source. Markdown gets a native basic preview without extra tools; installed Pandoc enables richer HTML/PDF export. Retain the last successful TeX PDF on failure and mark it stale. [Apple Markdown parsing](https://developer.apple.com/documentation/foundation/attributedstring), [Pandoc formats](https://pandoc.org/MANUAL.html).
+5. Show PDF beside LaTeX or rendered Markdown beside its source. Markdown Read uses locally installed Pandoc for the rich rendering; Write remains editable when Pandoc is absent. Retain the last successful TeX PDF on failure and mark it stale. [Pandoc formats](https://pandoc.org/MANUAL.html).
 6. Export or reveal the PDF and project folder. No account is required.
 7. Make the main flow work with keyboard navigation, VoiceOver, system appearance, high contrast and reduced motion.
 

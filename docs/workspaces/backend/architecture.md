@@ -27,7 +27,7 @@ Use one FSEvents stream per open folder to refresh the file tree and notice exte
 
 ## Default render routing
 
-One Build/Render command dispatches by target type: selected TeX root to `latexmk`, active Markdown file to a local Markdown preview. Opening a file never starts a compile or executes a Markdown code fence. Foundation's `AttributedString(markdown:)` supplies the basic Markdown preview without a dependency; if a document needs richer Markdown features or HTML/PDF export, use an installed Pandoc process and show its conversion limits. Do not treat other extensions as executable. [Apple Markdown parsing](https://developer.apple.com/documentation/foundation/attributedstring), [Pandoc manual](https://pandoc.org/MANUAL.html)
+One Build/Render command dispatches by target type: selected TeX root to `latexmk`, active Markdown file to a local Markdown preview. Opening a file never starts a compile or executes a Markdown code fence. The implemented Markdown Read uses an installed Pandoc process with sandboxing and resource limits; Write stays editable when Pandoc is absent. Do not treat other extensions as executable. [Pandoc manual](https://pandoc.org/MANUAL.html)
 
 ## Local compile pipeline
 
