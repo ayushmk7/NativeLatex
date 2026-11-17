@@ -315,11 +315,14 @@ final class MarkdownPreviewTests: XCTestCase {
         let mathHeight = try await js("document.querySelector('math[display=block]').getBoundingClientRect().height") as? Double ?? 0
         XCTAssertGreaterThan(mathHeight, 20, "display math is typeset as MathML, not raw TeX")
         let linkColor = try await js("getComputedStyle(document.querySelector('a')).color") as? String
-        XCTAssertEqual(linkColor, "rgb(65, 105, 225)", "royal-blue links")
+        // Increase Contrast swaps to the deeper #0A1FC2 via prefers-contrast.
+        let increased = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        XCTAssertEqual(linkColor, increased ? "rgb(10, 31, 194)" : "rgb(15, 43, 255)", "electric-blue links")
 
         try await snapshot(view, name: "libreleaf-markdown-light.png")
         window.appearance = NSAppearance(named: .darkAqua)
-        try await waitFor("getComputedStyle(document.querySelector('a')).color === 'rgb(139, 166, 255)'")
+        let darkLink = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast ? "rgb(166, 182, 255)" : "rgb(122, 147, 255)"
+        try await waitFor("getComputedStyle(document.querySelector('a')).color === '\(darkLink)'")
         try await snapshot(view, name: "libreleaf-markdown-dark.png")
 
         // Typing: content swaps in place and the reader's scroll position survives.
