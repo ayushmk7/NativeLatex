@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="LibreLeaf is a native Mac app in development for writing LaTeX and Markdown beside a rendered preview, using your local files." />
-    <title>LibreLeaf — write the source, see the page</title>
+    <meta name="description" content="LibreWeave is a native Mac app in development for writing LaTeX and Markdown beside a rendered preview, using your local files." />
+    <title>LibreWeave — write the source, see the page</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <script>
       try {
-        const saved = localStorage.getItem("libreleaf-theme");
+        const saved = localStorage.getItem("libreweave-theme");
         document.documentElement.dataset.theme = saved === "light" || saved === "dark" ? saved : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       } catch {
         document.documentElement.dataset.theme = "light";
@@ -24,7 +24,7 @@
     <header class="site-header">
       <a class="brand" href="#top">
         <img src="./icon.svg" width="28" height="28" alt="" />
-        <span>LibreLeaf</span>
+        <span>LibreWeave</span>
       </a>
       <nav class="site-nav" aria-label="Primary">
         <a href="#workflow">Workflow</a>
@@ -111,7 +111,7 @@
         <ol class="steps">
           <li><span class="step-number">01</span><h3>Open your folder</h3><p>Work with ordinary <code>.tex</code>, <code>.md</code>, bibliography, and image files. Your project stays yours.</p></li>
           <li><span class="step-number">02</span><h3>Write with room to focus</h3><p>Move between source, problems, and preview without juggling separate tools or losing your place.</p></li>
-          <li><span class="step-number">03</span><h3>Build locally</h3><p>Use the TeX tools installed on your Mac. Markdown preview is planned to work without a TeX installation.</p></li>
+          <li><span class="step-number">03</span><h3>Build locally</h3><p>Build PDFs with the TeX tools installed on your Mac. Markdown files are planned to get a preview too.</p></li>
         </ol>
       </section>
 
@@ -127,7 +127,7 @@
     </main>
 
     <footer class="site-footer">
-      <span>LibreLeaf · Made for the Mac</span>
+      <span>LibreWeave · Made for the Mac</span>
       <a href="https://github.com/ayushmk7/NativeLatex">Project on GitHub</a>
     </footer>
   </body>

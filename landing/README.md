@@ -1,4 +1,4 @@
-# LibreLeaf landing page
+# LibreWeave landing page
 
 Static, dependency-free landing page for the planned Mac app (repository and paths still use the NativeLatex name). The page links to the repository and says there is no download yet; the app window is labeled as a concept illustration. Replace the GitHub call to action with a download only after a signed and notarized Mac build passes the [deployment gate](../docs/deployment-plan.md).
 
