@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>LibreLeaf app icon, small-size master (16 and 32 px)</title>
+  <g id="background">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="#0A0A0A"/>
+  </g>
+  <g id="page">
+    <path d="M440 220H700L820 340V804H440Z" fill="#FFFFFF"/>
+    <path d="M700 220V340H820Z" fill="#4169E1"/>
+    <rect x="512" y="540" width="236" height="88" rx="16" fill="#0A0A0A"/>
+  </g>
+  <g id="brace" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M462 256C362 256 340 290 340 352V436C340 488 314 512 244 512C314 512 340 536 340 588V672C340 734 362 768 462 768" stroke="#0A0A0A" stroke-width="140"/>
+    <path d="M462 256C362 256 340 290 340 352V436C340 488 314 512 244 512C314 512 340 536 340 588V672C340 734 362 768 462 768" stroke="#4169E1" stroke-width="96"/>
+  </g>
+</svg>
