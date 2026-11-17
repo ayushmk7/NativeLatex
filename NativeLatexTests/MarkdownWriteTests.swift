@@ -4,7 +4,7 @@ import WebKit
 import XCTest
 @testable import LibreWeave
 
-/// Write in Preview and the Source / Both / Preview layout, driven through real document windows and the View menu.
+/// Write mode and the Source / Both / Preview layout, driven through real document windows and the View menu.
 @MainActor
 final class MarkdownWriteTests: XCTestCase {
     static let fixture = """
@@ -121,9 +121,10 @@ final class MarkdownWriteTests: XCTestCase {
     /// and the saved file reopens with exactly that text.
     func testWriteModeEditsTheSameBufferAndPreservesUntouchedMarkdown() async throws {
         let (document, window) = try await open("notes.md", Self.fixture)
+        let source = try XCTUnwrap(textView("Source", in: window))
         try setWrite(true, in: window)
         let writer = try XCTUnwrap(textView("Write", in: window), "Write view shown")
-        let source = try XCTUnwrap(textView("Source", in: window))
+        XCTAssertNil(source.window, "Write fills the window")
         XCTAssertEqual(writer.string, Self.fixture)
 
         // Looking around changes nothing.
@@ -201,9 +202,9 @@ final class MarkdownWriteTests: XCTestCase {
     func testUndoAndRedoAcrossPanesAndLayoutSwitches() async throws {
         let original = "# Notes\n\nFirst line.\n"
         let (document, window) = try await open("undo.md", original)
+        let source = try XCTUnwrap(textView("Source", in: window))
         try setWrite(true, in: window)
         let writer = try XCTUnwrap(textView("Write", in: window))
-        let source = try XCTUnwrap(textView("Source", in: window))
         // ⌘Z's path: the action travels up the responder chain from the focused view to the window's undo manager.
         func send(_ action: String) { _ = window.firstResponder?.tryToPerform(Selector((action)), with: nil); settle(0.2) }
 
@@ -222,12 +223,12 @@ final class MarkdownWriteTests: XCTestCase {
         send("redo:")
         XCTAssertEqual(try text(document), original + "Written.", "⇧⌘Z redoes it")
 
-        // Edit in Source, show only the preview (Write), undo from Write.
+        // Edit in Source, switch to Write (full width), undo from Write.
         source.setSelectedRange(NSRange(location: 0, length: 0))
         source.insertText("Top. ", replacementRange: source.selectedRange())
         settle()
         XCTAssertEqual(try text(document), "Top. " + original + "Written.")
-        try show(.preview, in: window)
+        try setWrite(true, in: window)
         XCTAssertNil(source.window, "Source pane hidden")
         XCTAssertEqual(writer.string, "Top. " + original + "Written.", "hidden edits reached Write")
         window.makeFirstResponder(writer)
@@ -286,6 +287,46 @@ final class MarkdownWriteTests: XCTestCase {
         do { let p = await renderedPreview(in: window); XCTAssertNotNil(p) }
         XCTAssertNil(source.window)
         XCTAssertEqual(layout.selectedSegment, Pane.preview.rawValue)
+    }
+
+    /// Write is the full-width editor in every path in, and the mode control always matches what is on screen:
+    /// Source Only or Source and Preview leave Write; Read returns to the layout Write replaced.
+    func testWriteIsFullWidthAndModeMatchesTheVisibleLayout() async throws {
+        let (document, window) = try await open("modes.md", "# Modes\n\nText.\n")
+        let width = try XCTUnwrap(window.contentView).bounds.width
+        let layout = try XCTUnwrap(segmented(3, in: window)), mode = try XCTUnwrap(segmented(2, in: window))
+        let source = try XCTUnwrap(textView("Source", in: window))
+        func check(_ pane: Pane, write: Bool, _ step: String, line: UInt = #line) async {
+            XCTAssertEqual(layout.selectedSegment, pane.rawValue, "\(step): layout", line: line)
+            XCTAssertEqual(mode.selectedSegment, write ? 1 : 0, "\(step): mode", line: line)
+            XCTAssertEqual(source.window != nil, pane != .preview, "\(step): source shown", line: line)
+            let writer = textView("Write", in: window)
+            XCTAssertEqual(writer != nil, write, "\(step): Write shown", line: line)
+            if let scroll = writer?.enclosingScrollView { XCTAssertGreaterThan(scroll.frame.width, width - 40, "\(step): Write full width", line: line) }
+            if pane != .source, !write { let p = await renderedPreview(in: window); XCTAssertNotNil(p, "\(step): Read shown", line: line) }
+            if pane == .source { XCTAssertNil(webView(in: window), "\(step): no Read", line: line) }
+        }
+
+        await check(.both, write: false, "default")
+        try setWrite(true, in: window); await check(.preview, write: true, "Both → Write")
+        try setWrite(false, in: window); await check(.both, write: false, "Write → Read restores Both")
+
+        try show(.source, in: window); await check(.source, write: false, "Source Only")
+        try setWrite(true, in: window); await check(.preview, write: true, "Source → Write")
+        try setWrite(false, in: window); await check(.both, write: false, "Read from Write that replaced Source shows Read beside it")
+
+        try show(.preview, in: window); await check(.preview, write: false, "Preview Only (Read)")
+        try setWrite(true, in: window); await check(.preview, write: true, "Read → Write")
+        try setWrite(false, in: window); await check(.preview, write: false, "Write → Read keeps Preview Only")
+
+        try setWrite(true, in: window)
+        try show(.source, in: window); await check(.source, write: false, "Source Only leaves Write")
+        try show(.preview, in: window); await check(.preview, write: false, "Preview Only after leaving Write is Read")
+        try setWrite(true, in: window)
+        try show(.both, in: window); await check(.both, write: false, "Source and Preview leaves Write")
+        XCTAssertFalse(document.isDocumentEdited, "mode changes never edit")
+
+        XCTAssertEqual(PaneState.selfCheck(), [], "every transition, including narrow windows")
     }
 
     /// ⌥⌘P (View ▸ Toggle Preview) hides the preview, then brings it back beside the source, or alone when narrow.
@@ -677,8 +718,7 @@ final class MarkdownWriteTests: XCTestCase {
                 mode.sendAction(mode.action, to: mode.target)
                 settle()
                 XCTAssertNotNil(textView("Write", in: window), "\(name) @\(width): choosing Write reveals the Write pane")
-                XCTAssertEqual(textView("Source", in: window)?.window != nil, width > EditorView.narrowWidth,
-                               "\(name) @\(width): wide shows both, narrow shows the preview alone")
+                XCTAssertNil(textView("Source", in: window), "\(name) @\(width): Write fills the window")
                 if width < EditorView.narrowWidth {
                     let items = window.toolbar?.items.filter { $0.view != nil }.map(\.itemIdentifier) ?? []
                     let visible = Set((window.toolbar?.visibleItems ?? window.toolbar?.items ?? []).map(\.itemIdentifier))
