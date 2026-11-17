@@ -79,7 +79,7 @@ def write(path, text):
     open(path, "w").write(text)
 
 
-# Flat icons on Apple's macOS grid (used for the .appiconset and previews).
+# Flat icons on Apple's macOS grid, for previews and docs.
 for name, (bg, ink) in SHEETS.items():
     write(f"art/source/app-icon-{name}.svg",
           svg("0 0 1024 1024", 1024, f"LibreWeave app icon, {name} sheet", [sheet(bg)] + lines(ink) + threads()))

@@ -1,6 +1,6 @@
 # Art direction: LibreWeave for Mac
 
-Status: adaptive icon shipped · 2026-11-17. **LibreWeave** is the working app name (NativeLatex stays the repository and project path); the mark must work without a wordmark. The app icon is `NativeLatex/AppIcon.icon`, with `AccentColor` and flat fallbacks in `NativeLatex/Assets.xcassets`. All pass `art/tools/validate.sh`; see [art/README](../../../art/README.md).
+Status: adaptive icon shipped · 2026-11-17. **LibreWeave** is the working app name (NativeLatex stays the repository and project path); the mark must work without a wordmark. The app icon is `NativeLatex/AppIcon.icon`; `AccentColor` is in `NativeLatex/Assets.xcassets`. All pass `art/tools/validate.sh`; see [art/README](../../../art/README.md).
 
 ## Visual thesis
 
@@ -45,27 +45,27 @@ The landing favicon follows the same rule through `prefers-color-scheme`: black 
   - `fill-specializations` sets the sheet colour per appearance.
   - `image-name-specializations` swaps the lines layer between white and black.
 - In the built app, `Assets.car` holds `IconImageStack` renditions for `NSAppearanceNameAqua`, `NSAppearanceNameDarkAqua` and `ISAppearanceTintable`.
-- From the same `.icon`, actool also generates the legacy `AppIcon.icns` (black sheet) for macOS 14–25.
-- The `.appiconset` now only supplies flat `Icon Image` renditions for in-app `NSImage` lookups. It uses the same geometry.
+- From the same `.icon`, actool also generates the legacy `AppIcon.icns` (black sheet) for macOS 14–25 and the flat `Icon Image` renditions.
+- When `AppIcon.icon` exists, actool ignores a same-named `.appiconset`: removing it left `AppIcon.icns` byte-identical. The project's `.appiconset` was deleted.
 
-## Appearance switch: adapt the Website reference
+## Appearance switch: the Website BB-8 (intentional palette exception)
 
-The actual reference is [BB8Toggle.astro](/Users/ayush/Downloads/Website/src/components/v2/BB8Toggle.astro) and [bb8.css](/Users/ayush/Downloads/Website/src/components/pro/opt4/bb8.css). Its pill is approximately 10.625:5.625 in aspect ratio; a round robot moves from left to right while the backdrop changes from clouds and desert to stars and a dark sky. The Website also uses orange accents, tan scenery, many small decorative elements, and staggered 0.2–0.8 second transitions. These details are useful as reference, but too busy and warm for the requested Mac palette.
+The shipped switch is the user's Website BB-8 toggle, kept in its own orange and gradient colours. The rest of the app stays black, white and royal blue; this switch is the one deliberate exception.
 
-**Native visual translation:** retain the instantly recognizable pill, rounded robot body, small dome head, and rolling left-to-right travel. In light mode, use a white pill with a black outline, one minimal blue sun or blue horizon mark, and a white/black robot with blue seams. In dark mode, use a black pill with a white outline, two or three white stars, and the same robot at the right. A short 180-degree body rotation can imply travel; head and antenna stay upright. Keep the fixed control large enough for pointer use and visual recognition, while the surrounding toolbar remains sparse. The switch is an appearance control, never the app icon or loading animation.
+- **Landing page:** `landing/bb8.css` is a verbatim copy of `Website/src/components/pro/opt4/bb8.css`.
+- **Mac app:** `NativeLatexDesign/BB8Toggle.swift` draws the native version.
+- **Ownership:** Design and UX own the switch's code, behaviour and accessibility. Art supplies no separate switch artwork.
+- **Credit:** the source credits **Uiverse.io / Galahhad** (MIT terms per Uiverse's [gallery README](https://github.com/uiverse-io/galaxy)). Keep that notice wherever the artwork or code is copied.
 
-Keep a still frame for each state. When Reduce Motion is on, swap state without rolling or scenery travel. When Increase Contrast is on, strengthen the pill border and robot silhouette. The focused state uses a visible royal-blue ring outside the pill. The light/dark state must also be conveyed through the control label and accessible value; interaction and keyboard behavior are specified in the [UX plan](../ux/ux-plan.md). Do not embed the Website's CSS or web checkbox inside the native app; redraw the small scene as native/vector artwork so it scales cleanly and follows macOS appearance settings.
-
-The reference source credits **Uiverse.io / Galahhad**. If implementation copies any original artwork or code, preserve the applicable license notice and credit; Uiverse's [gallery README](https://github.com/uiverse-io/galaxy) describes its MIT terms. A near-exact BB-8 character likeness has separate brand-rights questions, so the planned shipped art is an original rolling-robot interpretation.
+An earlier plan for a black-and-white "original rolling robot" redraw was dropped, and its stills were deleted on 2026-11-17.
 
 ## Brand assets to hand off
 
 | Asset | Source and export |
 | --- | --- |
-| Mac app icon | `NativeLatex/AppIcon.icon` (light/dark layers), flat `.appiconset` fallback, `art/exports/review.png` with default/dark/tinted/clear renditions. Done. |
+| Mac app icon | `NativeLatex/AppIcon.icon` (light/dark layers); `art/exports/review.png` with default/dark/tinted/clear renditions. Done. |
 | Standalone woven mark | SVG/PDF vector for About, help, and project materials, plus one-color black and white versions. |
 | Wordmark lockup | Editable type source and outlined export; keep name separate from icon geometry. |
-| Appearance-switch art | Native/vector source for light, dark, focused, increased-contrast, and reduced-motion still states. |
 | Palette sheet | Role names, light/dark values, contrast results, and examples on actual Mac controls. |
 
 Keep source files in the future art implementation workspace and exports in the app asset catalog. The present document is the brief; no artwork is being generated in this planning pass.
@@ -74,10 +74,8 @@ Keep source files in the future art implementation workspace and exports in the 
 
 1. Check the icon at 16, 32, 64, 128, and 512 px in light and dark Dock contexts (`art/tools/review.sh`). At 16 and 32 px, the blue/white over-under crossings must remain distinct.
 2. Inspect icon variants in Icon Composer for clipping, weight, and legibility; test the one-color mark at 16 px.
-3. Review the switch as two stills and a short transition at actual toolbar size. The robot must remain readable without clouds, tan ground, or orange markings.
-4. Test the switch with keyboard focus, VoiceOver, Reduce Motion, Increase Contrast, and grayscale. UX owns behavior; art owns visible state and silhouette.
-5. Compare a light and dark editor window with an actual PDF. The source and output should dominate; the switch and blue accent should be clear but secondary.
+3. Compare a light and dark editor window with an actual PDF. The source and output should dominate; the BB-8 switch and blue accent should be clear but secondary.
 
 ## Scope
 
-Mac only. No iPhone/iPad icon targets, theme packs, textured editor backgrounds, or page-load animation are planned. The icon and switch are the only custom illustration work in the first visual pass.
+Mac only. No iPhone/iPad icon targets, theme packs, textured editor backgrounds, or page-load animation are planned. The icon is the only custom illustration Art owns; the BB-8 switch reuses the Website artwork.
