@@ -1,6 +1,6 @@
 # Mac architecture and local release
 
-Status: target design, partly implemented · 2026-11-17. The app is named **LibreWeave** (repository and project path: NativeLatex), minimum macOS 14.0. The integrated code (`5386b36`) is a `DocumentGroup` app with one file per window, an AppKit `NSTextView` editor, and the Design and Integrations packages linked; it is not yet the folder workspace below; see [Implemented on main](../../README.md#implemented-on-main-checked-2026-11-17).
+Status: target design, partly implemented · 2026-11-17. The app is named **LibreWeave** (repository and project path: NativeLatex), minimum macOS 14.0. The integrated code (`5386b36`) is a `DocumentGroup` app with one file per window, an AppKit `NSTextView` editor, and the Design and Integrations packages linked; it is not yet the folder workspace below; see [Implemented on main](../../status.md#implemented-on-main-checked-2026-11-17).
 
 ## Decision
 

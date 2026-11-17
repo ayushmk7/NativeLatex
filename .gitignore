@@ -2,3 +2,5 @@ xcuserdata/
 *.xcuserstate
 .libreleaf-build/
 DerivedData/
+brag-output/
+build/
