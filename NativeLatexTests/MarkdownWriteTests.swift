@@ -415,6 +415,21 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertFalse(failedBox.request)
         let responder = try XCTUnwrap(failed.firstResponder as? NSView, "something in the banner has focus, not the bare window")
         XCTAssertTrue(responder.window === failed && !(responder is WKWebView))
+
+        // Failure first, request later (Write → Read after Pandoc already failed): Try Again still takes the keys.
+        let (late, lateBox, _) = host({ _ in throw MarkdownRenderer.Failure.missingPandoc })
+        defer { late.close() }
+        lateBox.request = false
+        settle(0.5) // render has failed; nobody asked for focus yet
+        late.makeFirstResponder(nil)
+        lateBox.request = true
+        (late.contentView?.subviews.first as? NSHostingView<MarkdownPreview>)?.rootView = MarkdownPreview(
+            text: "# Hi", fileURL: nil, focusRequest: Binding(get: { lateBox.request }, set: { lateBox.request = $0 }),
+            render: { _ in throw MarkdownRenderer.Failure.missingPandoc })
+        wait(3) { !lateBox.request }
+        XCTAssertFalse(lateBox.request, "late request handled")
+        let lateResponder = try XCTUnwrap(late.firstResponder as? NSView, "late request: Try Again focused, not the bare window")
+        XCTAssertTrue(lateResponder.window === late)
     }
 
     /// The Format menu is built from the shared command list: same commands and order as the bar, inline then

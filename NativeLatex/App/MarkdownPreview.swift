@@ -307,6 +307,15 @@ struct MarkdownPreview: View {
         }
         .background(Theme.background)
         .background(WindowAnchorView(anchor: anchor))
+        // The request can arrive after the render already failed (a missing Pandoc fails at once): still hand
+        // the keys to Try Again rather than leave the window with no focused view.
+        .onChange(of: focusRequest.wrappedValue) { _, requested in
+            guard requested, html == nil, failure != nil else { return }
+            DispatchQueue.main.async {
+                if Self.hasFocusGap(anchor.view?.window) { retryFocused = true }
+                focusRequest.wrappedValue = false
+            }
+        }
         .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
         // A new key cancels the previous task, which cancels its sleep or terminates its Pandoc run.
         .task(id: Key(text: text, folder: fileURL?.deletingLastPathComponent(), attempt: attempt)) {

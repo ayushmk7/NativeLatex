@@ -25,8 +25,16 @@ struct PaneState: Equatable {
     }
 
     /// Format commands need an editable Markdown view on screen: Write, or the source (Read in Preview Only has none).
-    func canFormat(narrow: Bool, markdown: Bool) -> Bool {
-        markdown && (write || shown(narrow: narrow, markdown: markdown) != .preview)
+    func canFormat(narrow: Bool, markdown: Bool) -> Bool { formatPane(narrow: narrow, markdown: markdown) != nil }
+
+    enum Editable { case source, write }
+
+    /// The one editable view on screen, which Format acts on: Write while writing, else the source if shown.
+    /// Never the hidden one, even if it still holds focus mid-transition.
+    func formatPane(narrow: Bool, markdown: Bool) -> Editable? {
+        guard markdown else { return nil }
+        if write { return .write }
+        return shown(narrow: narrow, markdown: markdown) != .preview ? .source : nil
     }
 
     /// A layout chosen from the toolbar or View menu. Source Only and Source and Preview leave Write
@@ -96,6 +104,16 @@ struct PaneState: Equatable {
                        ({ f.setWrite(true, narrow: false); return f.canFormat(narrow: false, markdown: true) }(), true, "Write"),
                        (f.canFormat(narrow: false, markdown: false), false, "not Markdown")]
         for (got, want, step) in formats where got != want { failures.append("canFormat, \(step): \(got)") }
+        // Format targets only the visible editor: Write hides the source, Read Preview Only has no editor.
+        var g = PaneState()
+        let panes: [(Editable?, Editable?, String)] = [
+            (g.formatPane(narrow: false, markdown: true), .source, "Both → source"),
+            (g.formatPane(narrow: true, markdown: true), .source, "narrow Both → source"),
+            ({ g.setWrite(true, narrow: false); return g.formatPane(narrow: false, markdown: true) }(), .write, "Write → write, not the hidden source"),
+            ({ g.setWrite(false, narrow: false); g.choose(.preview); return g.formatPane(narrow: false, markdown: true) }(), nil, "Read Preview Only → none"),
+            ({ g.choose(.source); return g.formatPane(narrow: false, markdown: true) }(), .source, "Source Only → source"),
+        ]
+        for (got, want, step) in panes where got != want { failures.append("formatPane, \(step): \(String(describing: got))") }
         if PaneState().shown(narrow: false, hasPreview: false) != .source { failures.append("plain text: source only") }
         return failures
     }

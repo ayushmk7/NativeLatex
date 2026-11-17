@@ -81,12 +81,11 @@ struct EditorView: View {
     /// Formatting needs an editable Markdown view on screen: Write, or the source beside or instead of Read.
     private var canFormat: Bool { panes.canFormat(narrow: isNarrow, markdown: isMarkdown) }
 
-    /// The view Format commands and the format bar act on: the focused Source or Write view of this window,
-    /// else the visible one (Write if shown, else Source), which then takes focus.
+    /// The view Format commands and the format bar act on: the one editable view on screen (Write, else the
+    /// source), which then takes focus. A hidden pane that still holds focus mid-transition is never edited.
     private func formatTarget() -> NSTextView? {
-        let visible = markdownWrite ? writer.view : (shown != .preview ? editor.view : nil)
-        let focused = (visible?.window?.firstResponder as? NSTextView).flatMap { $0 === editor.view || $0 === writer.view ? $0 : nil }
-        guard let view = focused ?? visible, view.window != nil else { return nil }
+        let pane = panes.formatPane(narrow: isNarrow, markdown: isMarkdown)
+        guard let view = pane == .write ? writer.view : pane == .source ? editor.view : nil, view.window != nil else { return nil }
         if view.window?.firstResponder !== view { view.window?.makeFirstResponder(view) }
         return view
     }
@@ -209,7 +208,7 @@ struct EditorView: View {
                         Text("Write").tag(Bool?.some(true))
                     }
                     .pickerStyle(.segmented)
-                    .help("Read: the Pandoc rendering beside or instead of the source. Write: edit the formatted document full width; markup shows on the line you’re editing, and tables, math and images stay as Markdown (⌥⌘E). Read or Source Only (⌥⌘1) leaves Write.")
+                    .help("Read: the Pandoc rendering beside or instead of the source. Write: edit the formatted document full width with markup hidden; tables, math and images stay as Markdown (⌥⌘E). Read or Source Only (⌥⌘1) leaves Write.")
                     .accessibilityLabel("Document Mode")
                 }
                 if !isNarrow { // narrow toolbars keep room for the labeled Preview toggle and BB-8; File ▸ Convert stays
