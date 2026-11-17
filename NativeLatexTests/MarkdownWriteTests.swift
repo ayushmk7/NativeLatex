@@ -417,6 +417,22 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertTrue(responder.window === failed && !(responder is WKWebView))
     }
 
+    /// The Format menu is built from the shared command list: same commands and order as the bar, inline then
+    /// block, each with its own shortcut, none clashing with the View menu or the standard Edit/File keys.
+    func testFormatMenuMatchesTheBarAndKeepsShortcuts() {
+        let all = MarkdownFormat.Command.all
+        let sections = MarkdownFormatCommands.sections
+        XCTAssertEqual(sections.flatMap { $0.map(\.id) }, all.map(\.id), "menu order is the bar's order")
+        XCTAssertEqual(sections.map { $0.first?.group }, [.inline, .block], "inline section, then block section")
+        XCTAssertEqual(sections.flatMap { $0.map(\.shortcut) }, all.map(\.shortcut), "shortcuts kept")
+        func key(_ s: KeyboardShortcut) -> String { "\(s.modifiers.rawValue)-\(s.key.character)" }
+        let keys = all.compactMap(\.shortcut).map(key)
+        XCTAssertEqual(Set(keys).count, keys.count, "no two commands share a shortcut")
+        let reserved = ["1", "2", "3", "e", "p"].map { key(KeyboardShortcut(KeyEquivalent(Character($0)), modifiers: [.command, .option])) }
+            + ["x", "c", "v", "z", "a", "s", "n", "o", "w", "f", "p"].map { key(KeyboardShortcut(KeyEquivalent(Character($0)))) }
+        XCTAssertTrue(Set(keys).isDisjoint(with: reserved), "no clash with View ▸ panes or standard File/Edit keys")
+    }
+
     /// ⌥⌘P (View ▸ Toggle Preview) hides the preview, then brings it back beside the source, or alone when narrow.
     func testTogglePreviewShortcutLogic() {
         XCTAssertEqual(PaneLayout.both.toggled(narrow: false), .source)

@@ -469,26 +469,26 @@ struct PaneCommands: Commands {
 struct MarkdownFormatCommands: Commands {
     @FocusedValue(\.paneControls) private var controls
 
+    /// Menu sections in the formatting bar's order: inline styles, then block styles, from the shared list.
+    static var sections: [[MarkdownFormat.Command]] {
+        let all = MarkdownFormat.Command.all
+        return [all.filter { $0.group == .inline }, all.filter { $0.group == .block }].filter { !$0.isEmpty }
+    }
+
     var body: some Commands {
         CommandMenu("Format") {
             if controls?.write != nil {
-                item("Bold", "b") { MarkdownFormat.wrap($0, marker: "**") }
-                item("Italic", "i") { MarkdownFormat.wrap($0, marker: "*") }
-                item("Link", "k") { MarkdownFormat.link($0) }
-                Divider()
-                item("Heading", nil) { MarkdownFormat.heading($0) }
-                item("Bulleted List", nil) { MarkdownFormat.togglePrefix($0, "- ") }
-                item("Quote", nil) { MarkdownFormat.togglePrefix($0, "> ") }
+                ForEach(Array(Self.sections.enumerated()), id: \.offset) { index, section in
+                    if index > 0 { Divider() }
+                    ForEach(section) { command in
+                        Button(command.title) { if let view = controls?.formatTarget?() { command.perform(on: view) } }
+                            .keyboardShortcut(command.shortcut)
+                            .disabled(controls?.formatTarget == nil)
+                    }
+                }
             } else {
                 Text("Formatting is available in Markdown documents.")
             }
         }
-    }
-
-    @ViewBuilder
-    private func item(_ title: String, _ key: KeyEquivalent?, action: @escaping (NSTextView) -> Void) -> some View {
-        let button = Button(title) { if let view = controls?.formatTarget?() { action(view) } }
-            .disabled(controls?.formatTarget == nil)
-        if let key { button.keyboardShortcut(key, modifiers: .command) } else { button }
     }
 }
