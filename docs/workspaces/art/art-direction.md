@@ -47,7 +47,7 @@ The landing favicon follows the same rule through `prefers-color-scheme`: black 
 - The Icon Composer document `NativeLatex/AppIcon.icon` gives real variants:
   - `fill-specializations` sets the sheet colour per appearance.
   - `image-name-specializations` swaps the lines layer between white and black.
-- In the built app, `Assets.car` holds `IconImageStack` renditions for `NSAppearanceNameAqua`, `NSAppearanceNameDarkAqua` and `ISAppearanceTintable`. The last is the Mono annotation (JSON key `tinted`) that drives both Clear and Tinted.
+- In the built app, `Assets.car` holds `IconImageStack` renditions for `NSAppearanceNameAqua`, `NSAppearanceNameDarkAqua` and `ISAppearanceTintable`. The last drives both Clear and Tinted. Our `icon.json` has no `tinted` (Mono) specialization, so actool derives the tintable stack from the default layers: per `assetutil`, its group is byte-identical to the Aqua group. A `tinted` specialization is an optional override. Adding one in a test changed only the tintable group and left Aqua and DarkAqua untouched.
 - From the same `.icon`, actool also generates the legacy `AppIcon.icns` (black sheet) for macOS 14–25 and the flat `Icon Image` renditions.
 - When `AppIcon.icon` exists, actool ignores a same-named `.appiconset`: removing it left `AppIcon.icns` byte-identical. The project's `.appiconset` was deleted.
 
