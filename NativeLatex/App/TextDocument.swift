@@ -13,7 +13,7 @@ enum SourceFileError: LocalizedError {
     case unsupportedEncoding
 
     var errorDescription: String? {
-        "This file is not UTF-8 text. LibreLeaf left it unchanged."
+        "This file is not UTF-8 text. LibreWeave left it unchanged."
     }
 }
 
@@ -21,7 +21,7 @@ enum SourceFileError: LocalizedError {
 /// NSDocument (behind DocumentGroup) supplies coordinated atomic saves, autosave,
 /// versions and the "changed by another application" conflict check.
 struct TextDocument: FileDocument {
-    // Text types only: claiming public.data put LibreLeaf in Open With for every binary file.
+    // Text types only: claiming public.data put LibreWeave in Open With for every binary file.
     // ponytail: extensionless files resolve to public.data and can't be opened; add a typed Open panel if needed.
     static let readableContentTypes: [UTType] = [.tex, .markdown, .bibtex, .texPackage, .texClass, .plainText]
     static let writableContentTypes: [UTType] = [.tex, .markdown, .plainText]
@@ -29,11 +29,24 @@ struct TextDocument: FileDocument {
     var text: String
     var hasBOM = false
     var usesCRLF = false
+    /// Format of this document. Untitled and duplicated documents have no file URL yet, so the
+    /// window needs this to keep Markdown preview and TeX controls. Not saved into the file.
+    var contentType: UTType = .plainText
 
-    init(text: String = "") { self.text = text }
+    init(text: String = "", contentType: UTType = .plainText) {
+        self.text = text
+        self.contentType = contentType
+    }
 
     init(configuration: ReadConfiguration) throws {
         try self.init(data: configuration.file.regularFileContents ?? Data())
+        contentType = configuration.contentType // also set for Duplicate, which has no URL
+    }
+
+    /// The saved file's own extension when there is a file (so .ltx stays .ltx); otherwise the
+    /// type's preferred one (tex, md, txt).
+    func sourceExtension(at fileURL: URL?) -> String {
+        (fileURL.map(\.pathExtension) ?? contentType.preferredFilenameExtension ?? "").lowercased()
     }
 
     init(data: Data) throws {

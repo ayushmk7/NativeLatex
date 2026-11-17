@@ -5,10 +5,22 @@ import SwiftUI
 
 @main
 struct LibreLeafApp: App {
-    init() { _ = AppearanceStore.shared } // apply the saved appearance before the first window
+    init() {
+        Self.migrateAppearance(into: .standard, legacy: UserDefaults(suiteName: BuildService.legacyDefaultsDomain))
+        _ = AppearanceStore.shared // apply the saved appearance before the first window
+    }
+
+    /// The bundle ID changed from app.libreleaf.LibreLeaf: carry the user's BB-8 choice over once.
+    /// A value already in the new domain wins; an unknown old value is ignored. The old domain is only read.
+    static func migrateAppearance(into defaults: UserDefaults, legacy: UserDefaults?) {
+        let key = "appearanceMode" // AppearanceStore.defaultsKey, internal to the Design package
+        guard defaults.object(forKey: key) == nil,
+              let old = legacy?.string(forKey: key), AppAppearance(rawValue: old) != nil else { return }
+        defaults.set(old, forKey: key)
+    }
 
     var body: some Scene {
-        DocumentGroup(newDocument: TextDocument()) { file in
+        DocumentGroup(newDocument: NewDocument.makeDocument()) { file in
             EditorView(document: file.$document, fileURL: file.fileURL)
         }
         .commands {
@@ -45,8 +57,9 @@ struct EditorView: View {
     @State private var diskChanged = false
     @State private var seenDiskDate: Date?
 
-    private var isTeX: Bool { BuildService.rootExtensions.contains(fileURL?.pathExtension.lowercased() ?? "") }
-    private var isMarkdown: Bool { ["md", "markdown"].contains(fileURL?.pathExtension.lowercased() ?? "") }
+    /// Untitled and duplicated windows have no URL yet; the document's type stands in until the first save.
+    private var isTeX: Bool { BuildService.rootExtensions.contains(document.sourceExtension(at: fileURL)) }
+    private var isMarkdown: Bool { ["md", "markdown"].contains(document.sourceExtension(at: fileURL)) }
     private var hasPreview: Bool { isTeX || isMarkdown }
     /// Same breakpoint as the Design package's WorkspaceShell: 320pt editor + 280pt preview + room.
     static let narrowWidth: CGFloat = 760
@@ -87,7 +100,7 @@ struct EditorView: View {
                                           line: line, column: column, lastBuild: lastBuild),
                       showPanel: $showProblems)
         }
-        .libreLeafTheme()
+        .libreWeaveTheme()
         .frame(minWidth: 640, minHeight: 420)
         .focusedSceneValue(\.documentFileURL, fileURL)
         .task { reopenSymlinkAtTarget() }
@@ -143,7 +156,7 @@ struct EditorView: View {
         .sheet(isPresented: $showLog) {
             ScrollView { Text(log).font(.system(.caption, design: .monospaced)).textSelection(.enabled).padding() }
                 .frame(minWidth: 600, minHeight: 400)
-                .libreLeafTheme()
+                .libreWeaveTheme()
                 .toolbar { Button("Done") { showLog = false } }
         }
         .alert("Build", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
@@ -214,7 +227,7 @@ struct EditorView: View {
             try doc.revert(toContentsOf: fileURL, ofType: doc.fileType ?? "public.plain-text")
             diskChanged = false
         } catch {
-            self.error = "LibreLeaf couldn’t reload “\(fileURL.lastPathComponent)”: \(error.localizedDescription)"
+            self.error = "LibreWeave couldn’t reload “\(fileURL.lastPathComponent)”: \(error.localizedDescription)"
         }
     }
 
@@ -233,7 +246,9 @@ struct EditorView: View {
     }
 
     private func build() async {
-        guard let fileURL else { error = "Save this file before building."; return }
+        var root = fileURL
+        if root == nil { root = await saveUntitledForBuild() }
+        guard let fileURL = root else { return }
         do {
             try await NSDocument.saveEditedDocuments(under: fileURL.deletingLastPathComponent())
             guard document.matchesDisk(at: fileURL) else {
@@ -255,6 +270,22 @@ struct EditorView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    /// Untitled LaTeX: Build shows the normal Save panel, then builds the saved file.
+    /// Cancel writes nothing and builds nothing; save errors are shown by NSDocument itself.
+    private func saveUntitledForBuild() async -> URL? {
+        guard let window = editor.view?.window ?? NSApp.keyWindow,
+              let doc = NSDocumentController.shared.document(for: window) else {
+            error = "Save this document (File ▸ Save, ⌘S), then build."
+            return nil
+        }
+        guard let url = await doc.saveUntitled() else { return nil }
+        guard BuildService.rootExtensions.contains(url.pathExtension.lowercased()) else {
+            error = "Saved as “\(url.lastPathComponent)”. Build works on .tex, .ltx and .latex files."
+            return nil
+        }
+        return url
     }
 
     /// NSDocument can't save onto a symlink, so edit the link's target instead.

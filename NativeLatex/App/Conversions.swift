@@ -14,14 +14,24 @@ extension NSDocument {
     /// catches cp -p/rsync replacements) shows its sheet, and nothing is overwritten unless the user chooses to.
     func saveIfEdited() async throws {
         guard isDocumentEdited, let url = fileURL else { return }
+        guard await runSave() else {
+            throw CocoaError(.userCancelled, userInfo: [NSLocalizedDescriptionKey:
+                "“\(url.lastPathComponent)” was not saved, so LibreWeave stopped. Save it (or resolve the change made by another app), then try again."])
+        }
+    }
+
+    /// Untitled document: the normal Save panel, as for ⌘S. Returns the saved file, or nil on
+    /// Cancel (nothing written). A document that already has a file just returns it.
+    func saveUntitled() async -> URL? {
+        if let fileURL { return fileURL }
+        return await runSave() ? fileURL : nil
+    }
+
+    private func runSave() async -> Bool {
         let callback = SaveCallback()
-        let saved = await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { continuation in
             callback.done = { continuation.resume(returning: $0) }
             save(withDelegate: callback, didSave: #selector(SaveCallback.document(_:didSave:contextInfo:)), contextInfo: nil)
-        }
-        guard saved else {
-            throw CocoaError(.userCancelled, userInfo: [NSLocalizedDescriptionKey:
-                "“\(url.lastPathComponent)” was not saved, so LibreLeaf stopped. Save it (or resolve the change made by another app), then try again."])
         }
     }
 
@@ -90,7 +100,7 @@ enum Conversions {
 
     static func importCopy(as format: DocumentFormat) {
         let panel = NSOpenPanel()
-        panel.message = "Choose a file. LibreLeaf writes a new \(format.displayName) copy next to it; the original is not changed."
+        panel.message = "Choose a file. LibreWeave writes a new \(format.displayName) copy next to it; the original is not changed."
         panel.prompt = "Import Copy"
         panel.allowedContentTypes = ["docx", "odt", "md", "markdown", "tex", "ltx", "latex"].compactMap { UTType(filenameExtension: $0) }
         guard panel.runModal() == .OK, let source = panel.url else { return }

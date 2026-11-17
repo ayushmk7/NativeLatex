@@ -113,20 +113,23 @@ Do not place provider-specific buttons in the main toolbar before any integratio
 
 ## Commands and accessibility
 
-| Action | Proposed shortcut | Menu location |
-| --- | --- | --- |
-| New workspace | ⌘N | File |
-| Open another app (Finder-style chooser, .app bundles only) | ⌘⇧N | File |
-| Open folder | ⌘O | File |
-| Save active file | ⌘S | File |
-| Build TeX / Render Markdown | ⌘B | Build |
-| Find in active file | ⌘F | Edit |
-| Quick open file | ⌘⇧O | File |
-| Show/hide sidebar | ⌘⌥S | View |
-| Show/hide preview | ⌘⌥P | View |
-| Jump to next problem | F8 | Build |
+| Action | Shortcut | Where | Status |
+| --- | --- | --- | --- |
+| New document (chooser: LaTeX, Markdown, Plain Text) | ⌘N | File ▸ New… | Shipped |
+| Open another document (same Open panel as File ▸ Open…) | ⌘⇧N | File ▸ Open Another Document… | Shipped |
+| Open file | ⌘O | File ▸ Open… (native, type-filtered) | Shipped |
+| Save active file | ⌘S | File | Shipped (native) |
+| Build TeX | ⌘B | Toolbar Build button (LaTeX windows; untitled ones save first) | Shipped |
+| Cancel build | ⌘. | Toolbar Cancel button while building | Shipped |
+| Markdown preview | none | Updates live while typing | Shipped |
+| Show/hide preview | ⌥⌘P | Toolbar Preview toggle | Shipped |
+| Find in active file | ⌘F | Edit ▸ Find (native find bar) | Shipped |
+| Open folder | proposed | File | Proposed (no folder workspace yet) |
+| Quick open file | ⌘⇧O | File | Proposed |
+| Show/hide sidebar | ⌘⌥S | View | Proposed (no sidebar yet) |
+| Jump to next problem | F8 | Build | Proposed |
 
-Shortcuts are proposals to validate against macOS and editor conflicts; every action also needs a menu or accessible control. Appearance commands need no dedicated shortcut because the BB-8 control is keyboard reachable and View > Appearance is available. Expose file tree, tabs, editor, PDF controls, appearance switch, and problem rows in a predictable keyboard focus order. Announce build completion and errors through accessibility status without shifting focus from the editor. Use text and symbols alongside severity colors. Respect system appearance when Use System is chosen, reduced motion, increased contrast, and text scaling. Apple calls for keyboard access and audits of accessibility, including adequate macOS control size and contrast. [Apple macOS design](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos), [Apple accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility).
+Proposed shortcuts still need checking against macOS and editor conflicts; every action also needs a menu or accessible control. Appearance commands need no dedicated shortcut because the BB-8 control is keyboard reachable and View > Appearance is available. Expose file tree, tabs, editor, PDF controls, appearance switch, and problem rows in a predictable keyboard focus order. Announce build completion and errors through accessibility status without shifting focus from the editor. Use text and symbols alongside severity colors. Respect system appearance when Use System is chosen, reduced motion, increased contrast, and text scaling. Apple calls for keyboard access and audits of accessibility, including adequate macOS control size and contrast. [Apple macOS design](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos), [Apple accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility).
 
 ## Build states and recovery
 
