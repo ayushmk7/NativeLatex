@@ -1,52 +1,41 @@
-# Brag workspace: product video and screenshots
+# Brag workspace: LibreWeave demo capture (2026-11-17)
 
-Status: **done** 2026-11-17. Media is from `main` at `b58a9e6` (Read/Write in the toolbar), the source of the final `dist/LibreWeave-current.app`.
+## Published files in `landing/media/`
 
-## Published assets (`landing/media/`)
+| File | What |
+| --- | --- |
+| `libreweave-demo.mp4` | 18.0 s, 1920×1080, 30 fps (540 frames), H.264 + AAC 48 kHz stereo, `+faststart`, 3.9 MB |
+| `libreweave-demo-poster.jpg` | 1280 px poster, frame at 9.0 s (Markdown take, table row and math rendered). Not baked into the video; frame 0 is the hook |
+| `libreweave-demo-preview.gif` | 18 s, 640×360, 6 fps, 1.6 MB silent moving preview embedded in the root README; click it for the MP4 with sound |
+| `libreweave-hero.png` | dark window, `orbit.tex` + built PDF |
+| `libreweave-markdown.png` | light window, source + Write mode (link and checklist in `#0066CC`) |
+| `libreweave-latex-light.png` | light window, `orbit.tex` + built PDF |
 
-| File | What | Size | Used by |
-| --- | --- | --- | --- |
-| `libreweave-demo.mp4` | 18.0 s, 1920×1080, 30 fps, H.264 + AAC, `+faststart` | 3.6 MB | landing `<video>`, README link |
-| `libreweave-demo-poster.jpg` | settled frame at 8.4 s (Markdown Write), 1280 px | 80 KB | landing `poster`, README |
-| `libreweave-hero.png` | dark window, `orbit.tex` source + built PDF | 167 KB | README hero |
-| `libreweave-markdown.png` | light window, `field-notes.md` source + Write mode | 129 KB | README |
-| `libreweave-latex-light.png` | light window, `orbit.tex` source + built PDF | 153 KB | README |
+## What the footage is
 
-Pages publishes only `landing/`, so the README links to the same files (one copy each).
+Each app scene is **one continuous real-time take**, with no cuts inside it:
 
-## Storyboard (18.0 s, ~100 BPM, cuts on beats)
+- **Markdown (3.0–9.6 s in video, 7.2 s of take):** a new table row and then a line with math are typed into the source pane. The app's own Pandoc Read preview adds the row when typing pauses, then renders the fraction as MathML. (The app cancels a pending render on each keystroke, so the preview updates at pauses. That is the app's real behaviour.)
+- **LaTeX (9.6–15.6 s, 6.0 s of take):** a sentence is typed into `orbit.tex`, then Build is pressed. The toolbar badge goes Ready → Building… (spinner) → Built, and the PDF built by `latexmk` appears, containing the typed sentence.
 
-| Time | Scene | On screen |
-| --- | --- | --- |
-| 0.0–3.0 | Hook | White. "Write the source. / See the page." Frame 0 is this scene; there is no poster frame baked into the video. |
-| 3.0–9.0 | Markdown | Light window in Source Only, then (4.8 s, 0.1 s near-cut) Source and Preview with Write selected. Caption: "Markdown you can read and write." |
-| 9.0–14.4 | LaTeX | Dark window, Ready and "No PDF yet", then (10.8 s) Built with the PDF. Caption: "LaTeX, built on your Mac." |
-| 14.4–18.0 | Outro | App icon, "LibreWeave", "Native on Mac. Local by default.", `libreweave.ayushmadhav.com` |
+## Exact capture method
 
-There's no voiceover; the score is a quiet stdlib synth (pad + pluck, −16 dBFS peak). Each scene shows two settled states of the real app. No typing is shown or claimed.
+Real on-screen capture of the shipping app was ruled out. A background `open -g` launch put its window on a hidden Space, where WebKit doesn't draw, and the instance became active once that Space was shown. That breaks "never touch the user's screen". So:
 
-## How the screenshots were made (headless, nothing on screen)
+1. **Harness:** `brag-output/work/harness`, a SwiftPM executable compiled from the app's own sources at `main` **19a5b68** (`NativeLatex/App`, `Design`, `Integrations`; the copy only drops `@main`). It hosts the real `EditorView` in an `NSWindow` that is **never ordered in**. The process uses activation policy `.prohibited`: it has no Dock icon, no menu bar, can't become active, and has no window on any display or Space. Appearance and the build owner token are launch arguments, so no preferences are written.
+2. **Input:** `NSTextView.insertText(_:replacementRange:)` on the app's Source view, one character every 70–85 ms, with 0.9 s pauses after lines. This is the text system's normal typing path (delegate → binding → preview), not a text swap. **Build** is the toolbar Build button's own `performClick`. Just before it, the harness writes the buffer to disk, standing in for `NSDocument.saveEditedDocuments`, which the app runs before every build (the harness has no NSDocument).
+3. **Frames:** captured continuously in real time (~18–19 fps). Each frame is the window frame view (title bar, toolbar, panes, status bar) drawn with `cacheDisplay` at 2×. The Markdown Read pane is a `WKWebView`, which `cacheDisplay` can't draw, so its own `takeSnapshot` is drawn into the same frame at that view's own rectangle.
+4. **Timing:** frames keep their capture timestamps and become 30 fps by holding each frame until the next one (ffmpeg concat with per-frame durations). Nothing is sped up, reordered or interpolated.
+5. **Composition:** `brag-output/work/comp/index.html` (hook, two takes, outro) rendered frame by frame in headless Chrome, then a quiet synthesized score (cue accents on beats 4, 16, 26 at 100 BPM). The outro says: "App footage: LibreWeave's own views, recorded in real time off-screen."
 
-Capturing a live app window was dropped. A background `open -g` launch of the final build put its window on a Space that wasn't showing, where WebKit doesn't draw, and the instance later turned up active. The owner's screen must not change, so:
+**Limits, stated plainly:** this is the app's code and views running in a harness process, not a recording of the shipped `LibreWeave.app` window. No text cursor is drawn, because the window is never key (it can't be, without activation). The scripted typing is perfectly regular.
 
-1. `brag-output/work/harness` is a SwiftPM executable that compiles the app's own sources (`NativeLatex/App`, `Design`, `Integrations` from `b58a9e6`; only `@main` removed in the copy) and hosts the real `EditorView` in an `NSWindow` that is **never ordered in**. The process uses activation policy `.prohibited`: it has no Dock icon and can't become active. Appearance and the build owner token are passed as launch arguments, so no preferences are written.
-2. The window frame view (title bar, toolbar and content) is drawn with `cacheDisplay` at 2×.
-3. Real controls are driven in-process: the toolbar Layout control (Source Only) and the toolbar Read/Write control (Write). **Build** is the toolbar button's own `performClick`, so the app's `BuildService` runs `latexmk` and the PDFKit preview shows the result.
-4. **Write pane composite:** offscreen, SwiftUI left the Write container empty: its shared scroll view was moved into a container that never got attached. The harness creates the app's own `WritingHandle`, takes its configured scroll view (styled by the app's `MarkdownStyler`), and attaches it to that container, as `HandleTextView.makeNSView` does. Then the whole window renders in one pass. These are real app components; no UI is drawn by hand.
-5. The **Read** view (WebKit, Pandoc HTML) doesn't draw offscreen, so no shot shows it. Its tables, math and footnotes are described in copy only.
-6. Corners are rounded (20 px alpha mask) for presentation.
+## Checks run
 
-At 640 pt wide, the toolbar shows Layout, Read/Write and BB-8 with no overflow (Convert is left out by design; File ▸ Convert remains).
+- `ffprobe`: 540 frames, 18.000 s, 1920×1080, 30 fps, AAC stereo, peak −16 dBFS.
+- Frames pulled from the MP4 at 0, 1.2, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.2, 14.6 and 16.8 s, viewed at 900 px wide. Typing progress, preview row, math, Building…, Built and the PDF are all visible. Captions fit inside the frame.
+- Old-blue scan (`#0F2BFF`, `#2438FF`, `#7A93FF`, ±8%) over every 6th rendered frame (90 frames) and all five deliverables: **0 pixels**. Control: `#0066CC` found where expected (hook "See the page.").
+- No app was launched and no window was put on screen. The harness can't activate, and no other app was queried or captured.
+- The capture harness did not edit landing or app source; the orchestrator copied the finished media into `landing/media/`.
 
-## Content
-
-Demo files are fictional: `field-notes.md` (tide pool notes, a link to `example.org`) and `orbit.tex` ("Notes on a Quiet Orbit", "A. Example"). Source lines are kept at 37 characters or fewer, so the source pane doesn't wrap. No real names, paths or accounts appear.
-
-## Embedding
-
-- **Landing:** a `<video>` with `controls`, `playsinline`, `preload="none"` and the poster. No `autoplay` and no `muted`: the music plays when a visitor presses Play. Page load fetches only the 80 KB poster.
-- **README:** `docs/README.md` is the product page (the status inventory moved to [docs/status.md](../../status.md)). GitHub strips `<video>` and shows `![](x.mp4)` as a broken image (checked with the GitHub Markdown API), so the README uses the poster as a clickable image linked to the MP4 on the live site, plus a "Watch the 18-second demo" link. It doesn't claim an inline player. The links work once this branch is merged and Pages redeploys.
-
-## Rebuild
-
-Everything is in `brag-output/` (git-ignored): `work/harness` (render the stills), `work/comp/index.html` (composition; each frame is a pure function of time), `work/tools/render.mjs` (headless Chrome frames), `work/tools/music.py`, `work/tools/build.sh` (encode, poster).
+GitHub's README renderer removes ordinary `<video>` tags for repository MP4 files (confirmed with the GitHub Markdown API). The root README embeds the animated GIF so the demonstration moves in place, and links it to the full MP4. The landing page uses the MP4 as an autoplaying, muted loop with native controls for sound.

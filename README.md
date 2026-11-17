@@ -12,8 +12,8 @@ A native Mac editor for LaTeX and Markdown that keeps the rendered page beside y
 </p>
 
 <p align="center">
-  <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><img src="landing/media/libreweave-demo-poster.jpg" width="640" alt="Play the 18-second LibreWeave demo"></a><br>
-  <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><b>▶ Watch the 18-second demo</b></a> · <a href="https://libreweave.ayushmadhav.com/">libreweave.ayushmadhav.com</a>
+  <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><img src="landing/media/libreweave-demo-preview.gif" width="640" alt="Looping preview of LibreWeave editing Markdown, rendering the preview, and building a LaTeX PDF"></a><br>
+  <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><b>▶ Watch the 18-second demo with sound</b></a> · <a href="https://libreweave.ayushmadhav.com/">libreweave.ayushmadhav.com</a>
 </p>
 
 ## Markdown you can read and write
