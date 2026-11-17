@@ -8,12 +8,10 @@ Run: python3 -I art/tools/gen.py   (build.sh runs it)
 """
 import os
 
-# Website homepage blue (Website/src/pages/index.astro, body.opt7 --electric), chosen by the surface it sits
-# on, as the site does: #0F2BFF on white, #2438FF on black.
-BLUE_ON_WHITE, BLUE_ON_BLACK = "#0F2BFF", "#2438FF"
-# Mono (Clear/Tinted) threads: the site's dark-mode blue text (--electric-ink). The system greys it by
-# luminance; the darker fills would sink into the Clear sheet, this stays between sheet and lines.
-BLUE_MONO = "#7A93FF"
+# Internship blue (Internship/frontend/src/style.css), chosen by the surface it sits on, as that site does:
+# #0066CC on white (light --accent), #0A84FF on black (dark --accent). Clear/Tinted derive from these
+# layers; #0A84FF greys midway between the Clear sheet and lines, so no Mono override is needed.
+BLUE_ON_WHITE, BLUE_ON_BLACK = "#0066CC", "#0A84FF"
 INK, PAPER = "#0A0A0A", "#FFFFFF"
 SHEETS = {"black": (INK, PAPER, BLUE_ON_BLACK), "white": (PAPER, INK, BLUE_ON_WHITE)}  # sheet, lines, threads
 # On the 1024 canvas, the macOS body is 824 px at a 100 px inset. Coordinates are multiples of 64,
@@ -97,7 +95,7 @@ for name, color in (("black", INK), ("white", PAPER)):
 # Icon Composer layers: transparent gaps, so the .icon fill is the sheet. 824 body scaled to the full canvas.
 for name, ink in (("lines-white", PAPER), ("lines-black", INK)):
     write(f"NativeLatex/AppIcon.icon/Assets/{name}.svg", svg("100 100 824 824", 1024, "", lines(ink)))
-for name, blue in (("threads-on-black", BLUE_ON_BLACK), ("threads-on-white", BLUE_ON_WHITE), ("threads-mono", BLUE_MONO)):
+for name, blue in (("threads-on-black", BLUE_ON_BLACK), ("threads-on-white", BLUE_ON_WHITE)):
     write(f"NativeLatex/AppIcon.icon/Assets/{name}.svg", svg("100 100 824 824", 1024, "", threads(blue)))
 
 # Landing favicon: black sheet on light pages, white sheet on dark pages.

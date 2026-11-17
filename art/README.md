@@ -1,54 +1,48 @@
 # LibreWeave brand art
 
-LibreWeave is the working app name. The artwork has no words in it, so a rename only changes labels. Design brief: [art direction](../docs/workspaces/art/art-direction.md). Palette: ink `#0A0A0A`, paper `#FFFFFF`, and the Website homepage blue from `Website/src/pages/index.astro` `body.opt7`:
+LibreWeave is the working app name. The artwork has no words in it, so a rename only changes labels. Design brief: [art direction](../docs/workspaces/art/art-direction.md). Palette: ink `#0A0A0A`, paper `#FFFFFF`, and the Internship blue from `Internship/frontend/src/style.css`:
 
-| Website token | Value | Use here |
+| Internship token | Value | Use here |
 | --- | --- | --- |
-| `--electric`, light | `#0F2BFF` | blue on white |
-| `--electric`, dark | `#2438FF` | blue on black |
-| `--electric-ink`, dark | `#7A93FF` | blue text on black |
+| `--accent` / `--fill`, light | `#0066CC` | blue on white; light `AccentColor` |
+| `--fill`, dark | `#0071E3` | dark `AccentColor` (filled, white text) |
+| `--accent`, dark | `#0A84FF` | blue on black |
 
 The icon is a woven sheet. The macOS silhouette is the paper, with no inner box or frame. Two lines weave over and under two blue threads.
 
-| Appearance | Sheet | Lines |
-| --- | --- | --- |
-| Light | black | white |
-| Dark | white | black |
-
-The threads use the Website blue for the sheet they sit on:
-- `#2438FF` on the black sheet
-- `#0F2BFF` on the white sheet
-- `#7A93FF` in Mono (Clear/Tinted), see below
+| Appearance | Sheet | Lines | Threads |
+| --- | --- | --- | --- |
+| Light | black | white | `#0A84FF` (5.43:1 on `#0A0A0A`) |
+| Dark | white | black | `#0066CC` (5.57:1 on white) |
 
 **Clear and Tinted** are chosen by the user in macOS, not by the app, and there is no in-app setting. In macOS 27, System Settings ▸ Appearance offers Icon & widget style (Default, Dark, Clear, Tinted) and a Liquid Glass slider that moves icons from clear to heavily tinted. LibreWeave follows both, with no opacity control of its own ([Apple: change Appearance settings on Mac](https://support.apple.com/en-euro/guide/mac-help/mchlp1225/27/mac/27)). The system builds them from the same `.icon`, using the `ISAppearanceTintable` stack.
 
-One Mono (`tinted`) override exists: the threads layer swaps to `threads-mono.svg` (`#7A93FF`). The system greys Mono layers by luminance, and the darker `#2438FF` sank into the Clear sheet. The table shows sheet / threads / lines brightness (0–255) in the `ictool` renders.
+There is no Mono (`tinted`) override: actool derives the tintable stack from the default layers. The system greys Mono layers by luminance, and `#0A84FF` lands between the Clear sheet and the white lines. The table shows sheet / threads brightness (0–255) in 1024 px `ictool` renders, lines are white:
 
-| Mode | Royal blue (before) | `#2438FF`, no override | `#7A93FF` override (shipped) |
+| Mode | Royal `#4169E1` (old) | `#2438FF` + `#7A93FF` Mono override (old) | `#0A84FF`, no override (shipped) |
 | --- | --- | --- | --- |
-| Clear light | 128 / 180 / 254 | 128 / 160 / 254 | 128 / 202 / 254 |
-| Clear dark | 44 / 125 / 241 | 44 / 94 / 241 | 44 / 160 / 241 |
-| Tinted dark | 36 / 62 / 97 | 36 / 48 / 97 | 36 / 78 / 97 |
+| Clear light | 128 / 180 | 128 / 203 | 128 / 185 |
+| Clear dark | 44 / 125 | 43 / 161 | 43 / 133 |
+| Tinted dark | 36 / 62 | 36 / 68 | 36 / 58 |
 
-`assetutil` confirms the override changes only the tintable group; Aqua and DarkAqua are untouched. Without a `tinted` key, actool derives the tintable stack from the default layers.
 - **Clear:** the system replaces our fill with its own glass sheet. Lines go white, threads go mid-gray, so the weave stays three-toned (sheet < threads < lines).
-- **Tinted:** the user's tint colour drives the sheet and threads.
+- **Tinted:** the user's tint colour drives the sheet and threads. Tinted dark is the weakest mode, as before: clear at 32 px and up, soft at 16 px.
 
-We force no alpha. The thread override is the only Mono-specific setting. Evidence, 2026-11-17 (Xcode 27.2, macOS 27.3):
+We force no alpha and set nothing Mono-specific. Evidence, 2026-11-17 (Xcode 27.2, macOS 27.3):
 - **Fill, glass and translucency:** `tinted` fill specializations, layer `glass` and group `translucency` never changed the Clear sheet in `ictool` or IconServices. It stays 128 gray in Clear light and 44 in Clear dark.
 - **Native comparison:** in static renders Clear is opaque for Apple's own Safari, Calculator, Maps and Notes icons too. The Dock adds live backdrop translucency itself.
-- **Mono thread opacity:** lowering it under `tinted` fades the Clear threads into the sheet, so it was not used. A lighter Mono thread colour is used instead.
+- **Mono thread opacity:** lowering it under `tinted` fades the Clear threads into the sheet, so it is not used.
 
 | Path | What |
 | --- | --- |
 | `tools/gen.py` | Single source of the geometry. Writes every SVG below, the `.icon` layers and `../landing/icon.svg`. Edit here. |
-| `../NativeLatex/AppIcon.icon` | **The app icon.** Icon Composer document in the LibreWeave target's Resources. Sheet colour comes from `fill-specializations`. `lines-white.svg` / `lines-black.svg` and `threads-on-black.svg` / `threads-on-white.svg` swap per appearance; `threads-mono.svg` is the Mono (`tinted`) override. |
-| `../NativeLatex/Assets.xcassets/AccentColor.colorset` | App accent: Website fills `#0F2BFF` light, `#2438FF` dark (control fills with white text: 7.47:1 and 6.81:1, so no separate high-contrast entry). |
+| `../NativeLatex/AppIcon.icon` | **The app icon.** Icon Composer document in the LibreWeave target's Resources. Sheet colour comes from `fill-specializations`. `lines-white.svg` / `lines-black.svg` and `threads-on-black.svg` / `threads-on-white.svg` swap per appearance. Clear/Tinted derive from the default layers. |
+| `../NativeLatex/Assets.xcassets/AccentColor.colorset` | App accent: Internship fills `#0066CC` light, `#0071E3` dark (control fills with white text: 5.57:1 and 4.70:1, both AA, so no separate high-contrast entry). |
 | `source/app-icon-black.svg`, `app-icon-white.svg` | Flat icons on the macOS grid |
 | `source/mark-black.svg`, `mark-white.svg` | One-color mark with real gaps |
 | `../landing/icon.svg` | Favicon: black sheet on light pages, white sheet on dark pages, via `prefers-color-scheme` inside the SVG |
 | `exports/review.png` | Review sheet (see below) |
-| `exports/built-app-icons.png`, `built-app-evidence.txt` | Evidence from a real `xcodebuild` of LibreWeave.app: `Assets.car` renditions and IconServices renders at 16, 32 and 256 px |
+| `exports/built-app-icons.png`, `built-app-evidence.txt` | Evidence from a real `xcodebuild` of LibreWeave.app: `Assets.car` renditions and IconServices renders at 16, 32 and 256 px. Recorded with an earlier blue; it proves the appearance stacks, `review.png` shows current colours. |
 
 `exports/review.png` rows:
 One row per mode, each at 16 and 32 px (zoomed), then 256 px on a light and on a dark backdrop:
