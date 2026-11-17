@@ -312,6 +312,141 @@ final class MarkdownObjectsTests: XCTestCase {
         XCTAssertEqual(MarkdownSyntax.maxSourcePixels, 100_000_000)
     }
 
+    private func bitmapImage(_ side: Int) -> MarkdownRendered {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
+                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        let image = NSImage(size: NSSize(width: side, height: side)); image.addRepresentation(rep)
+        return MarkdownRendered(image: image, size: image.size)
+    }
+
+    private func imageFolder(_ names: [String]) throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for name in names { try writePNG(folder.appendingPathComponent(name), width: 16, height: 16) }
+        return folder
+    }
+
+    /// Saves `file` again (new modification time) and restyles, as the Write view does on the next edit.
+    private func resave(_ file: URL, _ n: Int, in view: NSTextView) throws -> String {
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000_000 + Double(n))], ofItemAtPath: file.path)
+        restyle(view, nil)
+        return try key(file)
+    }
+
+    /// The cache key `process` uses: resolved like a span's source (symlinks too), fresh file attributes.
+    private func key(_ file: URL) throws -> String {
+        try XCTUnwrap(MarkdownSyntax.imageKey(try XCTUnwrap(MarkdownSyntax.resolveImage(file.lastPathComponent, in: file.deletingLastPathComponent()))))
+    }
+
+    /// Re-saving an image gives it a new key (path|mtime|size); its old decode must go, or each save kept one more
+    /// (~8 MB for a column-width photo). Other images keep theirs. Results are handed in directly (no wait).
+    func testResavedImageReplacesItsOldDecode() throws {
+        let folder = try imageFolder(["a.png", "b.png"])
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let (view, objects) = make("![a](a.png)\n\n![b](b.png)\n", folder: folder)
+        let a = folder.appendingPathComponent("a.png"), b = folder.appendingPathComponent("b.png")
+        objects.finish([try key(b): bitmapImage(4)])
+        var last = ""
+        for save in 1...6 { last = try resave(a, save, in: view); objects.finish([last: bitmapImage(4)]) }
+        XCTAssertEqual(objects.cachedImageCount, 2, "one decode per image path, however often it is saved")
+        XCTAssertNotNil(objects.cache[last] ?? nil, "the newest save is the one kept")
+        XCTAssertEqual(MarkdownObjects.imagePath(ofKey: "G:/d/x|y.png|2.0|6"), "G:/d/x|y.png", "a path may contain |")
+    }
+
+    /// Two saves in quick succession put two decodes in flight; if the older finishes last it must be dropped,
+    /// not cached over (or evict) the decode for the file as it is now.
+    func testOlderDecodeFinishingLastNeverEvictsTheCurrentOne() throws {
+        let folder = try imageFolder(["a.png"])
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let (view, objects) = make("![a](a.png)\n", folder: folder)
+        let file = folder.appendingPathComponent("a.png")
+        let old = try resave(file, 1, in: view), new = try resave(file, 2, in: view) // both requested, neither finished
+        objects.finish([new: bitmapImage(4)])
+        objects.finish([old: bitmapImage(4)]) // the stale one arrives last
+        XCTAssertNotNil(objects.cache[new] ?? nil, "current decode kept")
+        XCTAssertNil(objects.cache[old], "stale decode dropped")
+        XCTAssertEqual(objects.cachedImageCount, 1)
+        XCTAssertEqual(objectCount(view), 1, "the image is still drawn")
+    }
+
+    /// A document with more distinct images than the decode budget keeps at most the budget's worth: the first
+    /// ones are drawn, the rest stay Markdown source (text untouched), and nothing re-decodes in a loop.
+    /// Removing images frees their decodes for images added later.
+    func testDecodedImagesStayWithinTheBudget() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        for i in 1...12 { try writePNG(folder.appendingPathComponent("p\(i).png"), width: 16, height: 16) }
+        let one = MarkdownObjects.bytes(try XCTUnwrap(MarkdownSyntax.loadImage(folder.appendingPathComponent("p1.png"), maxPixels: 1600)))
+        let source = (1...10).map { "![p](p\($0).png)" }.joined(separator: "\n\n") + "\n"
+        let (view, objects) = make(source, folder: folder)
+        objects.decodedByteLimit = 4 * one
+        try await waitForRenders(objects)
+        XCTAssertEqual(objects.cachedImageCount, 4, "at most the budget's worth of decodes")
+        XCTAssertEqual(objectCount(view), 4, "the rest stay source")
+        XCTAssertEqual(view.string, source)
+        try await Task.sleep(nanoseconds: 400_000_000)
+        XCTAssertFalse(objects.isRendering, "no re-decode loop for over-budget images")
+
+        // Remove every image, then add two new ones: the old decodes are unreferenced and make room.
+        view.textStorage!.replaceCharacters(in: NSRange(location: 0, length: view.textStorage!.length), with: "![p](p11.png)\n\n![p](p12.png)\n")
+        restyle(view, nil)
+        try await waitForRenders(objects)
+        XCTAssertEqual(objectCount(view), 2, "new images drawn once old decodes are unreferenced")
+        XCTAssertLessThanOrEqual(objects.cachedImageCount, 4)
+    }
+
+    /// Many distinct images decode a few at a time, never all at once (each decode is held until its batch
+    /// finishes), and every one is drawn; once done nothing is queued or decoding again.
+    func testManyImagesDecodeInSmallBatches() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        for i in 1...24 { try writePNG(folder.appendingPathComponent("p\(i).png"), width: 16, height: 16) }
+        let source = (1...24).map { "![p](p\($0).png)" }.joined(separator: "\n\n") + "\n"
+        let (view, objects) = make(source, folder: folder)
+        try await waitForRenders(objects)
+        XCTAssertLessThanOrEqual(objects.peakInFlight, MarkdownObjects.decodeBatch, "decodes in flight stay bounded")
+        XCTAssertEqual(objectCount(view), 24, "all images drawn, batch by batch")
+        try await Task.sleep(nanoseconds: 400_000_000)
+        XCTAssertFalse(objects.isRendering, "nothing re-queued after the last batch")
+        XCTAssertEqual(view.string, source)
+    }
+
+    /// The budget is per document folder: attaching to another folder (or reopening, a new instance) starts
+    /// afresh, so images left as source by a full budget are decoded again there, still within the cap.
+    func testFolderChangeResetsTheDecodeBudget() async throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let a = base.appendingPathComponent("a"), b = base.appendingPathComponent("b")
+        for folder in [a, b] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for i in 1...6 { try writePNG(folder.appendingPathComponent("p\(i).png"), width: 16, height: 16) }
+        }
+        defer { try? FileManager.default.removeItem(at: base) }
+        let one = MarkdownObjects.bytes(try XCTUnwrap(MarkdownSyntax.loadImage(a.appendingPathComponent("p1.png"), maxPixels: 1600)))
+        let source = (1...6).map { "![p](p\($0).png)" }.joined(separator: "\n\n") + "\n"
+        let (view, objects) = make(source, folder: a)
+        objects.decodedByteLimit = 3 * one
+        try await waitForRenders(objects)
+        XCTAssertEqual(objectCount(view), 3, "budget full in folder a")
+
+        XCTAssertIdentical(MarkdownObjects.attach(to: view, folder: b), objects, "same presenter, new folder")
+        try await waitForRenders(objects)
+        XCTAssertEqual(objectCount(view), 3, "fresh budget in folder b: images drawn again, still capped")
+        XCTAssertEqual(objects.cachedImageCount, 3, "folder a's decodes are gone, not added to b's")
+        XCTAssertEqual(view.string, source)
+
+        // A decode from folder a that finishes after the switch is not cached: no span uses it.
+        let stale = try key(a.appendingPathComponent("p6.png"))
+        objects.finish([stale: bitmapImage(4)])
+        XCTAssertNil(objects.cache[stale], "old folder's late decode dropped")
+        XCTAssertEqual(objects.cachedImageCount, 3)
+
+        let (reopened, fresh) = make(source, folder: b) // reopening: a new presenter, its own budget
+        try await waitForRenders(fresh)
+        XCTAssertEqual(objectCount(reopened), 6, "default budget fits them all")
+    }
+
     func testImageEditedOnDiskOrAddedLaterReloads() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

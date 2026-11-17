@@ -59,7 +59,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     /// The caret's lines, whose objects show their source. Defaults to the caret line while the view has focus.
     public var revealRange: () -> NSRange? = { nil }
 
-    private var cache: [String: MarkdownRendered?] = [:]
+    private(set) var cache: [String: MarkdownRendered?] = [:]
     private var queuedImages: [String: URL] = [:]
     private var flushScheduled = false
     private var inFlight = Set<String>()
@@ -83,7 +83,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
               delegate.responds(to: #selector(NSLayoutManagerDelegate.layoutManager(_:boundingBoxForControlGlyphAt:for:proposedLineFragment:glyphPosition:characterIndex:)))
         else { return nil }
         if let existing = storage.delegate as? MarkdownObjects {
-            if existing.folder != folder { existing.folder = folder; existing.cache = [:]; existing.reprocess(nil) }
+            if existing.folder != folder { existing.folder = folder; existing.cache = [:]; existing.latestKey = [:]; existing.reprocess(nil) }
             return existing
         }
         let objects = MarkdownObjects()
@@ -170,6 +170,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         for span in MarkdownSyntax.images(in: text, range: target) where free(span.range) {
             guard let url = MarkdownSyntax.resolveImage(span.source, in: folder), let key = MarkdownSyntax.imageKey(url) else { continue }
             storage.addAttribute(.markdownObjectSource, value: key, range: span.range)
+            request(key)
             guard !revealed(span.range) else { continue }
             if let cached = cache[key] {
                 if let cached { place(cached, span.range, in: storage) }
@@ -283,32 +284,94 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.flush() }
     }
 
+    /// Images decoded per batch. One batch is in flight at a time and the next starts when it finishes, so a
+    /// document with many images holds at most this many decodes before the cache budget sees them.
+    static let decodeBatch = 4
+    /// Most decodes ever in flight at once (tests).
+    private(set) var peakInFlight = 0
+
     func flush() {
         flushScheduled = false
-        if !queuedImages.isEmpty {
-            let images = queuedImages; queuedImages = [:]
-            let maxPixels = Int(2 * max(availableWidth, 800))
-            inFlight.formUnion(images.keys)
-            Task.detached(priority: .userInitiated) {
-                var results: [String: MarkdownRendered?] = [:]
-                for (key, url) in images { results[key] = MarkdownSyntax.loadImage(url, maxPixels: maxPixels) }
-                let done = results
-                await MainActor.run { [weak self] in self?.finish(done) }
+        guard !queuedImages.isEmpty, inFlight.isEmpty else { return } // a batch in flight schedules the next when done
+        let images = Dictionary(uniqueKeysWithValues: queuedImages.prefix(Self.decodeBatch).map { ($0.key, $0.value) })
+        for key in images.keys { queuedImages[key] = nil }
+        let maxPixels = Int(2 * max(availableWidth, 800))
+        inFlight.formUnion(images.keys)
+        peakInFlight = max(peakInFlight, inFlight.count)
+        Task.detached(priority: .userInitiated) {
+            var results: [String: MarkdownRendered?] = [:]
+            for (key, url) in images { results[key] = autoreleasepool { MarkdownSyntax.loadImage(url, maxPixels: maxPixels) } }
+            let done = results
+            await MainActor.run { [weak self] in
+                self?.finish(done)
+                if self?.queuedImages.isEmpty == false { self?.scheduleFlush() }
             }
         }
     }
 
     /// Stores results (nil = can't render: stays source) and re-presents the spans that use them.
     func finish(_ results: [String: MarkdownRendered?]) {
-        for (key, value) in results { cache[key] = .some(value); inFlight.remove(key) }
-        if cache.count > 5000 { cache = results } // ponytail: crude bound; LRU if documents with >5k objects show up
+        for key in results.keys { inFlight.remove(key) }
         guard let storage = view?.textStorage else { return }
+        // Only results a span still uses: drops an older save's decode that finishes after the newer one was
+        // requested (it must not evict the new one), and a batch from before a folder change or an edit.
+        let used = Self.sourceKeys(storage)
+        var fresh: [String: MarkdownRendered?] = [:]
+        for (key, value) in results where used.contains(key) {
+            if let latest = latestKey[Self.imagePath(ofKey: key)], latest != key { continue }
+            fresh[key] = value
+        }
+        for (key, value) in fresh {
+            guard let value else { cache[key] = .some(nil); continue }
+            if decodedBytes + Self.bytes(value) > decodedByteLimit {
+                // Over budget: first drop decodes no span uses any more (removed or re-saved images).
+                for (k, v) in cache where v != nil && !used.contains(k) { cache[k] = nil }
+            }
+            // Past the budget an image stays its Markdown source and is not retried (no re-decode loop) until the
+            // document is reopened or its folder changes, which start a fresh budget.
+            // shortcut: first ~256 MB of decodes shown, the rest stay source; switch to visible-range loading (decode
+            // on screen, drop off screen) when documents with more column-width images than that are common.
+            cache[key] = decodedBytes + Self.bytes(value) <= decodedByteLimit ? .some(value) : .some(nil)
+        }
         var ranges: [NSRange] = []
         storage.enumerateAttribute(.markdownObjectSource, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
-            if let key = value as? String, results[key] != nil { ranges.append(range) }
+            if let key = value as? String, fresh[key] != nil { ranges.append(range) }
         }
         if !ranges.isEmpty { reprocess(ranges) }
     }
+
+    /// Decoded images kept at most (~32 column-width photos); the cache holds every image a span shows.
+    var decodedByteLimit = 256 << 20
+    private var decodedBytes: Int { cache.values.reduce(0) { $0 + ($1.map(Self.bytes) ?? 0) } }
+    static func bytes(_ rendered: MarkdownRendered) -> Int {
+        rendered.image.representations.reduce(0) { $0 + (($1 as? NSBitmapImageRep).map { $0.bytesPerRow * $0.pixelsHigh } ?? 0) }
+    }
+    private static func sourceKeys(_ storage: NSTextStorage) -> Set<String> {
+        var keys = Set<String>()
+        storage.enumerateAttribute(.markdownObjectSource, in: NSRange(location: 0, length: storage.length)) { value, _, _ in
+            if let key = value as? String { keys.insert(key) }
+        }
+        return keys
+    }
+
+    /// The newest key requested per image path. A key is path|mtime|size, so a re-saved image gets a new one;
+    /// its old decode (~8 MB) is dropped instead of kept beside the new one.
+    private var latestKey: [String: String] = [:]
+
+    func request(_ key: String) {
+        let path = Self.imagePath(ofKey: key)
+        guard latestKey[path] != key else { return }
+        if let old = latestKey[path] { cache[old] = nil }
+        latestKey[path] = key
+    }
+
+    /// `imageKey`'s path part: everything before its last two `|` fields (a path may itself contain `|`).
+    static func imagePath(ofKey key: String) -> String {
+        key.split(separator: "|", omittingEmptySubsequences: false).dropLast(2).joined(separator: "|")
+    }
+
+    /// Decoded images held (tests).
+    var cachedImageCount: Int { cache.values.filter { $0 != nil }.count }
 
     /// Test hook: a result as if a render had finished.
     public func prime(_ key: String, _ rendered: MarkdownRendered?) { cache[key] = .some(rendered) }
