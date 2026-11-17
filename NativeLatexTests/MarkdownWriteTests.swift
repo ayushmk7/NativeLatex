@@ -1193,7 +1193,7 @@ final class MarkdownWriteTests: XCTestCase {
 
         // Source, accessibility and copy are the Markdown; the caret steps over a marker; Delete removes it whole.
         XCTAssertEqual(pair.doc, text)
-        XCTAssertEqual(view.accessibilityValue() as? String, text)
+        XCTAssertEqual(view.accessibilityValue(), text)
         let board = NSPasteboard.withUniqueName() // never the user's clipboard
         defer { board.releaseGlobally() }
         view.setSelectedRange((text as NSString).range(of: "- [ ] todo"))
