@@ -11,13 +11,13 @@ function sync() {
 toggle.addEventListener("change", () => {
   const next = toggle.checked ? "dark" : "light";
   document.documentElement.dataset.theme = next;
-  try { localStorage.setItem("libreleaf-theme", next); } catch {}
+  try { localStorage.setItem("libreweave-theme", next); } catch {}
   sync();
 });
 
 // Follow live OS appearance changes until the visitor picks a theme themselves.
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
-  try { if (localStorage.getItem("libreleaf-theme")) return; } catch {}
+  try { if (localStorage.getItem("libreweave-theme")) return; } catch {}
   document.documentElement.dataset.theme = e.matches ? "dark" : "light";
   sync();
 });
