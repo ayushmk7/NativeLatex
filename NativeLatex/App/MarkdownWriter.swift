@@ -207,19 +207,102 @@ private extension NSRange {
 
 /// Markdown formatting and list continuation, applied through `insertText(_:replacementRange:)` so each
 /// command is one native undo step and goes through the normal text-change path. Works in either pane.
+/// Every command toggles: run it again on the same text and the source is back to what it was.
 @MainActor
 enum MarkdownFormat {
-    static func wrap(_ view: NSTextView, marker: String) {
-        let range = view.selectedRange()
-        let selected = (view.string as NSString).substring(with: range)
-        view.insertText(marker + selected + marker, replacementRange: range)
-        let inner = NSRange(location: range.location + (marker as NSString).length, length: (selected as NSString).length)
-        view.setSelectedRange(inner)
+    /// One formatting command, shared by the Format menu and the formatting bar.
+    @MainActor struct Command: Identifiable {
+        enum Group { case inline, block }
+        let id: String
+        let title: String
+        let shortcut: KeyboardShortcut?
+        let symbol: String
+        let group: Group
+        private let action: @MainActor (NSTextView) -> Void
+
+        init(_ id: String, _ title: String, _ shortcut: KeyboardShortcut?, _ symbol: String, _ group: Group, _ action: @escaping @MainActor (NSTextView) -> Void) {
+            self.id = id; self.title = title; self.shortcut = shortcut; self.symbol = symbol; self.group = group; self.action = action
+        }
+
+        func perform(on view: NSTextView) { action(view) }
+
+        /// Menu and bar order. ⌥⌘1–3, ⌥⌘E and ⌥⌘P are the View menu's, so block styles use ⌃⌘ and ⇧⌘.
+        static let all: [Command] = [
+            Command("bold", "Bold", KeyboardShortcut("b"), "bold", .inline) { wrap($0, marker: "**") },
+            Command("italic", "Italic", KeyboardShortcut("i"), "italic", .inline) { wrap($0, marker: "*") },
+            Command("strikethrough", "Strikethrough", KeyboardShortcut("x", modifiers: [.command, .shift]), "strikethrough", .inline) { wrap($0, marker: "~~") },
+            Command("code", "Inline Code", nil, "chevron.left.forwardslash.chevron.right", .inline) { wrap($0, marker: "`") },
+            Command("link", "Link", KeyboardShortcut("k"), "link", .inline) { link($0) },
+            Command("body", "Body", KeyboardShortcut("0", modifiers: [.command, .control]), "text.alignleft", .block) { setBlock($0, .body) },
+            Command("heading1", "Heading 1", KeyboardShortcut("1", modifiers: [.command, .control]), "textformat.size.larger", .block) { setBlock($0, .heading(1)) },
+            Command("heading2", "Heading 2", KeyboardShortcut("2", modifiers: [.command, .control]), "textformat.size", .block) { setBlock($0, .heading(2)) },
+            Command("heading3", "Heading 3", KeyboardShortcut("3", modifiers: [.command, .control]), "textformat.size.smaller", .block) { setBlock($0, .heading(3)) },
+            Command("bulleted", "Bulleted List", KeyboardShortcut("8", modifiers: [.command, .shift]), "list.bullet", .block) { setBlock($0, .bulleted) },
+            Command("numbered", "Numbered List", KeyboardShortcut("7", modifiers: [.command, .shift]), "list.number", .block) { setBlock($0, .numbered) },
+            Command("checklist", "Checklist", KeyboardShortcut("9", modifiers: [.command, .shift]), "checklist", .block) { setBlock($0, .checklist) },
+            Command("quote", "Quote", nil, "text.quote", .block) { togglePrefix($0, "> ") },
+            Command("codeBlock", "Code Block", nil, "curlybraces", .block) { codeBlock($0) },
+        ]
     }
 
+    /// Toggles inline `marker` (`**`, `*`, `~~` or `` ` ``) on the selection, or on the word at the caret.
+    /// Already formatted (markers just inside or just outside the selection): removes them. Otherwise wraps
+    /// the selection without its outer spaces, since `**word **` isn't bold in Markdown.
+    static func wrap(_ view: NSTextView, marker: String) {
+        let text = view.string as NSString
+        var range = view.selectedRange()
+        if range.length == 0 {
+            let word = view.selectionRange(forProposedRange: range, granularity: .selectByWord)
+            if word.length > 0, !text.substring(with: word).contains(where: \.isWhitespace), !text.substring(with: word).contains("\n") { range = word }
+        }
+        while range.length > 0, text.substring(with: NSRange(location: range.location, length: 1)).first!.isWhitespace { range.location += 1; range.length -= 1 }
+        while range.length > 0, text.substring(with: NSRange(location: NSMaxRange(range) - 1, length: 1)).first!.isWhitespace { range.length -= 1 }
+        let n = (marker as NSString).length
+        let chars: Set<Character> = marker.first == "*" ? ["*", "_"] : [marker.first!]
+        /// Whether a run of `count` marker characters carries this marker: `***` is both bold and italic.
+        func carries(_ count: Int) -> Bool {
+            switch marker {
+            case "**": count == 2 || count == 3
+            case "*": count == 1 || count == 3
+            default: count == n
+            }
+        }
+        func run(_ s: String) -> Int { guard let c = s.first, chars.contains(c) else { return 0 }; return s.prefix { $0 == c }.count }
+        let selected = text.substring(with: range)
+        // Markers inside the selection (it was selected across the hidden markup).
+        let inner = run(selected), innerEnd = run(String(selected.reversed()))
+        if range.length > 2 * n, carries(min(inner, innerEnd)), selected.first == selected.last {
+            let kept = (selected as NSString).substring(with: NSRange(location: n, length: range.length - 2 * n))
+            view.insertText(kept, replacementRange: range)
+            view.setSelectedRange(NSRange(location: range.location, length: (kept as NSString).length))
+            return
+        }
+        // Markers just outside the selection.
+        let before = String(text.substring(to: range.location).reversed()), after = text.substring(from: NSMaxRange(range))
+        if run(before) > 0, before.first == after.first, carries(min(run(before), run(after))) {
+            view.insertText(selected, replacementRange: NSRange(location: range.location - n, length: range.length + 2 * n))
+            view.setSelectedRange(NSRange(location: range.location - n, length: range.length))
+            return
+        }
+        view.insertText(marker + selected + marker, replacementRange: range)
+        view.setSelectedRange(NSRange(location: range.location + n, length: range.length))
+    }
+
+    private static let inlineLink = try! NSRegularExpression(pattern: #"(?<!!)\[([^\]\n]*)\]\([^)\n]*\)"#)
+
+    /// Wraps the selection as `[text](https://)` with the URL selected; with the selection anywhere in a
+    /// link (text or URL), unlinks it, keeping the text.
     static func link(_ view: NSTextView) {
+        let text = view.string as NSString
         let range = view.selectedRange()
-        let selected = (view.string as NSString).substring(with: range)
+        let line = text.lineRange(for: range)
+        if let m = inlineLink.matches(in: view.string, range: line).first(where: { range.location >= $0.range.location && NSMaxRange(range) <= NSMaxRange($0.range) }) {
+            let label = text.substring(with: m.range(at: 1))
+            view.insertText(label, replacementRange: m.range)
+            view.setSelectedRange(NSRange(location: m.range.location, length: (label as NSString).length))
+            return
+        }
+        let selected = text.substring(with: range)
         let label = selected.isEmpty ? "link" : selected
         view.insertText("[\(label)](https://)", replacementRange: range)
         view.setSelectedRange(NSRange(location: range.location + (label as NSString).length + 3, length: 8))
@@ -234,6 +317,39 @@ enum MarkdownFormat {
         }
     }
 
+    enum Block: Equatable { case body, heading(Int), bulleted, numbered, checklist }
+
+    /// Heading, list or task marker after a line's indentation (and any quote markers).
+    private static let blockPrefix = #/^([ \t]*(?:>[ \t]?)*)(#{1,6}[ \t]+|(?:[-*+]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]+)?)?/#
+
+    static func block(of line: String) -> Block {
+        guard let m = line.prefixMatch(of: blockPrefix), let prefix = m.output.2 else { return .body }
+        if prefix.first == "#" { return .heading(prefix.prefix { $0 == "#" }.count) }
+        if prefix.contains("[") { return .checklist }
+        return prefix.first!.isNumber ? .numbered : .bulleted
+    }
+
+    /// Sets the selected lines' block style, replacing any heading or list marker (indentation and quote
+    /// markers stay). If every non-empty line already has `style`, they become body text instead.
+    static func setBlock(_ view: NSTextView, _ style: Block) {
+        let lines = selectedLines(view).text.components(separatedBy: "\n")
+        let target = lines.filter { !$0.isEmpty }.allSatisfy { block(of: $0) == style } ? .body : style
+        var number = 0
+        replaceLinePrefixes(view) { line in
+            guard !line.isEmpty, let m = line.prefixMatch(of: blockPrefix) else { return line }
+            let content = line[m.range.upperBound...]
+            let marker: String
+            switch target {
+            case .body: marker = ""
+            case .heading(let level): marker = String(repeating: "#", count: level) + " "
+            case .bulleted: marker = "- "
+            case .numbered: number += 1; marker = "\(number). "
+            case .checklist: marker = "- [ ] "
+            }
+            return m.output.1 + marker + content
+        }
+    }
+
     /// Adds `prefix` to every selected line, or removes it if all already have it.
     static func togglePrefix(_ view: NSTextView, _ prefix: String) {
         let lines = selectedLines(view).text.components(separatedBy: "\n")
@@ -242,6 +358,26 @@ enum MarkdownFormat {
             if remove { return line.hasPrefix(prefix) ? String(line.dropFirst(prefix.count)) : line }
             return line.isEmpty ? line : prefix + line
         }
+    }
+
+    /// Fences the selected lines as a code block; inside a fenced block, removes its fence lines.
+    static func codeBlock(_ view: NSTextView) {
+        let text = view.string as NSString
+        let caret = view.selectedRange()
+        if let block = MarkdownStyler.fences(text).first(where: { NSLocationInRange(caret.location, $0.range) || caret.location == NSMaxRange($0.range) }) {
+            let whole = text.lineRange(for: block.range)
+            let open = text.lineRange(for: block.markers[0])
+            let bodyEnd = block.markers.count > 1 ? text.lineRange(for: block.markers[1]).location : NSMaxRange(whole)
+            var code = text.substring(with: NSRange(location: NSMaxRange(open), length: max(0, bodyEnd - NSMaxRange(open))))
+            if block.markers.count > 1, text.substring(with: whole).hasSuffix("\n"), !code.hasSuffix("\n") { code += "\n" }
+            if !text.substring(with: whole).hasSuffix("\n"), code.hasSuffix("\n") { code.removeLast() }
+            view.insertText(code, replacementRange: whole)
+            view.setSelectedRange(NSRange(location: whole.location, length: (code as NSString).length))
+            return
+        }
+        let (range, lines) = selectedLines(view)
+        view.insertText("```\n" + lines + "\n```", replacementRange: range)
+        view.setSelectedRange(NSRange(location: range.location + 4, length: (lines as NSString).length))
     }
 
     /// Return in a list or quote continues it; Return on an empty item ends it. Returns false otherwise.
@@ -388,8 +524,9 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
 
     override func textViewDidChangeSelection(_ notification: Notification) {
         super.textViewDidChangeSelection(notification)
-        // Mid-sync the storage is still being edited; didSync restyles once it settles.
-        guard !isUpdating else { return }
+        // Mid-sync or mid-edit the storage is still changing and the cached fences are stale (a shrinking
+        // command edit used to throw NSRangeException here); didSync / textDidChange restyle once it settles.
+        guard !isUpdating, edited == nil else { return }
         let event = NSApp.currentEvent?.type
         guard event != .leftMouseDown, event != .leftMouseDragged else { return } // wait for mouse-up
         updateReveal()
@@ -485,26 +622,19 @@ struct MarkdownFormatBar: View {
 
     var body: some View {
         HStack(spacing: Theme.s1) {
-            button("Heading", "textformat.size", help: "Cycle heading level") { MarkdownFormat.heading($0) }
-            button("Bold", "bold", help: "Bold (⌘B)") { MarkdownFormat.wrap($0, marker: "**") }
-            button("Italic", "italic", help: "Italic (⌘I)") { MarkdownFormat.wrap($0, marker: "*") }
-            button("Link", "link", help: "Link (⌘K)") { MarkdownFormat.link($0) }
-            button("Bulleted List", "list.bullet", help: "Bulleted list") { MarkdownFormat.togglePrefix($0, "- ") }
-            button("Quote", "text.quote", help: "Block quote") { MarkdownFormat.togglePrefix($0, "> ") }
+            ForEach(MarkdownFormat.Command.all) { command in
+                if command.id == "body" { Divider().frame(height: 16) }
+                Button { if let view = target() { command.perform(on: view); view.window?.makeFirstResponder(view) } } label: {
+                    Label(command.title, systemImage: command.symbol)
+                }
+                .help(command.title)
+                .accessibilityLabel(command.title)
+            }
             Spacer()
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
         .padding(.horizontal, Theme.s2)
         .padding(.vertical, Theme.s1)
-    }
-
-    /// Shortcuts live in the Format menu (so they work in either pane); the bar is for the pointer.
-    private func button(_ title: String, _ symbol: String, help: String, action: @escaping (NSTextView) -> Void) -> some View {
-        Button { if let view = target() { action(view); view.window?.makeFirstResponder(view) } } label: {
-            Label(title, systemImage: symbol)
-        }
-        .help(help)
-        .accessibilityLabel(title)
     }
 }

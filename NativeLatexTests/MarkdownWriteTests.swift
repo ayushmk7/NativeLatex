@@ -652,6 +652,49 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertEqual(pair.doc, text, "styling never edits the source")
     }
 
+    /// Every formatting command toggles: once formats, twice restores the exact source. Bold and italic
+    /// compose (`***`), work on the word at the caret, keep outer spaces outside the markers, and undo is one step.
+    func testFormatCommandsAreReversibleAndComposable() {
+        func run(_ text: String, select: NSRange, _ ids: [String]) -> (String, NSTextView) {
+            let handle = WritingHandle()
+            _ = handle.scrollView(text: text, label: "Write")
+            let view = handle.view!
+            view.setSelectedRange(select)
+            for id in ids { MarkdownFormat.Command.all.first { $0.id == id }!.perform(on: view) }
+            return (view.string, view)
+        }
+        let text = "Say hello world.\n"
+        let hello = (text as NSString).range(of: "hello")
+        XCTAssertEqual(run(text, select: hello, ["body"]).0, text, "body text is already body")
+        for id in ["bold", "italic", "strikethrough", "code", "link", "heading1", "heading2", "heading3",
+                   "bulleted", "numbered", "checklist", "quote", "codeBlock"] {
+            XCTAssertNotEqual(run(text, select: hello, [id]).0, text, "\(id) formats")
+            XCTAssertEqual(run(text, select: hello, [id, id]).0, text, "\(id) twice restores")
+        }
+        XCTAssertEqual(run(text, select: hello, ["bold"]).0, "Say **hello** world.\n")
+        XCTAssertEqual(run(text, select: hello, ["bold", "italic"]).0, "Say ***hello*** world.\n")
+        XCTAssertEqual(run(text, select: hello, ["bold", "italic", "bold"]).0, "Say *hello* world.\n")
+        XCTAssertEqual(run(text, select: NSRange(location: hello.location + 2, length: 0), ["italic"]).0, "Say *hello* world.\n", "word at caret")
+        XCTAssertEqual(run(text, select: NSRange(location: hello.location, length: 6), ["bold"]).0, "Say **hello** world.\n", "outer space stays outside")
+        XCTAssertEqual(run("Say **hello** world.", select: NSRange(location: 4, length: 9), ["bold"]).0, "Say hello world.", "selected across the markers")
+        XCTAssertEqual(run("Say __hello__ world.", select: NSRange(location: 6, length: 5), ["bold"]).0, "Say hello world.", "underscore form")
+        XCTAssertEqual(run("a\nb\n", select: NSRange(location: 0, length: 3), ["numbered"]).0, "1. a\n2. b\n")
+        XCTAssertEqual(run("- a\n- [x] b", select: NSRange(location: 0, length: 5), ["heading2"]).0, "## a\n## b", "replaces list markers")
+        XCTAssertEqual(run("> - a", select: NSRange(location: 4, length: 0), ["checklist"]).0, "> - [ ] a", "keeps quote markers")
+        XCTAssertEqual(run("x\n```\ncode\n```\ny", select: NSRange(location: 6, length: 0), ["codeBlock"]).0, "x\ncode\ny", "unfences")
+        XCTAssertEqual(run("[a](u) b", select: NSRange(location: 4, length: 0), ["link"]).0, "a b", "unlink from the URL")
+        let pair = Pair(text)
+        defer { pair.window.close() }
+        pair.window.makeFirstResponder(pair.wv)
+        pair.wv.setSelectedRange(hello)
+        MarkdownFormat.Command.all.first { $0.id == "bold" }!.perform(on: pair.wv)
+        pair.pump()
+        XCTAssertEqual(pair.doc, "Say **hello** world.\n")
+        pair.undo()
+        XCTAssertEqual(pair.doc, text, "one undo step")
+        XCTAssertEqual(Set(MarkdownFormat.Command.all.map(\.id)).count, MarkdownFormat.Command.all.count)
+    }
+
     /// Moving the caret onto a hidden fence line reveals it without moving the text below.
     func testRevealingAFenceLineDoesNotShiftTextBelow() {
         let pair = Pair("Intro.\n\n```\ncode\n```\n\nAfter.\n")
