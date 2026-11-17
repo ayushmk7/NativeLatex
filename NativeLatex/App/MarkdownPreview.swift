@@ -129,7 +129,7 @@ enum MarkdownRenderer {
     code { padding:.1em .3em; } pre { padding:12px; overflow:auto; } pre code { padding:0; background:none; }
     blockquote { margin:1em 0; padding:0 1em; color:var(--muted); border-left:3px solid var(--accent); }
     table { border-collapse:collapse; margin:1em 0; display:block; overflow:auto; }
-    th, td { border:1px solid var(--line); padding:6px 12px; } th { background:var(--code); }
+    th, td { border:1px solid var(--line); padding:6px 12px; } th { background:var(--code); text-align:left; }
     img { max-width:100%; } figure { margin:1em 0; } figcaption { color:var(--muted); font-size:.9em; }
     math[display="block"] { display:block; margin:1em 0; overflow-x:auto; } math { font-size:1.1em; }
     hr { border:0; border-top:1px solid var(--line); } .footnotes { font-size:.9em; color:var(--muted); }
