@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="200 200 640 600" width="640" height="600">
+  <title>LibreLeaf mark, one color (white)</title>
+  <mask id="m"><rect x="0" y="0" width="1024" height="1024" fill="#fff"/>
+    <path d="M452 262C368 262 345 292 345 352V440C345 490 320 512 262 512C320 512 345 534 345 584V672C345 732 368 762 452 762" fill="none" stroke="#000" stroke-width="100" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="496" y="508" width="238" height="48" rx="24" fill="#000"/>
+    <rect x="496" y="604" width="168" height="48" rx="24" fill="#000"/>
+    <path d="M690 230V340H800" fill="none" stroke="#000" stroke-width="20"/>
+  </mask>
+  <path d="M430 230H690L800 340V794H430Z" fill="#FFFFFF" mask="url(#m)"/>
+  <path d="M452 262C368 262 345 292 345 352V440C345 490 320 512 262 512C320 512 345 534 345 584V672C345 732 368 762 452 762" fill="none" stroke="#FFFFFF" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
