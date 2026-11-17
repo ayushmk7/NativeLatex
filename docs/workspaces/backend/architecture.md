@@ -1,0 +1,51 @@
+# Local app architecture
+
+## Decision
+
+Build a native macOS app in Swift. Use SwiftUI for windows, navigation, toolbars, settings, and commands; embed AppKit `NSTextView` for source editing and PDFKit `PDFView` for preview. Each **workspace is an ordinary folder** opened in its own window, with multiple source tabs inside it. Keep the user's `.tex`, `.bib`, images, and other project files in their original formats and locations. Store recent folders, chosen root document, engine, and window state in the app's Application Support directory. No server, database, Electron layer, account, or custom LaTeX renderer. Apple documents multiple independent `WindowGroup` windows, while `NSTextView` and PDFKit already supply the core native editor and PDF primitives. [WindowGroup](https://developer.apple.com/documentation/SwiftUI/WindowGroup), [NSTextView](https://developer.apple.com/documentation/appkit/nstextview), [PDFKit](https://developer.apple.com/documentation/pdfkit)
+
+The first release targets local macOS use and Developer ID distribution outside the Mac App Store. Enable hardened runtime and notarize release builds. App Sandbox is optional for that route; the first release should remain unsandboxed because it launches the user's TeX toolchain against ordinary project folders. Revisit sandboxing only with an end-to-end compile and file-access test, not an entitlement assumption. [Apple distribution guidance](https://developer.apple.com/documentation/Xcode/preparing-your-app-for-distribution), [Process sandbox behavior](https://developer.apple.com/documentation/foundation/process)
+
+## Responsibilities and state
+
+| Piece | Owns | Deliberately avoids |
+| --- | --- | --- |
+| Workspace window | Folder URL, file tree, tabs, root `.tex`, preview position, build status | Duplicating project files |
+| Source buffer | Original bytes/encoding, current text, undo state, dirty state, disk fingerprint | Rewriting on every keystroke |
+| Build coordinator | One active `latexmk` run per workspace, queued latest request, log, last successful PDF | A resident server or background daemon |
+| App state | Recent folders and per-folder UI choices in Application Support | Hidden project configuration files |
+
+The project folder is the source of truth. A workspace can have several `.tex` files; the user selects one **root document** to compile. Opening a source file never guesses or silently changes that root. Opening a folder that is already open focuses its existing window, so two windows cannot edit the same folder with separate buffers.
+
+Open `tex`, `bib`, `sty`, `cls`, and common text files as plain text; leave images and PDFs untouched. Preserve UTF-8 BOM and existing line endings when saving; reject unsupported encodings with a clear choice to convert rather than corrupting bytes. Save by coordinated write and atomic replacement. Before each save, compare the on-disk fingerprint against the version loaded; if another app changed it, offer reload, compare, or save as. A clean buffer reloads automatically. Perform file I/O off the main thread. Apple recommends file coordination for shared and file-provider files. [File access guidance](https://developer.apple.com/documentation/foundation/improving-performance-and-stability-when-accessing-the-file-system)
+
+Use one FSEvents stream per open folder to refresh the file tree and notice external edits; coalesce events and rescan affected paths, because an event is a hint rather than the new file contents. Ignore the app's generated build directory in the tree. File presenters or a version check remain necessary for open buffers: file-tree watching alone cannot protect a dirty editor from an outside write. [FSEvents guide](https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/FSEvents_ProgGuide/), [NSFilePresenter](https://developer.apple.com/documentation/foundation/nsfilepresenter)
+
+## Local compile pipeline
+
+At workspace open, detect `latexmk`, `pdflatex`, `xelatex`, `lualatex`, and `synctex` in `/Library/TeX/texbin`, then the app's inherited `PATH` and common Homebrew paths. Prefer a coherent tool directory and prepend it to the child process `PATH`, since a GUI-launched app may not inherit the user's interactive shell path. Show exact missing-tool guidance; do not download or install TeX silently. MacTeX explicitly identifies `/Library/TeX/texbin` as the location GUI apps should use. [MacTeX installation notes](https://tug.org/mactex/What_Is_Installed.pdf)
+
+On Build, save all dirty source buffers first; if any save fails or has a conflict, stop. Launch `latexmk` with Foundation `Process`, a selected root file, its parent as the working directory, `-norc`, `-interaction=nonstopmode`, `-file-line-error`, `-synctex=1`, `-no-shell-escape`, and one of `-pdf`, `-pdfxe`, or `-pdflua`. Pass arguments as an array, never through a user-constructed shell command. `latexmk` handles repeated TeX passes, citations, indexes, and input dependencies; its `-norc` option suppresses automatic project/user Perl configuration. The engine switch and `-outdir` options are documented by its maintainer. [latexmk manual](https://tug.ctan.org/support/latexmk/latexmk.pdf), [Process](https://developer.apple.com/documentation/foundation/process)
+
+Set `-outdir` to a unique, app-owned hidden directory **inside the root file's folder**, for example `.nativelatex/build/<root-id>`, so BibTeX and MakeIndex see an ordinary subdirectory. The latexmk manual warns that an output directory outside the document directory can cause these tools to fail. Never run a broad cleanup command over user files. Only remove a build directory that the app created and recorded as its own. A workspace may have a read-only folder; show the write error and offer a copy, rather than compiling into an unexpected place. [latexmk output-directory guidance](https://tug.ctan.org/support/latexmk/latexmk.pdf)
+
+Read stdout and stderr while the process runs, keep a bounded in-memory tail, and retain the complete log in the build directory. Show actionable file/line diagnostics where parsing is reliable and always expose the raw log. A build request replaces an older queued request; a completed older process cannot publish over a newer generation. Cancel by terminating the process and waiting for it to exit before the next run. Start with explicit Build; add debounced Build on Save only after conflict handling and cancellation are proven. On build failure, keep the last successful PDF visible with a stale-preview indicator. On success, load the new PDF into PDFKit and restore page, zoom, and scroll position.
+
+Compile is a trust boundary. LaTeX input, bibliography tools, and optional project recipes can execute or read local resources. Do not auto-build on folder open. Keep `-norc` and disabled shell escape in the default profile. If a document requires `minted`, a custom `.latexmkrc`, or shell escape, make that an explicit **trusted-project** action with a clear scope and persisted per-folder choice. This reduces risk; it does not make arbitrary TeX files a security sandbox.
+
+## Source ↔ PDF navigation
+
+Generate SyncTeX data during build and use the installed `synctex` CLI for forward and reverse lookup. Forward search maps source line/column to a PDF page and point; reverse search maps a PDF click back to a source file and line. Normalize PDFKit's bottom-left point coordinates to SyncTeX's top-left coordinates. Open the returned source file in the current workspace only after confirming it resolves to a file the user can access. Preserve the existing PDF selection if lookup returns no match. SyncTeX is specifically designed for input/output navigation. [SyncTeX manual](https://ftp.math.utah.edu/public_html/pub/texlive/Contents/live/texmf-dist/doc/man/man1/synctex.man1.pdf)
+
+## Build order and proof
+
+1. **Local shell:** window per folder, recent folders, file tree, source tabs, editor undo, save, conflict handling. Prove that two open workspaces and an external editor do not lose edits.
+2. **Compiler:** TeX tool discovery, explicit root selection, pdfLaTeX build, raw log, diagnostics, PDF preview, last-good output. Prove on one-file and multi-file fixtures with an image and bibliography, with missing TeX and read-only folder paths.
+3. **Power workflow:** XeLaTeX/LuaLaTeX selection, SyncTeX both directions, build cancellation, optional Build on Save. Prove nested-file line mapping, a failed compile followed by a successful one, and two workspaces building simultaneously.
+4. **Release:** keyboard and VoiceOver review, large-document responsiveness, crash recovery, signed/notarized local install, and a clean-machine run with no TeX installation.
+
+This Mac currently has `latexmk`, all three engines, `synctex`, and `pandoc` available, as well as `/Library/TeX/texbin`. Xcode 27.2 is installed at `/Applications/Xcode.app` and `xcodebuild -version` passes when `DEVELOPER_DIR` selects it. The user launch session has that variable set; system-wide `xcode-select` still points to Command Line Tools because changing it requires an administrator password. These checks establish local prerequisites; no app has been built yet.
+
+## Limits for the first release
+
+No bundled TeX distribution, proprietary document format, cloud synchronization, collaboration server, live WYSIWYG editing, or arbitrary build-recipe editor. Document conversion and external service integrations can sit at import/export boundaries without changing this project model.
