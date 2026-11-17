@@ -182,6 +182,8 @@ struct MarkdownWebView: NSViewRepresentable {
     let folder: URL?
     /// While true, the page takes keyboard focus once it is in a window (only into a focus gap); then cleared.
     var focus: Binding<Bool> = .constant(false)
+    /// False while Write covers the page: hidden (out of the key loop, never focused) but kept, with its scroll.
+    var visible = true
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -200,6 +202,7 @@ struct MarkdownWebView: NSViewRepresentable {
     }
 
     func updateNSView(_ view: WKWebView, context: Context) {
+        view.isHidden = !visible
         context.coordinator.show(html, folder: folder, in: view)
         context.coordinator.focus = focus
         context.coordinator.takeFocusIfRequested(view)
@@ -214,7 +217,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
         /// Focuses the page if asked and nothing else has focus; a page not yet in a window waits for `onWindow`.
         func takeFocusIfRequested(_ view: WKWebView) {
-            guard focus?.wrappedValue == true, let window = view.window else { return }
+            guard focus?.wrappedValue == true, !view.isHidden, let window = view.window else { return }
             if MarkdownPreview.hasFocusGap(window) { window.makeFirstResponder(view) }
             DispatchQueue.main.async { self.focus?.wrappedValue = false } // not during a view update
         }
@@ -261,9 +264,14 @@ struct MarkdownPreview: View {
     /// takes: the page on success, Try Again on failure. Cleared when handled. Never taken from a view that
     /// has focus (the window clears it if the user switches back to Write).
     var focusRequest: Binding<Bool> = .constant(false)
+    /// False while Write covers this view. It stays mounted, so the page, its scroll position and the last
+    /// result (page or failure) survive a Read → Write → Read switch; nothing renders while inactive.
+    var isActive = true
     /// Pandoc by default; tests substitute slow or failing renderers.
     var render: @Sendable (String) async throws -> String = { try await MarkdownRenderer.render($0) }
     @State private var html: String?
+    /// What `html`/`failure` show: an unchanged document is not rendered again (no spinner, no Pandoc run).
+    @State private var rendered: Key?
     @State private var failure: String?
     @State private var attempt = 0
     @State private var anchor = WindowAnchor()
@@ -279,11 +287,12 @@ struct MarkdownPreview: View {
     static let debounce: Duration = .milliseconds(250)
 
     private struct Key: Equatable { let text: String; let folder: URL?; let attempt: Int }
+    private struct Run: Equatable { let key: Key; let active: Bool }
 
     var body: some View {
         ZStack(alignment: .top) {
             if let html {
-                MarkdownWebView(html: html, folder: fileURL?.deletingLastPathComponent(), focus: focusRequest)
+                MarkdownWebView(html: html, folder: fileURL?.deletingLastPathComponent(), focus: focusRequest, visible: isActive)
             } else if failure == nil {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -317,18 +326,23 @@ struct MarkdownPreview: View {
             }
         }
         .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
-        // A new key cancels the previous task, which cancels its sleep or terminates its Pandoc run.
-        .task(id: Key(text: text, folder: fileURL?.deletingLastPathComponent(), attempt: attempt)) {
+        // A new key cancels the previous task, which cancels its sleep or terminates its Pandoc run. Inactive (under
+        // Write) nothing runs; becoming active renders only if the text, folder or attempt changed meanwhile.
+        .task(id: Run(key: Key(text: text, folder: fileURL?.deletingLastPathComponent(), attempt: attempt), active: isActive)) {
+            let key = Key(text: text, folder: fileURL?.deletingLastPathComponent(), attempt: attempt)
+            guard isActive, key != rendered else { return }
             if html != nil { try? await Task.sleep(for: Self.debounce) }
             guard !Task.isCancelled else { return }
             do {
-                let rendered = try await render(text)
+                let page = try await render(text)
                 guard !Task.isCancelled else { return }
-                html = rendered // the page takes a pending focus request once it is in the window
+                html = page // the page takes a pending focus request once it is in the window
                 failure = nil
+                rendered = key
             } catch is CancellationError {
             } catch {
                 failure = error.localizedDescription // last good preview stays visible underneath
+                rendered = key // Try Again (a new attempt) or an edit renders again; switching modes doesn't
                 if html == nil, focusRequest.wrappedValue {
                     // No page: Try Again takes the keys, unless something got focus meanwhile.
                     DispatchQueue.main.async {

@@ -97,8 +97,12 @@ final class MarkdownWriteTests: XCTestCase {
         return window.contentView.flatMap(find)
     }
 
+    /// The Read page on screen (Read stays mounted but hidden under Write, so hidden pages don't count).
     private func webView(in window: NSWindow) -> WKWebView? {
-        func find(_ v: NSView) -> WKWebView? { (v as? WKWebView) ?? v.subviews.lazy.compactMap(find).first }
+        func find(_ v: NSView) -> WKWebView? {
+            if let page = v as? WKWebView { return page.isHiddenOrHasHiddenAncestor ? nil : page }
+            return v.subviews.lazy.compactMap(find).first
+        }
         return window.contentView.flatMap(find)
     }
 
@@ -309,6 +313,7 @@ final class MarkdownWriteTests: XCTestCase {
         }
 
         await check(.both, write: false, "default")
+        let firstPage = await renderedPreview(in: window)
         // Write replaces the source in place: caret (and so scroll position) carries over both ways, and Write has focus.
         let writeAt = ("# Modes\n\nTe" as NSString).length
         source.setSelectedRange(NSRange(location: writeAt, length: 0))
@@ -320,6 +325,7 @@ final class MarkdownWriteTests: XCTestCase {
         try setWrite(false, in: window)
         XCTAssertEqual(source.selectedRange(), NSRange(location: 2, length: 3), "Write selection carried back to Source")
         XCTAssertIdentical(window.firstResponder, source, "Source focused after Read")
+        XCTAssertIdentical(webView(in: window), firstPage, "Read → Write → Read keeps the same rendered page (no re-render)")
         try setWrite(true, in: window); await check(.preview, write: true, "Both → Write")
         try setWrite(false, in: window); await check(.both, write: false, "Write → Read restores Both")
 
@@ -446,6 +452,86 @@ final class MarkdownWriteTests: XCTestCase {
         let reserved = ["1", "2", "3", "e", "p"].map { key(KeyboardShortcut(KeyEquivalent(Character($0)), modifiers: [.command, .option])) }
             + ["x", "c", "v", "z", "a", "s", "n", "o", "w", "f", "p"].map { key(KeyboardShortcut(KeyEquivalent(Character($0)))) }
         XCTAssertTrue(Set(keys).isDisjoint(with: reserved), "no clash with View ▸ panes or standard File/Edit keys")
+    }
+
+    /// Read stays mounted under Write: switching back with unchanged text shows the same page at the same scroll
+    /// position with no spinner and no new render; a changed text renders once on return; a failure stays put
+    /// (Try Again retries) and still takes focus when Read asks for it.
+    func testReadKeepsItsPageAcrossWriteSwitches() throws {
+        final class Counter: @unchecked Sendable { var runs = 0; var fail = false }
+        let counter = Counter()
+        let render: @Sendable (String) async throws -> String = { text in
+            counter.runs += 1
+            if counter.fail { throw MarkdownRenderer.Failure.missingPandoc }
+            return (0..<200).map { "<p>\(text) \($0)</p>" }.joined()
+        }
+        var request = false
+        let focus = Binding(get: { request }, set: { request = $0 })
+        let hosting = NSHostingView(rootView: MarkdownPreview(text: "one", fileURL: nil, focusRequest: focus, render: render))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting // never ordered in
+        defer { window.close() }
+        var hostingSwap = hosting
+        func show(_ text: String, active: Bool) {
+            hostingSwap.rootView = MarkdownPreview(text: text, fileURL: nil, focusRequest: focus, isActive: active, render: render)
+            settle(0.6) // past the debounce
+        }
+        func js(_ script: String) -> Any? {
+            var result: Any?, done = false
+            webView(in: window)?.evaluateJavaScript(script) { value, _ in result = value; done = true }
+            for _ in 0..<40 where !done { settle(0.05) }
+            return result
+        }
+        func spinner(_ v: NSView) -> Bool { (v is NSProgressIndicator && !v.isHiddenOrHasHiddenAncestor) || v.subviews.contains(where: spinner) }
+
+        settle(0.6)
+        let page = try XCTUnwrap(webView(in: window))
+        XCTAssertEqual(counter.runs, 1)
+        _ = js("window.scrollTo(0, 900); 0")
+        let scrolled = try XCTUnwrap(js("window.scrollY") as? Double)
+        XCTAssertGreaterThan(scrolled, 100)
+
+        for _ in 0..<3 {
+            show("one", active: false)
+            XCTAssertNil(webView(in: window), "hidden under Write")
+            show("one", active: true)
+            XCTAssertFalse(spinner(hostingSwap), "no spinner on return")
+        }
+        XCTAssertEqual(counter.runs, 1, "unchanged text: no new render")
+        XCTAssertIdentical(webView(in: window), page, "same page")
+        XCTAssertEqual(js("window.scrollY") as? Double, scrolled, "scroll position kept")
+
+        show("two", active: false)
+        XCTAssertEqual(counter.runs, 1, "nothing renders while Write covers Read")
+        show("two", active: true)
+        XCTAssertEqual(counter.runs, 2, "changed text renders once on return")
+        XCTAssertEqual((js("document.body.innerText") as? String)?.hasPrefix("two 0"), true, "page updated")
+        XCTAssertIdentical(webView(in: window), page, "updated in place")
+
+        // Read asks for focus on return: the kept page takes it.
+        show("two", active: false)
+        request = true
+        show("two", active: true)
+        XCTAssertTrue((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false, "kept page focused on return")
+        XCTAssertFalse(request)
+
+        // A failure with no page (e.g. no Pandoc) stays across switches (no rerun), and Try Again takes focus
+        // when Read asks. (With an earlier page, that page stays under the banner and takes focus instead.)
+        counter.fail = true
+        let failedHost = NSHostingView(rootView: MarkdownPreview(text: "three", fileURL: nil, focusRequest: focus, render: render))
+        window.contentView = failedHost
+        hostingSwap = failedHost
+        settle(0.6)
+        XCTAssertEqual(counter.runs, 3)
+        XCTAssertNil(webView(in: window), "failed: no page")
+        window.makeFirstResponder(nil)
+        show("three", active: false)
+        request = true
+        show("three", active: true)
+        XCTAssertEqual(counter.runs, 3, "failure not rerun by switching")
+        let responder = try XCTUnwrap(window.firstResponder as? NSView, "Try Again focused, not the bare window")
+        XCTAssertFalse(responder is WKWebView)
     }
 
     /// ⌥⌘P (View ▸ Toggle Preview) hides the preview, then brings it back beside the source, or alone when narrow.

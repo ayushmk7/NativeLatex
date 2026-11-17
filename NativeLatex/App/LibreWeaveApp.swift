@@ -263,14 +263,21 @@ struct EditorView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Read stays mounted under Write (hidden, not rendering), so switching back shows the same page at the
+    /// same scroll position with no spinner or Pandoc run unless the text changed.
     private var markdownPane: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            MarkdownPreview(text: document.text, fileURL: fileURL, focusRequest: $readFocus, isActive: !markdownWrite)
+                .opacity(markdownWrite ? 0 : 1)
+                .allowsHitTesting(!markdownWrite)
+                .accessibilityHidden(markdownWrite)
             if markdownWrite {
-                MarkdownFormatBar(target: formatTarget)
-                .background(Theme.surface)
-                HandleTextView(text: $document.text, handle: writer, label: "Write") { line = $0; column = $1 }
-            } else {
-                MarkdownPreview(text: document.text, fileURL: fileURL, focusRequest: $readFocus)
+                VStack(spacing: 0) {
+                    MarkdownFormatBar(target: formatTarget)
+                        .background(Theme.surface)
+                    HandleTextView(text: $document.text, handle: writer, label: "Write") { line = $0; column = $1 }
+                }
+                .background(Theme.background)
             }
         }
         .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
