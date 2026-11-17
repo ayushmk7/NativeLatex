@@ -155,8 +155,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
             !taken.intersects(integersIn: r.location..<NSMaxRange(r)) && !isCode(storage, r)
         }
         for span in MarkdownSyntax.images(in: text, range: target) where free(span.range) {
-            guard let url = MarkdownSyntax.resolveImage(span.source, in: folder) else { continue }
-            let key = "G:" + url.path
+            guard let url = MarkdownSyntax.resolveImage(span.source, in: folder), let key = MarkdownSyntax.imageKey(url) else { continue }
             storage.addAttribute(.markdownObjectSource, value: key, range: span.range)
             guard !revealed(span.range) else { continue }
             if let cached = cache[key] {

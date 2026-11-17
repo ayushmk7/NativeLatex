@@ -216,6 +216,64 @@ final class MarkdownObjectsTests: XCTestCase {
         XCTAssertTrue(hit == at || hit == at + 1, "hit \(hit) not at the image span \(at)")
     }
 
+    func testImageDimensionsAreCappedBeforeDecoding() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let small = folder.appendingPathComponent("s.png")
+        try writePNG(small, width: 8, height: 8)
+        XCTAssertNotNil(MarkdownSyntax.loadImage(small, maxPixels: 100, maxSourcePixels: 64))
+        XCTAssertNil(MarkdownSyntax.loadImage(small, maxPixels: 100, maxSourcePixels: 63))
+        // A 65-byte PNG whose header declares 11000 x 10000 (110 MP): refused (cap or ImageIO), never decoded; the cap itself is proven with maxSourcePixels above.
+        let bomb = folder.appendingPathComponent("bomb.png")
+        try Self.pngHeader(width: 11000, height: 10000).write(to: bomb)
+        XCTAssertNotNil(MarkdownSyntax.resolveImage("bomb.png", in: folder))
+        XCTAssertNil(MarkdownSyntax.loadImage(bomb, maxPixels: 1600))
+        XCTAssertEqual(MarkdownSyntax.maxSourcePixels, 100_000_000)
+    }
+
+    func testImageEditedOnDiskOrAddedLaterReloads() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("p.png")
+        try writePNG(file, width: 8, height: 8)
+        let source = "![p](p.png)\n\n![later](later.png)\n"
+        let (view, objects) = make(source, folder: folder)
+        try await waitForRenders(objects)
+        func width(_ s: String) -> CGFloat? {
+            guard case let .image(_, size)? = box(view, at: (source as NSString).range(of: s).location)?.content else { return nil }
+            return size.width
+        }
+        XCTAssertEqual(width("![p]"), 8)
+        XCTAssertNil(width("![later]"), "missing file stays source")
+        // Replaced on disk (new size and time) and the missing one created; the next restyle picks both up.
+        try writePNG(file, width: 16, height: 8)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: file.path)
+        try writePNG(folder.appendingPathComponent("later.png"), width: 4, height: 4)
+        restyle(view, nil)
+        try await waitForRenders(objects)
+        XCTAssertEqual(width("![p]"), 16)
+        XCTAssertEqual(width("![later]"), 4)
+        XCTAssertEqual(view.string, source)
+    }
+
+    /// PNG signature, IHDR (8-bit RGBA), an empty IDAT and IEND.
+    static func pngHeader(width: UInt32, height: UInt32) -> Data {
+        func crc(_ bytes: [UInt8]) -> UInt32 {
+            var c: UInt32 = 0xFFFF_FFFF
+            for b in bytes { c ^= UInt32(b); for _ in 0..<8 { c = c & 1 == 1 ? 0xEDB8_8320 ^ (c >> 1) : c >> 1 } }
+            return ~c
+        }
+        func be(_ v: UInt32) -> [UInt8] { [UInt8(v >> 24), UInt8(v >> 16 & 0xFF), UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)] }
+        func chunk(_ type: String, _ body: [UInt8]) -> [UInt8] {
+            let typed = Array(type.utf8) + body
+            return be(UInt32(body.count)) + typed + be(crc(typed))
+        }
+        let ihdr = be(width) + be(height) + [8, 6, 0, 0, 0]
+        return Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] + chunk("IHDR", ihdr) + chunk("IDAT", [0x78, 0x9C, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01]) + chunk("IEND", []))
+    }
+
     // MARK: Math
 
     /// Write never runs TeX (a filter bypass let a formula read a private file): math stays source. A fake
@@ -267,7 +325,7 @@ final class MarkdownObjectsTests: XCTestCase {
         try writePNG(folder.appendingPathComponent("p.png"), width: 8, height: 8)
         let source = "first ![p](p.png) line\nsecond line\n"
         let (view, objects) = make(source, folder: folder)
-        objects.prime("G:" + MarkdownSyntax.resolveImage("p.png", in: folder)!.path, fakeImage(NSSize(width: 24, height: 14)))
+        objects.prime(MarkdownSyntax.imageKey(MarkdownSyntax.resolveImage("p.png", in: folder)!)!, fakeImage(NSSize(width: 24, height: 14)))
         objects.revealRange = { nil }
         objects.reprocess(nil)
         let span = (source as NSString).range(of: "![p](p.png)")

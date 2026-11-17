@@ -140,11 +140,22 @@ public enum MarkdownSyntax {
     }
 
     /// Decodes a downsampled copy (at most `maxPixels` on the long side); natural size is the pixel size in points, like Read.
-    public static func loadImage(_ url: URL, maxPixels: Int) -> MarkdownRendered? {
+    /// Largest source image decoded, in pixels (~100 MP): the header is read first, so a small file declaring
+    /// huge dimensions is refused before any decode.
+    public static let maxSourcePixels = 100_000_000
+
+    /// Cache key for a resolved image: path, modification time and size, so an edit on disk reloads it.
+    public static func imageKey(_ url: URL) -> String? {
+        guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+              let date = values.contentModificationDate, let size = values.fileSize else { return nil }
+        return "G:\(url.path)|\(date.timeIntervalSinceReferenceDate)|\(size)"
+    }
+
+    public static func loadImage(_ url: URL, maxPixels: Int, maxSourcePixels: Int = maxSourcePixels) -> MarkdownRendered? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               var w = props[kCGImagePropertyPixelWidth] as? Int, var h = props[kCGImagePropertyPixelHeight] as? Int,
-              w > 0, h > 0, Double(w) * Double(h) <= 1e9 else { return nil }
+              w > 0, h > 0, Double(w) * Double(h) <= Double(maxSourcePixels) else { return nil }
         if let orientation = props[kCGImagePropertyOrientation] as? Int, orientation >= 5 { swap(&w, &h) }
         let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                         kCGImageSourceCreateThumbnailWithTransform: true,
