@@ -37,14 +37,12 @@ final class ThemeTests: XCTestCase {
         XCTAssertNil(NSApp.appearance)
     }
 
-    /// Tokens resolve per appearance and keep WCAG AA (4.5:1) for text, including white text on the accent fill.
-    func testTokensResolvePerAppearanceWithReadableContrast() {
-        func resolve(_ name: String, _ appearance: NSAppearance.Name) -> NSColor {
-            var out = NSColor.clear
-            NSAppearance(named: appearance)!.performAsCurrentDrawingAppearance {
-                out = Theme.swatches[name]!.nsColor.usingColorSpace(.sRGB)!
-            }
-            return out
+    /// Tokens keep WCAG AA (4.5:1) for text in all four variants, including white on the accent fill,
+    /// and the accent matches the shared brand tokens (Art AccentColor, Landing).
+    /// `NSAppearance(named:)` can't create high-contrast appearances, so variants are tested via `resolve`.
+    func testTokensKeepContrastAndMatchBrand() {
+        func color(_ name: String, dark: Bool, hc: Bool) -> NSColor {
+            Theme.swatches[name]!.resolve(isDark: dark, highContrast: hc).usingColorSpace(.sRGB)!
         }
         func luminance(_ color: NSColor) -> Double {
             let c = color.usingColorSpace(.sRGB)!
@@ -55,16 +53,34 @@ final class ThemeTests: XCTestCase {
         func contrast(_ a: NSColor, _ b: NSColor) -> Double {
             let (x, y) = (luminance(a), luminance(b)); return (max(x, y) + 0.05) / (min(x, y) + 0.05)
         }
+        func hex(_ v: UInt32) -> NSColor { NSColor.hex(v, 1).usingColorSpace(.sRGB)! }
 
-        XCTAssertEqual(resolve("background", .aqua), NSColor.hex(0xFFFFFF, 1).usingColorSpace(.sRGB))
-        XCTAssertEqual(resolve("background", .darkAqua), NSColor.hex(0x000000, 1).usingColorSpace(.sRGB))
+        XCTAssertEqual(color("accent", dark: false, hc: false), hex(0x4169E1))
+        XCTAssertEqual(color("accent", dark: true, hc: false), hex(0x4169E1))
+        XCTAssertEqual(color("accentText", dark: false, hc: false), hex(0x4169E1))
+        XCTAssertEqual(color("accentText", dark: true, hc: false), hex(0x8BA6FF))
 
-        for appearance in [NSAppearance.Name.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua] {
-            let bg = resolve("background", appearance)
-            for text in ["foreground", "secondary", "accentText", "error"] {
-                XCTAssertGreaterThanOrEqual(contrast(resolve(text, appearance), bg), 4.5, "\(text) on background, \(appearance.rawValue)")
+        for dark in [false, true] {
+            for hc in [false, true] {
+                let bg = color("background", dark: dark, hc: hc), label = "dark=\(dark) hc=\(hc)"
+                for text in ["foreground", "secondary", "accentText", "error"] {
+                    XCTAssertGreaterThanOrEqual(contrast(color(text, dark: dark, hc: hc), bg), 4.5, "\(text) on background, \(label)")
+                }
+                XCTAssertGreaterThanOrEqual(contrast(.white, color("accent", dark: dark, hc: hc)), 4.5, "white on accent, \(label)")
+                if hc {
+                    XCTAssertGreaterThan(contrast(color("accentText", dark: dark, hc: true), bg),
+                                         contrast(color("accentText", dark: dark, hc: false), bg), "HC raises accent text contrast, \(label)")
+                }
             }
-            XCTAssertGreaterThanOrEqual(contrast(.white, resolve("accent", appearance)), 4.5, "white on accent, \(appearance.rawValue)")
+        }
+
+        // The dynamic color follows the drawing appearance.
+        var light = NSColor.clear, darkBG = NSColor.clear
+        NSAppearance(named: .aqua)!.performAsCurrentDrawingAppearance { light = Theme.swatches["accentText"]!.nsColor.usingColorSpace(.sRGB)! }
+        NSAppearance(named: .darkAqua)!.performAsCurrentDrawingAppearance { darkBG = Theme.swatches["background"]!.nsColor.usingColorSpace(.sRGB)! }
+        if !NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast {
+            XCTAssertEqual(light, hex(0x4169E1))
+            XCTAssertEqual(darkBG, hex(0x000000))
         }
     }
 

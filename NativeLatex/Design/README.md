@@ -69,10 +69,12 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 | surface | `#F5F5F7` | `#141416` |
 | foreground | `#0A0A0A` | `#F5F5F7` |
 | secondary | `#6E6E73` | `#98989D` |
-| accent (fill, white text) | `#2F55D4` (6.2:1) | `#4169E1` royal blue (4.9:1) |
-| accentText | `#2F55D4` | `#7E9BFF` (8:1 on black) |
+| accent (fill, white text) | `#4169E1` royal blue (4.85:1) | `#4169E1` (4.85:1) |
+| accentText | `#4169E1` (4.85:1 on white) | `#8BA6FF` (9.0:1 on black) |
+| accent, Increase Contrast | `#1E3FB8` (8.5:1) | `#2F55D4` (6.2:1) |
+| accentText, Increase Contrast | `#1E3FB8` | `#B4C6FF` (12.5:1) |
 
-The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors.
+These match the shared tokens in Art's `AccentColor` and Landing. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors.
 
 ## Check
 
@@ -84,6 +86,6 @@ swift run NativeLatexDesignDemo                             # LibreLeaf sample w
 swift run NativeLatexDesignDemo --snapshot "$PWD/Screenshots"  # regenerate the PNGs above
 ```
 
-Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears them; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the BB-8 day and night renders differ.
+Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears them; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent hex values match the shared brand tokens; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ.
 
 Still to check by hand in the real app: VoiceOver reading, Full Keyboard Access, Reduce Motion, and switching macOS appearance while two windows are open.

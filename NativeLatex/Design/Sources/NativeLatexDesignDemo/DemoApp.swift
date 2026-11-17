@@ -62,14 +62,15 @@ struct SampleWorkspace: View {
         } preview: {
             ZStack {
                 Theme.surface
-                // PDF pages keep their real white paper in both appearances.
+                // PDF pages keep their real white paper and dark ink in both appearances.
+                let ink = Color(red: 0.07, green: 0.07, blue: 0.07)
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("LibreLeaf: A Thesis").font(.system(size: 18, weight: .bold, design: .serif))
-                    Text("1  Introduction").font(.system(size: 13, weight: .semibold, design: .serif))
-                    Text("Writing in ordinary folders, compiled with the local TeX installation.").font(.system(size: 11, design: .serif))
+                    Text("LibreLeaf: A Thesis").font(.system(size: 18, weight: .bold, design: .serif)).foregroundColor(ink)
+                    Text("1  Introduction").font(.system(size: 13, weight: .semibold, design: .serif)).foregroundColor(ink)
+                    Text("Writing in ordinary folders, compiled with the local TeX installation.").font(.system(size: 11, design: .serif)).foregroundColor(ink)
                     Spacer()
                 }
-                .foregroundStyle(.black)
+                .environment(\.colorScheme, .light)
                 .padding(28)
                 .frame(width: 300, height: 390)
                 .background(.white)

@@ -16,15 +16,23 @@ public enum Theme {
             lightAlpha = alpha.0; darkAlpha = alpha.1
         }
 
+        func resolve(isDark: Bool, highContrast: Bool) -> NSColor {
+            switch (isDark, highContrast) {
+            case (false, false): .hex(light, lightAlpha)
+            case (true, false): .hex(dark, darkAlpha)
+            case (false, true): .hex(lightHC, 1)
+            case (true, true): .hex(darkHC, 1)
+            }
+        }
+
         var nsColor: NSColor {
             NSColor(name: nil) { appearance in
-                let match = appearance.bestMatch(from: [.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua])
-                return switch match {
-                case .darkAqua?: .hex(dark, darkAlpha)
-                case .accessibilityHighContrastAqua?: .hex(lightHC, 1)
-                case .accessibilityHighContrastDarkAqua?: .hex(darkHC, 1)
-                default: .hex(light, lightAlpha)
-                }
+                let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                // Window appearances carry the high-contrast variant when Increase Contrast is on;
+                // the system flag covers contexts that only report plain Aqua/DarkAqua.
+                let highContrast = appearance.bestMatch(from: [.accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua]) != nil
+                    || NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+                return resolve(isDark: isDark, highContrast: highContrast)
             }
         }
     }
@@ -36,10 +44,11 @@ public enum Theme {
         "secondary": Swatch(0x6E6E73, 0x98989D, hc: (0x3A3A3C, 0xC7C7CC)),
         // ponytail: alpha only for normal contrast; HC swaps to opaque greys.
         "line": Swatch(0x000000, 0xFFFFFF, hc: (0x8E8E93, 0x8E8E93), alpha: (0.10, 0.14)),
-        // Royal blue. Light: #2F55D4 (6.2:1 on white, both as text and as fill).
-        // Dark: fill is true royal blue #4169E1 (4.9:1 with white text); text uses #7E9BFF (8:1 on black).
-        "accent": Swatch(0x2F55D4, 0x4169E1, hc: (0x1E3FB8, 0x5B7CFF)),
-        "accentText": Swatch(0x2F55D4, 0x7E9BFF, hc: (0x1E3FB8, 0xA3B8FF)),
+        // Shared brand tokens (Art AccentColor, Landing): royal blue #4169E1 is the fill in both
+        // appearances (4.85:1 with white text) and the blue text on white; #8BA6FF is blue text on black (9.0:1).
+        // Increase Contrast: deeper fills (#1E3FB8 8.5:1, #2F55D4 6.2:1 with white), lighter dark text (#B4C6FF 12.5:1).
+        "accent": Swatch(0x4169E1, 0x4169E1, hc: (0x1E3FB8, 0x2F55D4)),
+        "accentText": Swatch(0x4169E1, 0x8BA6FF, hc: (0x1E3FB8, 0xB4C6FF)),
         "error": Swatch(0xD70015, 0xFF453A),
         "warning": Swatch(0xB25000, 0xFF9F0A),
         "success": Swatch(0x1A7F37, 0x30D158),
