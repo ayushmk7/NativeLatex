@@ -1,16 +1,18 @@
 # Interchange and integration plan
 
-Status: planning only · 2026-11-16
+Status: planning and local conversion test · revised 2026-11-17 · Mac only
 
 ## Principle
 
 The local `.tex` or `.md` file and its project folder are the source of truth. Compile/render and edit work offline. Every conversion creates a separate copy, shows a result summary, and leaves the original untouched. A cloud account is required only when the user chooses a cloud action. Do not claim bidirectional sync until there is a reliable conflict and fidelity model.
 
+Only the owner's provider accounts are in scope. Use direct, opt-in user sign-in; there is no shared account database, tenant administration, or AWS proxy. Provider request limits still exist, so a rejected transfer must leave the local source intact and offer a retry. They do not justify a quota dashboard for one person.
+
 The name “libretext” is interpreted here as **LibreTexts**, the education publishing platform. **LibreOffice Writer** is covered separately through ODT. Confirm the intended product before implementing a provider-specific connector.
 
 ## Free integration choices
 
-“Free” below means no separate fee for the integration itself at the stated usage level. A user may still pay for a provider account, storage, or Apple app distribution; AWS hosting has its own limits. The [AWS plan](../../aws-hosting-plan.md) keeps these costs separate.
+“Free” below means no separate fee for the integration itself at the stated usage level. A user may still pay for a provider account, storage, or Apple app distribution; hosting has its own limits. The [deployment plan](../../deployment-plan.md) keeps these costs separate.
 
 | Choice | Useful app action | Cost and access boundary | Plan |
 | --- | --- | --- | --- |
@@ -32,14 +34,16 @@ For native sign-in, request user consent in the app and keep tokens in the devic
 
 | Destination/source | First useful path | Later path, only if proven | Main risk |
 | --- | --- | --- | --- |
-| Microsoft Word | Import/export `.docx` as a copy via user-installed Pandoc | Better style mapping with a reference DOCX | Custom LaTeX macros, layout, citations, and comments may change |
-| LibreOffice Writer | Import/export `.odt` as a copy via Pandoc | Open exported ODT in Writer for manual review | Same conversion losses; do not mistake Writer for LibreTexts |
+| Microsoft Word | Export `.docx` as a reviewable copy via user-installed Pandoc; import a separate copy only after fidelity checks | Better style mapping with a reference DOCX | Custom LaTeX macros, references, citations, layout, and comments may change |
+| LibreOffice Writer | Export `.odt` as a reviewable copy via Pandoc; import a separate copy only after fidelity checks | Open exported ODT in Writer for manual review | Same conversion losses; do not mistake Writer for LibreTexts |
 | Google Docs | Export `.docx` or PDF, then let the user upload; import a Google Doc by first exporting it to `.docx` | Opt-in Google Drive sign-in and per-file transfer | Internet/OAuth, conversion loss, remote edits and conflicts |
 | LibreTexts | Export reviewable HTML/EPUB or DOCX copy and hand off to its authoring flow | A supported authenticated publish flow after partner/API validation | Attribution, license, page structure, math, and images |
 | Zotero | Read a `.bib` file exported by Zotero; offer citation-key completion | Optional local Zotero connector | Key stability and bibliography ownership |
 | Git/Overleaf | Keep ordinary project files so Git works directly | No special connector needed initially | Merge conflicts are managed by Git/Overleaf, not the editor |
 
 Pandoc documents LaTeX, DOCX, ODT, HTML and EPUB readers/writers; its handling of LaTeX macros and DOCX styles is format-dependent. Treat it as a conversion engine, not a lossless document model. [Pandoc manual](https://pandoc.org/MANUAL.html). LibreOffice documents DOCX and ODT filters if a user prefers its command-line conversion, but there is no reason to require LibreOffice for the first connector. [LibreOffice conversion filters](https://help.libreoffice.org/latest/en-US/text/shared/guide/convertfilters.html).
+
+The [local conversion test](../../research/conversion-test-2026-11-17.md) used Pandoc 3.13 and LibreOffice 26.8.3 on real DOCX/ODT outputs. Simple text, math, images, tables, and bibliography text rendered, but equation numbers and references broke, citation style changed, and imported LaTeX lost source semantics. Pandoc exited successfully without reporting those losses. Consequently, the first conversion UI must present DOCX/ODT as **reviewable copies** and flag risky structures; source PDF remains the faithful LaTeX export.
 
 Word can accept some LaTeX syntax inside its equation editor, but this is not equivalent to opening an entire `.tex` project with packages, macros, bibliography and layout. [Microsoft's equation support](https://support.microsoft.com/en-gb/word/linear-format-equations-using-unicodemath-and-latex-in-word).
 
@@ -49,7 +53,13 @@ Word can accept some LaTeX syntax inside its equation editor, but this is not eq
 
 **Optional account connector:** use desktop OAuth and the narrow `drive.file` scope for user-selected files. Upload an exported copy as a *new* Google Doc. Download a selected Doc as DOCX for import into a *new* local workspace. Store OAuth tokens in macOS Keychain, make sign-out and token deletion available, and never upload during ordinary Build. Google describes `drive.file` as per-file access and notes verification requirements for broader scopes. [Drive scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth), [installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app).
 
+For this owner's personal use, Google says verification is not mandatory below 100 users, though an unverified-app warning can appear. An external OAuth app left in **Testing** gets refresh tokens that expire after seven days; plan the owner's published-status setup and reauthentication flow before treating sign-in as persistent. This does not require an AWS auth service. [Google personal-use exception](https://support.google.com/cloud/answer/13464323?hl=en), [Google token expiration](https://developers.google.com/identity/protocols/oauth2).
+
 Do not update an existing Google Doc by file conversion in an early release: Google states that media conversion during an update replaces the document's full contents. Remote edits and comments need an explicit conflict strategy before that is safe. [Drive upload and conversion](https://developers.google.com/workspace/drive/api/guides/manage-uploads).
+
+## Microsoft OneDrive
+
+For the owner's personal Microsoft account, use delegated Microsoft Graph file permission and explicit selection. Upload a newly converted DOCX copy to OneDrive or download a selected DOCX into a new local workspace. Do not overwrite a remote file or claim live Word synchronization. Microsoft documents personal-account support for file upload with delegated `Files.ReadWrite`; standard Graph operations have no additional API charge within the user's license limits. Keep tokens in Keychain and make disconnect available. [Graph file upload](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content?view=graph-rest-1.0), [Graph metering](https://learn.microsoft.com/en-us/graph/metered-api-overview).
 
 ## LibreTexts
 
@@ -63,7 +73,7 @@ For reusing LibreTexts content in a local project, require the user to select co
 
 1. User chooses **Import a copy** or **Export a copy** from File. Show source and destination paths.
 2. Verify the converter is installed. If absent, explain how to install it; editing and PDF export keep working.
-3. Run conversion into a temporary location. Never overwrite the source or a previous export silently.
+3. Run conversion into a temporary location. For imports, copy extracted media into the new workspace and rewrite references to relative paths. Never overwrite the source or a previous export silently.
 4. Show a summary: files created, images found/missing, equations, citations, unrecognized/raw LaTeX, conversion warnings. If a reliable count is unavailable, state that manual review is required rather than inventing one.
 5. Let the user inspect the generated document and choose the final destination. Keep the conversion log with that session.
 

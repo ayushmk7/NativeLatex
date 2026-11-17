@@ -1,0 +1,44 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\newcommand{\projectword}{quasar}
+\newenvironment{projectnote}{\begin{quote}\bfseries}{\end{quote}}
+
+\title{NativeLatex conversion sample}
+\author{Test Author}
+
+\begin{document}
+\maketitle
+\section{Overview}\label{sec:overview}
+This is \textbf{bold}, \emph{emphasized}, and contains the custom word \projectword.
+See \href{https://example.org}{a link} and cite \cite{knuth1984}.
+
+\begin{equation}\label{eq:energy}
+E = mc^2 + \frac{a}{b}
+\end{equation}
+Equation~\ref{eq:energy} appears in Section~\ref{sec:overview}.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lr}
+Item & Value \\
+Alpha & 2 \\
+Beta & 3
+\end{tabular}
+\caption{A small table}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.65\linewidth]{figure.png}
+\caption{Blue test diagram}
+\end{figure}
+
+\begin{projectnote}
+Custom LaTeX environment content must not disappear silently.
+\end{projectnote}
+
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

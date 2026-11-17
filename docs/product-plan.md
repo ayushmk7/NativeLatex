@@ -1,10 +1,10 @@
-# NativeLatex product plan
+# NativeLatex Mac product plan
 
-Status: planning only · 2026-11-16
+Status: planning and conversion validation · revised 2026-11-17 · Mac only
 
 ## Product promise
 
-NativeLatex is planned as a native Mac, iPad, and iPhone app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. Mac ships first. LaTeX compiles with the Mac's TeX installation there; iPad and iPhone require a proven embedded compiler for the same offline promise. Markdown renders locally on every device. No account or network connection is required for local projects. See the [platform plan](platform-plan.md).
+NativeLatex is planned as a native Mac app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
 
 The app is for authors who want a faster local editing loop than switching among a text editor, terminal, PDF viewer and Finder. It should handle a single article quickly and remain dependable on multi-file projects with images and bibliographies.
 
@@ -13,17 +13,17 @@ The app is for authors who want a faster local editing loop than switching among
 | Question | Decision | Reason |
 | --- | --- | --- |
 | Native implementation | SwiftUI window and commands, AppKit source editor, PDFKit preview | Use mature macOS editing and PDF components. |
-| Apple devices | Separate Mac and universal iPad/iPhone targets with shared document logic | Keep each interface native while reusing file and diagnostic behavior. |
 | Project format | Ordinary `.tex`, `.md`, `.bib`, images and related files in a folder | Keep projects portable to TeX, Git and other editors. |
 | Workspace | One folder per window, several windows open at once | Separate build root, state and outputs clearly. |
 | Render target | An opened `.md` file, or an explicitly selected root `.tex` file per workspace | Render the active note by default without guessing a multi-file TeX root. |
 | Build engine | Installed `latexmk`, with pdfLaTeX first and XeLaTeX/LuaLaTeX next | Let TeX tooling handle passes and bibliography work. |
 | Preview | PDFKit; retain the last successful PDF with a stale label on failure | Prevent old output from looking current. |
 | Local data | Source stays in the chosen folder; UI state lives in Application Support | Avoid a proprietary project database. |
-| Distribution | Developer ID signed/notarized local app first | Support the local TeX toolchain and ordinary folders. |
-| External formats | Non-destructive import/export copies | Document models do not convert losslessly. |
+| Appearance | Black/white light and dark themes with royal-blue accent and a native BB-8 inspired switch | Follow the requested visual direction while keeping editor and PDF readable. |
+| Distribution | Local Debug first; Developer ID signed and notarized ZIP for public download | Support local TeX tools and ordinary folders. |
+| External formats | Non-destructive, reviewable import/export copies | The [conversion test](research/conversion-test-2026-11-17.md) found silent reference and citation changes. |
 
-Technical detail and source references are in the [architecture](workspaces/backend/architecture.md), [platform plan](platform-plan.md), and [integration plan](workspaces/integrations/integrations.md).
+Technical detail and source references are in the [architecture](workspaces/backend/architecture.md), [art plan](workspaces/art/art-direction.md), [UX plan](workspaces/ux/ux-plan.md), and [integration plan](workspaces/integrations/integrations.md).
 
 ## First usable release: Mac
 
@@ -34,6 +34,8 @@ Technical detail and source references are in the [architecture](workspaces/back
 5. Show PDF beside LaTeX or rendered Markdown beside its source. Markdown gets a native basic preview without extra tools; installed Pandoc enables richer HTML/PDF export. Retain the last successful TeX PDF on failure and mark it stale. [Apple Markdown parsing](https://developer.apple.com/documentation/foundation/attributedstring), [Pandoc formats](https://pandoc.org/MANUAL.html).
 6. Export or reveal the PDF and project folder. No account is required.
 7. Make the main flow work with keyboard navigation, VoiceOver, system appearance, high contrast and reduced motion.
+
+The visual system uses white and black surfaces, a royal-blue accent, and the native BB-8 inspired appearance switch described in the [art](workspaces/art/art-direction.md) and [UX](workspaces/ux/ux-plan.md) plans. The switch follows the Mac's effective appearance until the user chooses an explicit Light or Dark override.
 
 The first release should work on a real multi-file project before advanced completion or cloud exchange arrives. Its exit checks are in the [delivery plan](delivery-plan.md).
 
@@ -55,11 +57,10 @@ Opening a file does not execute its contents. **Build/Render** is a deliberate u
 | Writing speed | Outline, quick open, project search, image insertion, small templates, citation and reference completion | Reliable file model. |
 | Source/PDF navigation | SyncTeX forward/reverse search, detachable preview | Stable build output and coordinate mapping. |
 | Compiler choice | XeLaTeX/LuaLaTeX profiles; optional Build on Save | Tool discovery, cancellation and conflict handling. |
-| Interchange | DOCX and ODT import/export copies with a conversion report | Fidelity corpus and review in Word/Writer. |
-| Connected exchange | Opt-in Google Docs transfer, then evaluated LibreTexts publishing path | OAuth, content ownership, conflict and license handling. |
-| iPad/iPhone | Native Files-based editing, local Markdown and PDF preview, then offline LaTeX after an embedded-engine gate | Mobile cannot rely on the Mac's `latexmk` executable. |
+| Interchange | DOCX and ODT reviewable exports first; import copies only after a conversion report is proven | Fidelity corpus and review in Word/Writer. |
+| Connected exchange | Opt-in owner-only Google Docs and OneDrive transfer; then evaluate LibreTexts publishing | OAuth, content ownership, conflict and license handling. |
 
-The first Mac release excludes a collaboration server, bundled TeX distribution, package manager, WYSIWYG editor, arbitrary execution recipes and proprietary file format. Mobile offline compilation will need an embedded engine and a bounded package bundle; that work follows the [platform feasibility gate](platform-plan.md).
+The first release excludes a collaboration server, bundled TeX distribution, package manager, WYSIWYG editor, arbitrary execution recipes and proprietary file format. There is no iPhone or iPad app track.
 
 ## Critical behavior
 
@@ -71,9 +72,9 @@ The first Mac release excludes a collaboration server, bundled TeX distribution,
 
 ## Integration posture
 
-“Docs” means Google Docs here; “libretext” is treated as LibreTexts, with LibreOffice Writer covered too because the term could refer to it. Word and Writer exchange use DOCX/ODT copies. Google Docs begins with manual exchange and can gain a narrow, opt-in Drive connector. LibreTexts begins as a reviewed publishing handoff until its supported API and author workflow are verified. See the [integration evidence and limits](workspaces/integrations/integrations.md).
+“Docs” means Google Docs here; “libretext” is treated as LibreTexts, with LibreOffice Writer covered too because the term could refer to it. Word and Writer exchange use reviewable DOCX/ODT copies. Google Docs begins with manual exchange and can gain a narrow, opt-in Drive connector for the owner's account. LibreTexts begins as a reviewed publishing handoff until its supported API and author workflow are verified. See the [integration evidence and limits](workspaces/integrations/integrations.md) and [conversion test](research/conversion-test-2026-11-17.md).
 
-AWS may serve the website and signed Mac download, while the native app keeps editing and builds local. The [AWS hosting plan](aws-hosting-plan.md) records the free-plan limits and the boundary for any later account or sync service.
+AWS can serve the signed Mac download. A Vercel landing page is optional; the app itself needs no website. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
 
 ## Product success checks
 

@@ -1,6 +1,6 @@
 # NativeLatex Mac UX plan
 
-Status: planning only · 2026-11-16
+Status: planning only · revised 2026-11-17 · Mac only
 
 ## Product promise
 
@@ -23,7 +23,7 @@ The app should remember recent workspaces and each workspace's selected root and
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ Folder / target title           Build/Render status    Preview Inspector │
+│ Folder / target title       Build/Render status   Preview   BB-8 switch │
 ├──────────────┬────────────────────────────┬────────────────────────────────┤
 │ Files        │ Tabs: main.tex  notes.md    │ PDF or Markdown preview        │
 │ + outline    │                            │ page / zoom / search           │
@@ -37,15 +37,25 @@ The app should remember recent workspaces and each workspace's selected root and
 - Leading sidebar: workspace files, followed by a collapsible outline for the active `.tex` document. Keep file hierarchy readable; hide the sidebar on small windows or by command. Apple recommends a hideable sidebar and standard View menu commands. [Apple sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars).
 - Center: source tabs, monospaced editor, line numbers, search, and an obvious active cursor. Split the editor only if users later need simultaneous source files; the PDF split solves the first need.
 - Trailing pane: PDF preview for LaTeX or rendered Markdown for `.md`; detachable into a second window for two-display work. PDF has fit width/page, zoom, page navigation, and find.
-- Bottom panel: Problems by default after a failed build; a Log tab exposes full output. Its height is resizable and it can be closed without losing errors. The toolbar stays sparse: sidebar, root title, Build, build state, preview, and inspector. [Apple toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars), [Apple split views](https://developer.apple.com/design/human-interface-guidelines/split-views).
+- Bottom panel: Problems by default after a failed build; a Log tab exposes full output. Its height is resizable and it can be closed without losing errors. The toolbar stays sparse: sidebar, root title, Build, build state, preview, and the BB-8 appearance control. [Apple toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars), [Apple split views](https://developer.apple.com/design/human-interface-guidelines/split-views).
 - A narrow window prioritizes the editor. Preview becomes a toggle, not a compressed second column; problems become a drawer/panel.
+
+## Appearance and BB-8 control
+
+The interface has two visual appearances: paper-white with black text, and near-black with white text. Royal blue is the only brand accent, used for selection, focus, active controls, and key actions. Problems still need text, symbols, and system semantic status treatment so color alone never conveys an error. The editor and Markdown preview follow the selected appearance; the generated PDF keeps its actual page colors, usually white, so a dark UI does not misrepresent the document.
+
+The app starts in **Use System**. In **NativeLatex > Settings > Appearance**, offer **Use System**, **Light**, and **Dark**. Use System tracks macOS changes while the app is open. The selected appearance is one app-wide preference, so all workspace windows, sheets, menus, editor, and preview chrome change together. The BB-8 switch in the trailing toolbar displays the *effective* light/dark appearance; clicking it chooses the opposite appearance as an explicit app override. **Use System** in Settings or **View > Appearance** restores automatic behavior. If macOS changes while Use System is selected, the switch updates without modifying the preference. This is a deliberate, limited override of Apple's recommendation to follow the system appearance because the user requested a visible switch. [Apple Dark Mode](https://developer.apple.com/design/human-interface-guidelines/dark-mode), [Apple appearance behavior](https://developer.apple.com/documentation/appkit/nsapplication/effectiveappearance).
+
+Adapt the day/night BB-8 artwork from `/Users/ayush/Downloads/Website/src/components/v2/BB8Toggle.astro` and `/Users/ayush/Downloads/Website/src/components/pro/opt4/bb8.css` as a native Mac control; the Downloads design guide at `/Users/ayush/Downloads/distinctive-frontend.md` informs its distinctive character. Keep the robot silhouette and day/night direction recognizable, with a restrained short movement confined to the switch. Do not carry over browser `localStorage`, hidden-checkbox behavior, web fonts, or full-page entrance animation. The app must be immediately usable while the switch animates. With Reduce Motion, change the scene and thumb position immediately without rolling, bounce, or scenery movement. [Apple motion guidance](https://developer.apple.com/design/human-interface-guidelines/motion).
+
+The switch needs a visible focus ring and a comfortably sized hit area. Tab reaches it; Space activates it. VoiceOver announces **Dark appearance, on/off** and a hint that **Use System** is in Settings. The current appearance must remain evident without interpreting the BB-8 art: the View menu has checked System/Light/Dark options, and the control's help text says **Switch to Light Appearance** or **Switch to Dark Appearance**. The control reflects the current state even when another workspace window changes it. Test both appearances with Increase Contrast, system accent overrides, and PDF pages of varied colors. [Apple accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility), [Apple color](https://developer.apple.com/design/human-interface-guidelines/color).
 
 ## Primary journeys
 
 ### First launch and first PDF
 
-1. Start screen offers **New Workspace**, **Open File**, **Open Folder**, and recent workspaces. Opening `.tex`, `.md`, or `.markdown` from Finder/Open With opens its containing folder as a workspace and selects the file. The app registers these types without changing the user's default app choice. [Apple document type registration](https://developer.apple.com/documentation/SwiftUI/DocumentGroup).
-2. New Workspace asks for a folder location, name, and a blank LaTeX article or Markdown note. It creates ordinary files and opens the new workspace window.
+1. Start screen offers **Open File**, **Open Folder**, **New Workspace**, and recent workspaces. It follows macOS appearance immediately; there is no account, theme, or TeX setup wizard. Opening `.tex`, `.md`, or `.markdown` from Finder/Open With opens its containing folder as a workspace and selects the file. The app registers these types without changing the user's default app choice. [Apple document type registration](https://developer.apple.com/documentation/SwiftUI/DocumentGroup).
+2. New Workspace asks for a folder location, name, and a blank LaTeX article or Markdown note. Confirming creates ordinary files and opens the new workspace window; canceling creates nothing. Opening an existing file edits it in place, without copying it into app storage.
 3. On first Build, check for a usable local TeX engine. If missing, show the detected state and a path to install/configure one; keep the draft editable. Never silently install a multi-gigabyte toolchain.
 4. Build saves current source files, shows progress, then opens the PDF. Errors appear with file, line, severity, and a concise message. A click opens the source and selects the line.
 5. Closing and reopening the app restores recent folders and per-window context, subject to the user's macOS window restoration setting.
@@ -115,7 +125,7 @@ Do not place provider-specific buttons in the main toolbar before any integratio
 | Show/hide preview | ⌘⌥P | View |
 | Jump to next problem | F8 | Build |
 
-Shortcuts are proposals to validate against macOS and editor conflicts; every action also needs a menu or accessible control. Expose file tree, tabs, editor, PDF controls, and problem rows in a predictable keyboard focus order. Announce build completion and errors through accessibility status without shifting focus from the editor. Use text and symbols alongside severity colors. Respect system appearance, accent color, reduced motion, increased contrast, and text scaling. Apple calls for keyboard access and audits of accessibility, including adequate macOS control size and contrast. [Apple macOS design](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos), [Apple accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility).
+Shortcuts are proposals to validate against macOS and editor conflicts; every action also needs a menu or accessible control. Appearance commands need no dedicated shortcut because the BB-8 control is keyboard reachable and View > Appearance is available. Expose file tree, tabs, editor, PDF controls, appearance switch, and problem rows in a predictable keyboard focus order. Announce build completion and errors through accessibility status without shifting focus from the editor. Use text and symbols alongside severity colors. Respect system appearance when Use System is chosen, reduced motion, increased contrast, and text scaling. Apple calls for keyboard access and audits of accessibility, including adequate macOS control size and contrast. [Apple macOS design](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos), [Apple accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility).
 
 ## Build states and recovery
 
@@ -132,16 +142,12 @@ Shortcuts are proposals to validate against macOS and editor conflicts; every ac
 
 | Milestone | User-visible scope | Exit check |
 | --- | --- | --- |
-| 1. Reliable local loop | Multi-workspace windows; direct `.tex`/`.md` open; source editing; explicit TeX root; local compile; PDF and Markdown previews; linked errors; standard save/open/recent; PDF export | Two independent workspaces compile correctly; Markdown renders without TeX; failed build marks previous PDF stale; external edits do not get silently overwritten. |
+| 1. Reliable local loop | Multi-workspace windows; direct `.tex`/`.md` open; source editing; explicit TeX root; local compile; PDF and Markdown previews; linked errors; standard save/open/recent; PDF export; both appearances and BB-8 control | Two independent workspaces compile correctly; Markdown renders without TeX; failed build marks previous PDF stale; external edits do not get silently overwritten; appearance follows macOS until overridden and updates every window. |
 | 2. Writing speed | Outline, templates, image insertion, project search, citation key completion, SyncTeX jumps, preview detach | Real multi-file paper remains responsive and jumps resolve to the right source. |
 | 3. Interchange | Proven DOCX import/export; Google Docs and LibreTexts paths only after capability and loss audits | No source replacement, clear conversion report, and documented unsupported cases. |
 
 Live collaboration, simultaneous cloud editing, and a built-in package manager are outside the initial product. Their complexity and data ownership requirements would distract from the local compile loop. Revisit them only after the editor is reliable on real projects.
 
-## iPad and iPhone adaptation
-
-Keep the same file, root-selection, Build/Render, stale-output, and conflict meanings across devices. On iPad, show a Files-backed project sidebar with source and preview side by side when space allows; support an external keyboard and multiple windows. On iPhone, make Files/project, source, preview, and problems separate focused screens with a persistent way back to the current file. Do not squeeze the Mac three-pane layout onto a phone. A LaTeX Build button appears on mobile only when the offline embedded engine passes the [platform gate](../../platform-plan.md); Markdown preview and opening existing PDFs work earlier. [Apple iPad multiwindow behavior](https://developer.apple.com/documentation/SwiftUI/WindowGroup), [Apple Files importer](https://developer.apple.com/documentation/swiftui/view/fileimporter%28ispresented%3Aallowedcontenttypes%3Aoncompletion%3A%29).
-
 ## UX validation before build
 
-Prototype and observe four Mac tasks: create a first article, open a multi-file thesis and select root, fix a compile error, and switch between two workspace windows. Test a keyboard-only path and a VoiceOver path for the same tasks. On iPad and iPhone, also test opening a project through Files, editing offline, switching source/preview, and reaching an error from the compact layout. These should expose wrong-root assumptions, hidden build state, focus traps, and stale PDF confusion before implementation hardens them.
+Prototype and observe four Mac tasks: create a first article, open a multi-file thesis and select root, fix a compile error, and switch between two workspace windows. Test a keyboard-only path and a VoiceOver path for the same tasks. Switch macOS appearance while Use System is selected, toggle BB-8 in one of two windows, restore Use System, and repeat with Reduce Motion and Increase Contrast enabled. These should expose wrong-root assumptions, hidden build state, focus traps, stale PDF confusion, and appearance state that differs between windows before implementation hardens them.

@@ -1,56 +1,69 @@
-# Art and icon brief: NativeLatex
+# Art direction: NativeLatex for Mac
 
-Status: planning. **NativeLatex** is a working name; the mark must also work without a wordmark.
+Status: planning · 2026-11-17. **NativeLatex** is a working name; the mark must work without a wordmark.
 
-## Art objective
+## Visual thesis
 
-Create one recognizable mark for a local LaTeX and Markdown editor: source becomes a polished document. It should read at small sizes in the Mac Dock and on iPhone/iPad Home Screens, and work in Finder, Spotlight, and the app's About view. The brand system is deliberately small: the app icon, its central mark, and a restrained wordmark. Interface styling is secondary.
+Use a precise ink-and-paper identity: white and black form almost the entire interface, with **royal blue** marking the active action, selection, and brand. The character comes from a distinctive app icon, strong but readable typography, and a small animated appearance switch. The writing and PDF surfaces stay calm during long sessions.
 
-## Concept exploration
+This interprets the four-vector approach in the supplied [frontend design guide](/Users/ayush/Downloads/distinctive-frontend.md): typography, color, motion, and background should form one system. Its web examples of thin body type, page-load choreography, and textured gradients are poor fits for a dense native editor, so the Mac plan uses strong headings, one accent, purposeful switch motion, and flat document surfaces.
 
-| Concept | Visual | Strength | Concern |
+## Core palette and type
+
+| Role | Light | Dark | Use |
 | --- | --- | --- | --- |
-| **A. Brace to page** | A bold source brace on the left resolves into the edge of a typeset page on the right. | Immediately connects code and document; distinctive silhouette. | Needs careful spacing so it does not read as two unrelated symbols. |
-| **B. Typesetter's block** | A compact grid of text rules with one emphasized mathematical glyph. | Strong editorial feel and clear at large size. | Fine text details may disappear in the Dock. |
-| **C. Folded manuscript** | A single folded sheet with a large TeX-like monogram. | Simple and familiar document-app language. | Less distinctive; a monogram locks the mark to the working name. |
+| Main surface | White `#FFFFFF` | Black `#000000` | Editor surroundings and primary window areas |
+| Secondary surface | Near-white `#F4F4F4` | Near-black `#141414` | Sidebar, toolbar, problems panel |
+| Primary ink | Near-black `#0A0A0A` | White `#FFFFFF` | Body and controls |
+| Divider | Neutral gray, adjusted for contrast | Neutral gray, adjusted for contrast | Pane edges, never decorative heavy borders |
+| Royal blue | `#4169E1` | Brighter `#8BA6FF` where blue is text or a thin focus ring | Build action, selected tab, links, focus, small brand details |
 
-**Chosen direction: A, brace to page.** It expresses the core action without relying on a temporary name or a tiny formula. Keep B and C only as comparison sketches; do not build three production icon families.
+The blue values are design targets, not a promise that one hex value works on every surface. A local relative-luminance check measured `#4169E1` on white at 4.85:1 and `#8BA6FF` on black at 9.00:1; still validate actual controls, focus, and increased-contrast mode. Inactive chrome and errors must remain understandable in grayscale; never encode build status by blue alone. PDF paper stays white in both appearances because it represents the actual output. Respect native macOS material and semantic colors where they control legibility, then apply the royal-blue brand to chosen interactive states. Apple's [color guidance](https://developer.apple.com/design/human-interface-guidelines/color) calls for appearance and contrast testing.
 
-## Production icon specification
+Use San Francisco for ordinary Mac controls and a clear monospaced face for source. Give start-screen titles and major section labels a bolder editorial weight; keep editor text regular and adjustable rather than using the guide's ultra-thin body example. The wordmark, if used, can pair a bold sans name with the standalone icon mark. Avoid downloaded web fonts in the app's core interface.
 
-- **Composition:** square 1024 × 1024 source canvas. Center a single large mark. The left brace begins at about 27% of canvas width; the page begins at about 43%; their shapes overlap by a small amount to visually connect input and output. Keep the mark within a generous central safe area, then inspect the final system mask in Icon Composer. These measurements are starting proportions for the sketch, not fixed export coordinates.
-- **Shape:** one thick, continuous brace with rounded optical joins. One clean page silhouette with a visible top edge and two short, broad text rules. No literal code, tiny mathematical notation, pen nib, or fake screenshot. The brace and page must remain recognizable at a 32 px Dock preview.
-- **Depth:** two or three layers at most: background, page, foreground brace. Use subtle separation between layers; avoid a deep 3D stack or heavy drop shadow. Let system rendering supply its own mask and appearance treatment.
-- **Palette:** deep ink blue `#173A75` for the brace, warm paper `#F8F5EC` for the page, and a blue-gray `#647895` for the background or secondary detail. These are art-direction targets, subject to visual testing in each appearance. Do not use the icon palette as hard-coded app UI colors.
-- **Background:** a simple blue-gray field or restrained gradient with enough contrast for the white page. No border drawn around the square canvas; macOS applies the final rounded mask.
-- **Wordmark:** set the working name in a system sans face, medium weight. Pair it with the standalone central mark for a splash or About treatment. Keep the wordmark separate from the app icon so a future name change does not require redrawing the icon.
+## App icon: concepts and decision
 
-Apple's current [app icon guidance](https://developer.apple.com/design/human-interface-guidelines/app-icons) calls for simple centered content, square unmasked layers, and testing across default, dark, clear, and tinted appearances. The source should be prepared for Icon Composer, not flattened into a single screenshot-style icon.
-
-## Required variants and assets
-
-| Asset | Source of truth | Output/use |
+| Concept | Visual | Assessment |
 | --- | --- | --- |
-| Layered app icon | Editable vector source with named background, page, and brace layers | Mac Icon Composer source plus platform-specific app asset catalogs for Mac, iPad, and iPhone |
-| Appearance checks | Same core mark in default, dark, clear light/dark, and tinted light/dark contexts | Review sheet; custom variants only if automatic versions lose the mark |
-| Standalone mark | Same geometry without the square background | About window and documentation |
-| Monochrome mark | Single-color vector | Small UI or print contexts where full-color art is unsuitable |
-| Wordmark lockup | Editable type and outline-safe export | About window and project materials |
+| **A. Brace to page** | A bold source brace merges with a crisp typeset sheet. | Best expression of source becoming output, independent of the working name. |
+| **B. Typesetter's block** | Rules of text around one large mathematical glyph. | Attractive at large size; fine rules risk vanishing in the Dock. |
+| **C. Folded manuscript** | One folded sheet with a monogram. | Familiar but generic and tied to a name that may change. |
 
-Keep the editable vector file, Icon Composer project, exported asset catalogs, and review sheet in the future implementation workspace. SVG/PDF vector exports are appropriate for review; each app target should consume its platform asset catalog. Record the font and color values alongside the source so the art can be regenerated.
+**Choose A.** The square 1024 × 1024 source has a centered, bold brace at roughly the left third and a page beginning just right of center. Let the shapes overlap slightly so they read as one source-to-output symbol. Use a black or white field according to the icon appearance, a contrasting page, and royal blue for the brace or the connection between shapes. Keep two broad text rules on the page at most. No literal code, tiny equations, pen nib, faux app screenshot, or multicolor gradient. Make two or three editable layers: background, page, and brace. Inspect the system mask rather than drawing rounded corners into the artwork.
 
-## Validation before approval
+Create default and dark reviews, plus clear and tinted appearance checks, from the same central geometry. Produce custom variants only if system-generated ones lose the mark. Apple's [app icon guidance](https://developer.apple.com/design/human-interface-guidelines/app-icons) recommends simple centered content and square unmasked layers for Icon Composer.
 
-1. View the icon at 16, 32, 64, 128, and 512 px against light and dark Dock backgrounds. At 32 px, the brace and page must remain separate and identifiable.
-2. Inspect the system mask, highlights, and all available appearances in Icon Composer. Check that no important content clips near the corners and that tinted/clear variants preserve the same mark.
-3. Place the icon among native productivity apps in a Dock mockup. Check for visual weight, edge contrast, and whether it looks like a document rather than a folder or terminal.
-4. Run a grayscale check. The two primary shapes must remain distinguishable without hue.
-5. Confirm the monochrome mark works at 16 px and that the wordmark remains readable in the About window.
+## Appearance switch: adapt the Website reference
 
-## Supporting interface styling
+The actual reference is [BB8Toggle.astro](/Users/ayush/Downloads/Website/src/components/v2/BB8Toggle.astro) and [bb8.css](/Users/ayush/Downloads/Website/src/components/pro/opt4/bb8.css). Its pill is approximately 10.625:5.625 in aspect ratio; a round robot moves from left to right while the backdrop changes from clouds and desert to stars and a dark sky. The Website also uses orange accents, tan scenery, many small decorative elements, and staggered 0.2–0.8 second transitions. These details are useful as reference, but too busy and warm for the requested Mac palette.
 
-Use native macOS toolbar, sidebar, split-view, and menu treatments. Keep the source editor visually quiet and the PDF preview on a neutral canvas with a white page. Use semantic system colors and the user's accent color for app chrome; the blue icon palette is a brand cue, not a forced UI theme. Apple's [macOS design guidance](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos), [split-view guidance](https://developer.apple.com/design/human-interface-guidelines/split-views), and [color guidance](https://developer.apple.com/design/human-interface-guidelines/color) support those choices.
+**Native visual translation:** retain the instantly recognizable pill, rounded robot body, small dome head, and rolling left-to-right travel. In light mode, use a white pill with a black outline, one minimal blue sun or blue horizon mark, and a white/black robot with blue seams. In dark mode, use a black pill with a white outline, two or three white stars, and the same robot at the right. A short 180-degree body rotation can imply travel; head and antenna stay upright. Keep the fixed control large enough for pointer use and visual recognition, while the surrounding toolbar remains sparse. The switch is an appearance control, never the app icon or loading animation.
+
+Keep a still frame for each state. When Reduce Motion is on, swap state without rolling or scenery travel. When Increase Contrast is on, strengthen the pill border and robot silhouette. The focused state uses a visible royal-blue ring outside the pill. The light/dark state must also be conveyed through the control label and accessible value; interaction and keyboard behavior are specified in the [UX plan](../ux/ux-plan.md). Do not embed the Website's CSS or web checkbox inside the native app; redraw the small scene as native/vector artwork so it scales cleanly and follows macOS appearance settings.
+
+The reference source credits **Uiverse.io / Galahhad**. If implementation copies any original artwork or code, preserve the applicable license notice and credit; Uiverse's [gallery README](https://github.com/uiverse-io/galaxy) describes its MIT terms. A near-exact BB-8 character likeness has separate brand-rights questions, so the planned shipped art is an original rolling-robot interpretation.
+
+## Brand assets to hand off
+
+| Asset | Source and export |
+| --- | --- |
+| Mac app icon | Editable vector layers, Icon Composer project, and app asset catalog; include default/dark/clear/tinted review sheet. |
+| Standalone source-to-page mark | SVG/PDF vector for About, help, and project materials, plus one-color black and white versions. |
+| Wordmark lockup | Editable type source and outlined export; keep name separate from icon geometry. |
+| Appearance-switch art | Native/vector source for light, dark, focused, increased-contrast, and reduced-motion still states. |
+| Palette sheet | Role names, light/dark values, contrast results, and examples on actual Mac controls. |
+
+Keep source files in the future art implementation workspace and exports in the app asset catalog. The present document is the brief; no artwork is being generated in this planning pass.
+
+## Review checklist
+
+1. Check the icon at 16, 32, 64, 128, and 512 px in light and dark Dock contexts. At 32 px, brace and page must remain distinct.
+2. Inspect icon variants in Icon Composer for clipping, weight, and legibility; test the one-color mark at 16 px.
+3. Review the switch as two stills and a short transition at actual toolbar size. The robot must remain readable without clouds, tan ground, or orange markings.
+4. Test the switch with keyboard focus, VoiceOver, Reduce Motion, Increase Contrast, and grayscale. UX owns behavior; art owns visible state and silhouette.
+5. Compare a light and dark editor window with an actual PDF. The source and output should dominate; the switch and blue accent should be clear but secondary.
 
 ## Scope
 
-This is a production brief, not finished artwork. Create the chosen icon and its required assets before visual polish elsewhere. Custom illustrations, theme packs, and animated branding are outside the first release.
+Mac only. No iPhone/iPad icon targets, theme packs, textured editor backgrounds, or page-load animation are planned. The icon and switch are the only custom illustration work in the first visual pass.
