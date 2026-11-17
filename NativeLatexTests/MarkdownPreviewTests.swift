@@ -103,7 +103,7 @@ final class MarkdownPreviewTests: XCTestCase {
         let tmp = FileManager.default.temporaryDirectory
         func workDirs() throws -> Int { try FileManager.default.contentsOfDirectory(atPath: tmp.path).filter { $0.hasPrefix("libreleaf-preview-") }.count }
         let before = try workDirs()
-        let big = String(repeating: "| a | $x^2$ | **b** |\n|---|---|---|\n| 1 | $\\frac{1}{2}$ | [l](u) |\n\n", count: 40_000)
+        let big = String(repeating: "| a | $x^2$ | **b** |\n|---|---|---|\n| 1 | $\\frac{1}{2}$ | [l](u) |\n\n", count: 12_000)
         let started = ContinuousClock.now
         let task = Task { try await MarkdownRenderer.render(big) }
         try await Task.sleep(for: .milliseconds(150))
@@ -146,6 +146,10 @@ final class MarkdownPreviewTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(finished, 10, "uncancelled renders complete")
         try await Task.sleep(for: .milliseconds(1500)) // past the SIGKILL escalation
+        try assertNoPandocChildren()
+    }
+
+    private func assertNoPandocChildren(file: StaticString = #filePath, line: UInt = #line) throws {
         let pgrep = Process()
         pgrep.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
         pgrep.arguments = ["-l", "-P", String(getpid()), "pandoc"]
@@ -154,7 +158,89 @@ final class MarkdownPreviewTests: XCTestCase {
         try pgrep.run()
         pgrep.waitUntilExit()
         let survivors = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        XCTAssertEqual(pgrep.terminationStatus, 1, "no renderer process survives cancellation: \(survivors)")
+        XCTAssertEqual(pgrep.terminationStatus, 1, "no renderer process survives: \(survivors)", file: file, line: line)
+    }
+
+    /// Fake `pandoc` that writes `bytes` bytes to its --output= path; no real renderer runs.
+    private func fakePandoc(writing bytes: Int) throws -> URL {
+        let url = folder.appendingPathComponent("fake-pandoc-\(bytes)")
+        try """
+        #!/bin/sh
+        for a in "$@"; do case "$a" in --output=*) out="${a#--output=}";; esac; done
+        head -c \(bytes) /dev/zero | tr '\\0' a > "$out"
+        """.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        return url
+    }
+
+    func testResourceLimitsArgumentsAndSizeBoundaries() async throws {
+        let args = MarkdownRenderer.arguments
+        XCTAssertEqual(Array(args.prefix(3)), ["+RTS", "-M256m", "-RTS"], "GHC heap cap comes first")
+        XCTAssertTrue(args.contains("--math-method=mathml") && args.contains("--sandbox"))
+        XCTAssertFalse(args.contains("--mathml"), "deprecated flag")
+        XCTAssertEqual(MarkdownRenderer.maxInputBytes, 1 << 20)
+        XCTAssertEqual(MarkdownRenderer.maxOutputBytes, 8 << 20)
+        XCTAssertEqual(MarkdownRenderer.timeout, .seconds(10))
+
+        let small = try fakePandoc(writing: 9)
+        let atLimit = String(repeating: "é", count: MarkdownRenderer.maxInputBytes / 2) // 2-byte UTF-8: exactly 1 MiB
+        let rendered = try await MarkdownRenderer.render(atLimit, pandoc: small)
+        XCTAssertEqual(rendered.count, 9, "input of exactly 1 MiB is accepted")
+        do { _ = try await MarkdownRenderer.render(atLimit + "x", pandoc: small); XCTFail() } catch {
+            XCTAssertEqual(error as? MarkdownRenderer.Failure, .tooLarge(MarkdownRenderer.maxInputBytes + 1))
+        }
+
+        let html = try await MarkdownRenderer.render("# hi", pandoc: try fakePandoc(writing: MarkdownRenderer.maxOutputBytes))
+        XCTAssertEqual(html.utf8.count, MarkdownRenderer.maxOutputBytes, "output of exactly 8 MiB is shown")
+        do { _ = try await MarkdownRenderer.render("# hi", pandoc: try fakePandoc(writing: MarkdownRenderer.maxOutputBytes + 1)); XCTFail() } catch {
+            XCTAssertEqual(error as? MarkdownRenderer.Failure, .outputTooLarge(MarkdownRenderer.maxOutputBytes + 1))
+            XCTAssertTrue(error.localizedDescription.contains("Split"), error.localizedDescription)
+        }
+    }
+
+    /// Heap-capped real Pandoc on the audited pathological shape (uncapped it passed 3 GB): fails fast, leaves nothing running.
+    func testCappedPathologicalInputFailsFastWithoutSurvivors() async throws {
+        _ = try pandocOrSkip()
+        let started = ContinuousClock.now
+        do { _ = try await MarkdownRenderer.render(String(repeating: "[", count: MarkdownRenderer.maxInputBytes)); XCTFail() } catch {
+            XCTAssertEqual(error as? MarkdownRenderer.Failure, .outOfMemory, "\(error)")
+            XCTAssertTrue(error.localizedDescription.contains("256MB"), error.localizedDescription)
+        }
+        XCTAssertLessThan(ContinuousClock.now - started, .seconds(8), "heap cap stops it well before the timeout")
+        try assertNoPandocChildren()
+    }
+
+    /// The caps keep ordinary previews working: a dense 1 MiB mix still renders.
+    func testOrdinaryDenseOneMiBDocumentStillRenders() async throws {
+        _ = try pandocOrSkip()
+        var text = ""
+        for n in 0... {
+            let section = """
+            # Section \(n)
+
+            Text with [a link](https://example.org/\(n)), *emphasis*, `code` and $e^{i\\pi}+1=0$.[^n\(n)]
+
+            | A | B |
+            |---|--:|
+            | 1 | $\\frac{1}{2}$ |
+
+            $$\\int_0^1 x^2\\,dx$$
+
+            ```python
+            print("hello \(n)")
+            ```
+
+            [^n\(n)]: Footnote \(n).
+
+
+            """
+            if text.utf8.count + section.utf8.count > MarkdownRenderer.maxInputBytes { break }
+            text += section
+        }
+        XCTAssertGreaterThan(text.utf8.count, 1_000_000)
+        let html = try await MarkdownRenderer.render(text)
+        XCTAssertTrue(html.contains("<table") && html.contains("<math") && html.contains("class=\"footnotes"))
+        XCTAssertLessThanOrEqual(html.utf8.count, MarkdownRenderer.maxOutputBytes)
     }
 
     func testAssetHandlerServesOnlyImagesInsideTheDocumentFolder() throws {

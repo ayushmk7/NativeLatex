@@ -8,12 +8,21 @@ import WebKit
 /// TeX math becomes native MathML (no MathJax CDN), raw HTML/TeX in the source is shown as text,
 /// and `--sandbox` stops Pandoc reading or fetching anything but its input.
 enum MarkdownRenderer {
-    static let maxInputBytes = 5 << 20
-    static let timeout: Duration = .seconds(20)
+    /// Measured on Apple silicon: a dense 1 MiB mix of tables, math, footnotes and code renders in ~2.5 s at ~300 MB RSS.
+    static let maxInputBytes = 1 << 20
+    /// MathML is ~5.4× the input on dense math; anything bigger is not loaded into WebKit.
+    static let maxOutputBytes = 8 << 20
+    /// Pandoc is a GHC program: its RTS heap cap makes it exit 251 "Heap exhausted" instead of growing
+    /// (5 MiB of "[" passed 3 GB uncapped; capped, hostile inputs stop in <2 s at ~370 MB RSS).
+    static let heapLimit = "256m"
+    static let timeout: Duration = .seconds(10)
 
     enum Failure: LocalizedError, Equatable {
         case missingPandoc
         case tooLarge(Int)
+        case outOfMemory
+        case outputTooLarge(Int)
+        case timedOut
         case failed(String)
 
         var errorDescription: String? {
@@ -22,6 +31,12 @@ enum MarkdownRenderer {
                 "Rich Markdown preview needs Pandoc, which wasn’t found in /opt/homebrew/bin, /usr/local/bin or your PATH. Install it with “brew install pandoc” or from pandoc.org, then choose Try Again. Your file is not affected."
             case .tooLarge(let bytes):
                 "This file is \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)), too large to preview live (limit \(ByteCountFormatter.string(fromByteCount: Int64(maxInputBytes), countStyle: .file))). Editing and saving still work."
+            case .outOfMemory:
+                "This document needs more memory than the live preview allows (\(heapLimit.uppercased())B), so it wasn’t rendered. Split it into smaller files or simplify very deep nesting; editing and saving still work."
+            case .outputTooLarge(let bytes):
+                "The rendered preview would be \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)), more than the \(ByteCountFormatter.string(fromByteCount: Int64(maxOutputBytes), countStyle: .file)) the live preview shows. Split the document into smaller files; editing and saving still work."
+            case .timedOut:
+                "Pandoc took longer than \(timeout.components.seconds) seconds and was stopped. Very long runs of *, `, > or $ can be slow to parse; editing and saving still work."
             case .failed(let message):
                 "Pandoc couldn’t render this file: \(message)"
             }
@@ -29,10 +44,11 @@ enum MarkdownRenderer {
     }
 
     static let arguments = [
+        "+RTS", "-M\(heapLimit)", "-RTS",
         "--sandbox",
         // Pandoc Markdown covers GFM pipe tables, footnotes, fenced code and $…$ math; raw HTML/TeX stay literal text.
         "--from=markdown-raw_html-raw_tex-raw_attribute+autolink_bare_uris+task_lists",
-        "--to=html5", "--mathml", "--wrap=none",
+        "--to=html5", "--math-method=mathml", "--wrap=none",
     ]
 
     /// Renders `text` (the unsaved buffer, never the file on disk) via a private temp copy.
@@ -75,11 +91,16 @@ enum MarkdownRenderer {
         } onCancel: { stop(process) } onTimeout: { stop(process) }
         if let launchError { throw Failure.failed("LibreLeaf couldn’t start \(pandoc.path): \(launchError.localizedDescription)") }
         try Task.checkCancellation()
-        guard process.terminationReason == .exit else { throw Failure.failed("stopped after \(timeout) or cancelled.") }
-        guard process.terminationStatus == 0, let html = try? String(contentsOf: output, encoding: .utf8) else {
-            let message = (try? String(contentsOf: errors, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
-            throw Failure.failed(message?.isEmpty == false ? message! : "exit status \(process.terminationStatus).")
+        guard process.terminationReason == .exit else { throw Failure.timedOut } // not cancelled, so the timer stopped it
+        let message = ((try? String(contentsOf: errors, encoding: .utf8)) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if process.terminationStatus == 251 || message.contains("Heap exhausted") { throw Failure.outOfMemory }
+        guard process.terminationStatus == 0 else {
+            throw Failure.failed(message.isEmpty ? "exit status \(process.terminationStatus)." : message)
         }
+        // Check the size before reading, so an oversized result never reaches memory or WebKit.
+        let size = (try? output.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard size <= maxOutputBytes else { throw Failure.outputTooLarge(size) }
+        guard let html = try? String(contentsOf: output, encoding: .utf8) else { throw Failure.failed("no readable output.") }
         return html
     }
 
