@@ -93,8 +93,9 @@ enum MarkdownRenderer {
         try Task.checkCancellation()
         guard process.terminationReason == .exit else { throw Failure.timedOut } // not cancelled, so the timer stopped it
         let message = ((try? String(contentsOf: errors, encoding: .utf8)) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if process.terminationStatus == 251 || message.contains("Heap exhausted") { throw Failure.outOfMemory }
         guard process.terminationStatus == 0 else {
+            // Only a failed run can be heap exhaustion; a successful run's warnings may quote the phrase from the document.
+            if process.terminationStatus == 251 || message.contains("Heap exhausted") { throw Failure.outOfMemory }
             throw Failure.failed(message.isEmpty ? "exit status \(process.terminationStatus)." : message)
         }
         // Check the size before reading, so an oversized result never reaches memory or WebKit.
