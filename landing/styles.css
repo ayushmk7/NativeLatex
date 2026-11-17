@@ -1,6 +1,5 @@
-/* Black/white with one electric-blue accent, the Website's body.opt7 values (src/pages/index.astro).
-   Neutrals follow the Internship page (Apple greys).
-   Contrast: #0F2BFF on white 7.47:1 (also white text on it); dark: #7A93FF text on black 7.45:1, white on #2438FF 6.81:1. */
+/* Black/white with one blue accent, the Internship tracker's values (Internship/frontend/src/style.css).
+   Contrast: #0066CC on white 5.6:1 (also white text on it); dark: #0A84FF text on black 5.6:1, white on #0071E3 4.7:1. */
 :root {
   color-scheme: light;
   --bg: #ffffff;
@@ -8,8 +7,8 @@
   --muted: #6e6e73;
   --solid: #f5f5f7;
   --line: rgba(0, 0, 0, .10);
-  --accent: #0f2bff;      /* blue as text, links, focus */
-  --fill: #0f2bff;        /* filled button, white text */
+  --accent: #0066cc;      /* blue as text, links, focus */
+  --fill: #0066cc;        /* filled button, white text */
   --ring: var(--accent);  /* own name: bb8.css redefines --accent (orange) inside the toggle */
   --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 96px;
   --h: 44px;
@@ -23,8 +22,8 @@ html[data-theme="dark"] {
   --muted: #98989d;
   --solid: #141416;
   --line: rgba(255, 255, 255, .14);
-  --accent: #7a93ff;
-  --fill: #2438ff;
+  --accent: #0a84ff;
+  --fill: #0071e3;
 }
 
 * { box-sizing: border-box; }
@@ -54,33 +53,41 @@ code { font-family: var(--mono); font-size: .9em; }
 .bb8-toggle__checkbox { display: block !important; position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .bb8-toggle__checkbox:focus-visible + .bb8-toggle__container { outline: 3px solid var(--ring); outline-offset: 4px; }
 
-.hero { padding: var(--s8) 0; text-align: center; }
-h1 { margin: var(--s5) 0; font-size: clamp(40px, 7vw, 80px); font-weight: 800; line-height: 1.02; letter-spacing: -.035em; text-wrap: balance; }
-.lede { max-width: 36rem; margin-inline: auto; color: var(--muted); font-size: clamp(17px, 2vw, 19px); }
+.hero { padding: 120px 0 var(--s8); text-align: center; }
+h1 { margin: 0 0 var(--s5); font-size: clamp(42px, 7.5vw, 88px); font-weight: 800; line-height: 1; letter-spacing: -.04em; text-wrap: balance; }
+.lede { max-width: 34rem; margin-inline: auto; color: var(--muted); font-size: clamp(17px, 2vw, 20px); line-height: 1.5; text-wrap: pretty; }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s3); margin-top: var(--s6); }
 .button { display: inline-flex; align-items: center; gap: 10px; min-height: var(--h); padding: 0 22px; border: 1px solid var(--line); border-radius: 999px; font-size: 15px; font-weight: 600; transition: background-color .2s, border-color .2s; }
 .button:hover { border-color: var(--fg); }
 .button.primary { background: var(--fill); border-color: transparent; color: #fff; }
-.button.primary:hover { filter: brightness(.9); }
+.button.primary:hover { filter: brightness(1.1); }
+.button.primary:active { transform: scale(.98); }
 
-.preview { margin-top: var(--s8); text-align: left; }
-.preview figcaption { margin-top: var(--s3); font-size: 13px; color: var(--muted); text-align: center; }
-.preview-player { position: relative; }
-.preview video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .08); }
-.preview-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 22px; border: 0; border-radius: 999px; background: #0a0a0a; color: #fff; font: 600 15px var(--font); white-space: nowrap; cursor: pointer; box-shadow: 0 8px 28px rgba(0, 0, 0, .2); }
-.preview-play:hover { background: var(--fill); }
+.preview { margin-top: 88px; text-align: left; }
+.preview figcaption { margin-top: var(--s4); font-size: 13px; color: var(--muted); text-align: center; }
+/* the video sits on a quiet surface "stage" so the white app frame never reads as a hole in the page */
+.preview-player { position: relative; padding: clamp(8px, 1.6vw, 20px); border: 1px solid var(--line); border-radius: 24px; background: var(--solid); }
+.preview video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 14px; background: #fff;
+  box-shadow: 0 0 0 1px var(--line), 0 24px 64px -16px rgba(0, 0, 0, .22); }
+html[data-theme="dark"] .preview video { box-shadow: 0 0 0 1px var(--line), 0 24px 64px -16px rgba(0, 0, 0, .9); }
+/* clean poster until it plays: hide the native control bar while the Play button shows (script.js hides it on play) */
+.preview-player:has(.preview-play:not([hidden])) video::-webkit-media-controls { display: none !important; }
+.preview-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px 0 20px; border: 0; border-radius: 999px; background: var(--fill); color: #fff; font: 600 15px var(--font); white-space: nowrap; cursor: pointer;
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, .55), 0 12px 32px rgba(0, 0, 0, .25); transition: transform .2s; }
+.preview-play:hover { transform: translate(-50%, -50%) scale(1.04); }
+.preview-play:active { transform: translate(-50%, -50%) scale(.98); }
 .preview-play[hidden] { display: none; }
 
 .section { padding: var(--s8) 0; border-top: 1px solid var(--line); }
-h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 48px); font-weight: 800; line-height: 1.08; letter-spacing: -.03em; }
+h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 52px); font-weight: 800; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; }
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s6); margin-top: var(--s7); padding: 0; list-style: none; }
 .steps li { padding-top: var(--s4); border-top: 2px solid var(--fg); }
-.step-number { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+.step-number { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); }
 .steps h3 { margin: var(--s3) 0 var(--s2); font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .steps p, .principle-list dd { color: var(--muted); font-size: 15px; }
 .principle-list { margin-top: var(--s7); border-top: 1px solid var(--line); }
 .principle-list div { display: grid; grid-template-columns: 220px 1fr; gap: var(--s4); padding: var(--s5) 0; border-bottom: 1px solid var(--line); }
-.principle-list dt { font-weight: 700; }
+.principle-list dt { font-weight: 700; font-size: 17px; }
 
 .site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s3); padding: var(--s6) 0 var(--s7); border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
 
@@ -95,9 +102,12 @@ h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 48px); font-weight: 800; lin
   .site-nav { display: none; }
   /* padding grows the tap target to 44px; negative margin keeps the artwork in place */
   .bb8-toggle { --toggle-size: 5.2px; margin: -8px -8px -8px auto; padding: 8px; }
-  .hero { padding: var(--s7) 0 var(--s8); }
+  .hero { padding: 64px 0 var(--s7); }
   .preview { margin-top: var(--s7); }
-  .button { flex: 1 1 100%; justify-content: center; }
+  .preview-player { border-radius: 16px; }
+  .preview video { border-radius: 10px; }
+  .preview-play { min-height: 44px; padding: 0 18px 0 16px; font-size: 14px; box-shadow: 0 0 0 4px rgba(255, 255, 255, .55), 0 8px 24px rgba(0, 0, 0, .25); }
+  .button { min-width: 200px; justify-content: center; }
   .section { padding: var(--s7) 0; }
 }
 
@@ -106,8 +116,8 @@ h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 48px); font-weight: 800; lin
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
-/* Increase Contrast: stronger greys and dividers; the blues already pass at 6.8:1 or more */
+/* Increase Contrast: stronger greys, dividers and blues */
 @media (prefers-contrast: more) {
-  :root { --line: #8e8e93; --muted: #3a3a3c; }
-  html[data-theme="dark"] { --line: #8e8e93; --muted: #c7c7cc; }
+  :root { --line: #8e8e93; --muted: #3a3a3c; --accent: #004c99; --fill: #004c99; }
+  html[data-theme="dark"] { --line: #8e8e93; --muted: #c7c7cc; --accent: #409cff; --fill: #0058b0; }
 }
