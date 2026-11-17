@@ -8,12 +8,32 @@ extension NSAttributedString.Key {
 }
 
 /// Styles Markdown source so it reads like the rendered document: headings, emphasis, code, links,
-/// quotes and lists are formatted and their markup is hidden, except on the line being edited.
+/// quotes and lists are formatted and their markup is hidden, on the caret's line too, so moving the caret
+/// never changes a line's width. Sizes and spacing are the Read stylesheet's (`MarkdownRenderer.css`).
 /// Only attributes change; the characters (and so the saved Markdown) are exactly what the user typed.
 /// Tables, math, images, HTML and front matter stay visible as Markdown in a quiet monospaced style.
 enum MarkdownStyler {
     static let bodySize: CGFloat = 15
-    static let headingSizes: [CGFloat] = [26, 22, 19, 17, 15, 15]
+    /// h1–h6 in points; Read's stylesheet uses the same values in px.
+    static let headingSizes: [CGFloat] = [30, 22.5, 18.75, 15, 13, 12]
+    /// Read: `line-height: 1.55`, paragraphs `margin: 1em`, headings `margin-top: 1.4em`, `line-height: 1.25`.
+    static let lineHeight: CGFloat = 1.55, headingLineHeight: CGFloat = 1.25, headingSpaceBefore: CGFloat = 1.4
+    /// Read's `main { max-width: 46em }` at the 15 px body size.
+    static let columnWidth: CGFloat = 46 * bodySize
+    /// Font and paragraph style per heading level, made once (measuring line height costs a layout manager).
+    nonisolated(unsafe) static let headingStyles: [[NSAttributedString.Key: Any]] = headingSizes.map { size in
+        let font = NSFont.systemFont(ofSize: size, weight: .bold)
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = lineSpacing(font, multiple: headingLineHeight)
+        // Read's 1.4em margin above, less the blank line's 1em that already separates the blocks.
+        style.paragraphSpacingBefore = max(0, size * headingSpaceBefore - bodySize)
+        return [.font: font, .paragraphStyle: style]
+    }
+    static let bodyLineSpacing = lineSpacing(.systemFont(ofSize: bodySize), multiple: lineHeight)
+    /// Extra space below each line so it is `lineHeight` × the font size tall, like CSS line-height.
+    static func lineSpacing(_ font: NSFont, multiple: CGFloat) -> CGFloat {
+        max(0, (font.pointSize * multiple - NSLayoutManager().defaultLineHeight(for: font)).rounded())
+    }
 
     private static func regex(_ pattern: String) -> NSRegularExpression {
         try! NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
@@ -21,6 +41,7 @@ enum MarkdownStyler {
     private static let heading = regex(#"^ {0,3}(#{1,6})([ \t]+|$)"#)
     private static let quote = regex(#"^ {0,3}(>[ \t]?)+"#)
     private static let list = regex(#"^[ \t]*([-*+]|\d{1,9}[.)])[ \t]+(\[[ xX]\][ \t]+)?"#)
+    private static let blankLine = regex(#"^[ \t]*$"#)
     private static let literalLine = regex(#"^ {0,3}(\||\$\$|<|---[ \t]*$|\+\+\+).*$"#)
     /// Longest inline span (emphasis, link, image, math) the Write view styles, in UTF-16 units. Unbounded
     /// lazy spans made a long line of unmatched markers quadratic: a 24 KB line of `*a ` cost seconds per
@@ -61,8 +82,8 @@ enum MarkdownStyler {
         return result
     }
 
-    /// Restyles `limit` (whole paragraphs; all of `storage` if nil). Markup inside `reveal` (the caret's
-    /// lines) stays visible, dimmed. Code fences are found over the whole text, since an opening fence
+    /// Restyles `limit` (whole paragraphs; all of `storage` if nil). Hidden markup stays hidden everywhere;
+    /// only fence lines inside `reveal` (the caret's lines) turn from clear to dim, which never moves text. Code fences are found over the whole text, since an opening fence
     /// anywhere above changes what follows; a fence block touching `limit` is restyled whole.
     static func apply(to storage: NSTextStorage, reveal: NSRange, in limit: NSRange? = nil, fences known: [(range: NSRange, markers: [NSRange])]? = nil) {
         let text = storage.string as NSString
@@ -77,8 +98,10 @@ enum MarkdownStyler {
         let mono = NSFont.monospacedSystemFont(ofSize: bodySize - 2, weight: .regular)
         let codeBackground = NSColor(Theme.surface)
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 3
-        paragraph.paragraphSpacing = 4
+        paragraph.lineSpacing = bodyLineSpacing
+        // A blank line is the gap between blocks: one body size tall, like Read's 1em paragraph margin.
+        let gap = NSMutableParagraphStyle()
+        gap.minimumLineHeight = bodySize; gap.maximumLineHeight = bodySize
 
         storage.beginEditing()
         defer { storage.endEditing() }
@@ -90,11 +113,7 @@ enum MarkdownStyler {
         }
         func hide(_ range: NSRange) {
             guard range.length > 0 else { return }
-            if isRevealed(range) {
-                storage.addAttribute(.foregroundColor, value: secondary, range: range)
-            } else {
-                storage.addAttribute(.markdownHidden, value: true, range: range)
-            }
+            storage.addAttribute(.markdownHidden, value: true, range: range)
         }
         func isProtected(_ range: NSRange) -> Bool { protected.intersects(integersIn: range.location..<NSMaxRange(range)) }
         func protect(_ range: NSRange) { protected.insert(integersIn: range.location..<NSMaxRange(range)) }
@@ -110,6 +129,7 @@ enum MarkdownStyler {
             protect(range)
         }
 
+        for m in matches(blankLine) { storage.addAttribute(.paragraphStyle, value: gap, range: text.lineRange(for: m.range)) }
         for block in blocks where NSIntersectionRange(block.range, target).length > 0 {
             storage.addAttribute(.font, value: mono, range: block.range)
             protect(block.range)
@@ -137,8 +157,7 @@ enum MarkdownStyler {
 
         for m in matches(heading) where !isProtected(m.range) {
             let line = text.lineRange(for: m.range)
-            let level = m.range(at: 1).length
-            storage.addAttribute(.font, value: NSFont.systemFont(ofSize: headingSizes[level - 1], weight: .bold), range: line)
+            storage.addAttributes(headingStyles[m.range(at: 1).length - 1], range: line)
             hide(m.range)
         }
         for m in matches(quote) where !isProtected(m.range) {
@@ -266,7 +285,7 @@ enum MarkdownFormat {
     }
 }
 
-/// The Write view's text view: Markdown styled as rendered, markup hidden off the caret's lines.
+/// The Write view's text view: Markdown styled as rendered in a centered, Read-width column; markup hidden.
 @MainActor
 final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
     private var revealed = NSRange(location: NSNotFound, length: 0)
@@ -275,10 +294,17 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
     private var edited: NSRange?
     private var fenceEdit = false
     private var mouseUp: Any?
+    private var resize: Any?
 
     override func configure(_ view: NSTextView) {
         view.font = .systemFont(ofSize: MarkdownStyler.bodySize)
         view.textContainerInset = NSSize(width: Theme.s5, height: Theme.s4)
+        // Full-width editor, centered column: the side insets grow so the text is at most Read's width.
+        view.postsFrameChangedNotifications = true
+        resize = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.centerColumn() }
+        }
+        centerColumn()
         view.layoutManager?.delegate = self // TextKit 1 for per-glyph hiding
         view.layoutManager?.allowsNonContiguousLayout = true // large files: lay out only what's visible
         // Reveal follows the caret only after a click or drag ends, so the line doesn't reflow under the mouse.
@@ -289,7 +315,18 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
         restyle(nil)
     }
 
-    deinit { if let mouseUp { NSEvent.removeMonitor(mouseUp) } }
+    deinit {
+        if let mouseUp { NSEvent.removeMonitor(mouseUp) }
+        if let resize { NotificationCenter.default.removeObserver(resize) }
+    }
+
+    /// Side insets that center a column of at most `MarkdownStyler.columnWidth`, never less than Read's 24 pt padding.
+    func centerColumn() {
+        guard let view else { return }
+        let padding = view.textContainer?.lineFragmentPadding ?? 0
+        let side = max(Theme.s5, ((view.frame.width - MarkdownStyler.columnWidth) / 2 - padding).rounded(.down))
+        if view.textContainerInset.width != side { view.textContainerInset = NSSize(width: side, height: Theme.s4) }
+    }
 
     func textView(_ textView: NSTextView, shouldChangeTextIn range: NSRange, replacementString: String?) -> Bool {
         let replacement = replacementString ?? ""

@@ -120,9 +120,10 @@ enum MarkdownRenderer {
     @media (prefers-color-scheme: dark) { :root { --bg:#000000; --fg:#F5F5F7; --muted:#98989D; --line:rgba(255,255,255,.16); --code:#141416; --link:#F5F5F7; --accent:#2563EB; } }
     @media (prefers-contrast: more) { :root { --muted:#3A3A3C; } }
     @media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root { --muted:#C7C7CC; --link:#FFFFFF; } }
-    html { background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, system-ui, sans-serif; }
-    body { margin:0; } main { max-width:46em; margin:0 auto; padding:16px 24px 48px; overflow-wrap:break-word; }
-    h1,h2,h3,h4,h5,h6 { line-height:1.25; margin:1.4em 0 .5em; } h1 { font-size:2em; } h2 { font-size:1.5em; border-bottom:1px solid var(--line); padding-bottom:.2em; }
+    html { background:var(--bg); color:var(--fg); font:\(Int(MarkdownStyler.bodySize))px/\(MarkdownStyler.lineHeight) -apple-system, system-ui, sans-serif; }
+    body { margin:0; } main { max-width:\(Int(MarkdownStyler.columnWidth))px; margin:0 auto; padding:16px 24px 48px; overflow-wrap:break-word; }
+    h1,h2,h3,h4,h5,h6 { line-height:\(MarkdownStyler.headingLineHeight); margin:\(MarkdownStyler.headingSpaceBefore)em 0 .5em; font-weight:700; }
+    \(MarkdownStyler.headingSizes.enumerated().map { "h\($0 + 1) { font-size:\($1)px; }" }.joined(separator: " "))
     a { color:var(--link); text-decoration:underline; }
     code, pre { font:13px ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--code); border-radius:4px; }
     code { padding:.1em .3em; } pre { padding:12px; overflow:auto; } pre code { padding:0; background:none; }

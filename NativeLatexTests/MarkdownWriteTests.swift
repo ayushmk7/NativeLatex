@@ -135,7 +135,7 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertEqual(try text(document), Self.fixture, "no-op: caret movement and styling never edit")
         XCTAssertFalse(document.isDocumentEdited)
 
-        // Rendered look: heading sized, markup hidden off the caret line, bold applied, literal blocks monospaced.
+        // Rendered look: heading sized, markup hidden (on the caret line too), bold applied, literal blocks monospaced.
         window.makeFirstResponder(writer)
         writer.setSelectedRange(NSRange(location: 0, length: 0))
         settle()
@@ -154,7 +154,7 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertTrue(table.isFixedPitch, "tables stay as Markdown")
         writer.setSelectedRange(NSRange(location: ns.range(of: "Some").location, length: 0))
         settle()
-        XCTAssertNil(storage.attribute(.markdownHidden, at: ns.range(of: "**bold**").location, effectiveRange: nil), "caret line reveals markup")
+        XCTAssertNotNil(storage.attribute(.markdownHidden, at: ns.range(of: "**bold**").location, effectiveRange: nil), "caret line keeps markup hidden")
 
         // Write: add words, continue a list, start a paragraph, format, delete.
         var expected = Self.fixture
@@ -431,13 +431,13 @@ final class MarkdownWriteTests: XCTestCase {
         window.makeFirstResponder(writer)
         writer.setSelectedRange(NSRange(location: ns.range(of: "Other").location, length: 0))
         settle()
-        XCTAssertNil(storage.attribute(.markdownHidden, at: ns.range(of: "**line").location, effectiveRange: nil), "caret line revealed")
+        XCTAssertNotNil(storage.attribute(.markdownHidden, at: ns.range(of: "**line").location, effectiveRange: nil), "caret line stays hidden")
         XCTAssertNotNil(storage.attribute(.markdownHidden, at: ns.range(of: "**bold").location, effectiveRange: nil))
 
         writer.setSelectedRange(NSRange(location: 2, length: ns.range(of: "Other").location)) // drag-select up into the intro
         settle()
         XCTAssertNotNil(storage.attribute(.markdownHidden, at: ns.range(of: "**bold").location, effectiveRange: nil), "selection doesn't reveal (no reflow)")
-        XCTAssertNil(storage.attribute(.markdownHidden, at: ns.range(of: "**line").location, effectiveRange: nil), "previous reveal kept")
+        XCTAssertNotNil(storage.attribute(.markdownHidden, at: ns.range(of: "**line").location, effectiveRange: nil), "still hidden")
 
         let fence = ns.range(of: "```\ncode")
         XCTAssertEqual(storage.attribute(.foregroundColor, at: fence.location, effectiveRange: nil) as? NSColor, .clear, "fence hidden")
@@ -611,6 +611,45 @@ final class MarkdownWriteTests: XCTestCase {
         while view.undoManager?.canUndo == true { view.undoManager?.undo() }
         XCTAssertEqual(view.string, big, "undo restores the exact source")
         assertMatchesFullRestyle("after undo")
+    }
+
+    /// Write matches Read's typography (one set of numbers drives both), the column is centered at Read's width,
+    /// and putting the caret on a line never moves its text: markup stays hidden, so widths don't jump.
+    func testWriteMatchesReadTypographyAndCaretNeverMovesText() {
+        let css = MarkdownRenderer.css
+        for (i, size) in MarkdownStyler.headingSizes.enumerated() { XCTAssertTrue(css.contains("h\(i + 1) { font-size:\(size)px; }"), "h\(i + 1)") }
+        XCTAssertTrue(css.contains("font:15px/1.55"))
+        XCTAssertTrue(css.contains("max-width:690px"))
+
+        let text = "## Sub\n\nSome **bold** and `code` [link](https://x.org) end.\n\n> quoted *it*\n"
+        let pair = Pair(text)
+        defer { pair.window.close() }
+        pair.window.makeFirstResponder(pair.wv)
+        let storage = pair.wv.textStorage!
+        let sub = storage.attribute(.font, at: pair.location(of: "Sub"), effectiveRange: nil) as? NSFont
+        XCTAssertEqual(sub?.pointSize, 22.5)
+        let style = storage.attribute(.paragraphStyle, at: pair.location(of: "Some"), effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertGreaterThan(style?.lineSpacing ?? 0, 0, "body has Read's 1.55 line height")
+        let gap = storage.attribute(.paragraphStyle, at: pair.location(of: "\n\nSome") + 1, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(gap?.maximumLineHeight, MarkdownStyler.bodySize, "blank line is a 1em block gap")
+
+        // Centered column: 1400 pt wide view keeps text 690 pt wide.
+        pair.wv.enclosingScrollView!.frame.size.width = 1400
+        pair.wv.frame.size.width = 1400
+        XCTAssertEqual(pair.wv.textContainer!.size.width - 2 * pair.wv.textContainer!.lineFragmentPadding, MarkdownStyler.columnWidth, accuracy: 2)
+
+        func xs() -> [CGFloat] {
+            let layout = pair.wv.layoutManager!
+            layout.ensureLayout(for: pair.wv.textContainer!)
+            return ["Sub", "end.", "quoted", "it*"].map { layout.location(forGlyphAt: layout.glyphIndexForCharacter(at: pair.location(of: $0))).x }
+        }
+        pair.wv.setSelectedRange(NSRange(location: 0, length: 0)); pair.pump()
+        let away = xs()
+        for needle in ["Sub", "bold", "quoted"] {
+            pair.wv.setSelectedRange(NSRange(location: pair.location(of: needle), length: 0)); pair.pump()
+            XCTAssertEqual(xs(), away, "caret on \(needle)'s line")
+        }
+        XCTAssertEqual(pair.doc, text, "styling never edits the source")
     }
 
     /// Moving the caret onto a hidden fence line reveals it without moving the text below.
