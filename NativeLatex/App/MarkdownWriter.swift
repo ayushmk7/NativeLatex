@@ -71,7 +71,6 @@ enum MarkdownStyler {
         let fg = NSColor(Theme.foreground), secondary = NSColor(Theme.secondary), accent = NSColor(Theme.accentText)
         let body = NSFont.systemFont(ofSize: bodySize)
         let mono = NSFont.monospacedSystemFont(ofSize: bodySize - 2, weight: .regular)
-        let collapsed = NSFont.monospacedSystemFont(ofSize: 1, weight: .regular)
         let codeBackground = NSColor(Theme.surface)
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = 3
@@ -111,12 +110,12 @@ enum MarkdownStyler {
             storage.addAttribute(.font, value: mono, range: block.range)
             protect(block.range)
             for marker in block.markers {
-                let line = text.lineRange(for: marker) // with its newline
                 if isRevealed(marker) {
                     storage.addAttribute(.foregroundColor, value: secondary, range: marker)
                 } else {
-                    // A hidden fence line collapses to a hairline instead of leaving an empty band.
-                    storage.addAttributes([.markdownHidden: true, .font: collapsed], range: line)
+                    // Drawn clear rather than removed: the line keeps its exact height, so revealing it when the
+                    // caret arrives only changes colour and never shifts the text below.
+                    storage.addAttribute(.foregroundColor, value: NSColor.clear, range: marker)
                 }
             }
             // Shade only the code lines between the fences.
@@ -312,13 +311,21 @@ final class WritingHandle: TextViewHandle, NSLayoutManagerDelegate {
 
     override func textViewDidChangeSelection(_ notification: Notification) {
         super.textViewDidChangeSelection(notification)
+        // Mid-sync the storage is still being edited; didSync restyles once it settles.
+        guard !isUpdating else { return }
         let event = NSApp.currentEvent?.type
         guard event != .leftMouseDown, event != .leftMouseDragged else { return } // wait for mouse-up
         updateReveal()
     }
 
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        selector == #selector(NSResponder.insertNewline(_:)) ? MarkdownFormat.continueBlock(textView) : false
+        guard selector == #selector(NSResponder.insertNewline(_:)) else { return false }
+        // Inside fenced code, Return is a plain newline: `- ` or `> ` there is code (a diff, YAML, a shell prompt).
+        let caret = textView.selectedRange().location
+        if MarkdownStyler.fences(textView.string as NSString).contains(where: { caret > $0.range.location && caret <= NSMaxRange($0.range) }) {
+            return false
+        }
+        return MarkdownFormat.continueBlock(textView)
     }
 
     /// Fence structure can change only if a fence run is typed/removed, the edit touches a fence line, or an

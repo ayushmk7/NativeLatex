@@ -344,7 +344,7 @@ final class MarkdownWriteTests: XCTestCase {
     }
 
     /// Selecting text keeps the current reveal (no reflow mid-selection); hidden fence lines collapse without a band.
-    func testSelectionKeepsLayoutAndFencesCollapse() async throws {
+    func testSelectionKeepsLayoutAndHidesFences() async throws {
         let text = "Intro **bold** here.\n\n```\ncode\n```\n\nOther **line**.\n"
         let (_, window) = try await open("select.md", text)
         try setWrite(true, in: window)
@@ -363,11 +363,141 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertNil(storage.attribute(.markdownHidden, at: ns.range(of: "**line").location, effectiveRange: nil), "previous reveal kept")
 
         let fence = ns.range(of: "```\ncode")
-        XCTAssertNotNil(storage.attribute(.markdownHidden, at: fence.location, effectiveRange: nil))
+        XCTAssertEqual(storage.attribute(.foregroundColor, at: fence.location, effectiveRange: nil) as? NSColor, .clear, "fence hidden")
         let fenceFont = try XCTUnwrap(storage.attribute(.font, at: fence.location, effectiveRange: nil) as? NSFont)
-        XCTAssertLessThanOrEqual(fenceFont.pointSize, 1, "hidden fence line collapses")
+        XCTAssertGreaterThan(fenceFont.pointSize, 1, "hidden fence line keeps its height")
         XCTAssertNil(storage.attribute(.backgroundColor, at: fence.location, effectiveRange: nil), "no grey band on the fence line")
         XCTAssertNotNil(storage.attribute(.backgroundColor, at: ns.range(of: "code\n").location, effectiveRange: nil), "code lines shaded")
+    }
+
+    // MARK: Headless pair: Source and Write in one bare window that is never shown or made key.
+
+    /// Both panes wired like EditorView: an edit writes the buffer, then both views sync to it. Offscreen text
+    /// views apply undo without sending textDidChange (the app's key window does send it), so storage edits
+    /// outside a sync stand in for that path here.
+    @MainActor private final class Pair {
+        let source = TextViewHandle(), writer = WritingHandle()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+        var doc: String
+        private var observers: [Any] = []
+        var sv: NSTextView { source.view! }
+        var wv: NSTextView { writer.view! }
+
+        init(_ text: String) {
+            doc = text
+            window.isReleasedWhenClosed = false
+            let content = NSView(frame: NSRect(x: 0, y: 0, width: 900, height: 500))
+            window.contentView = content
+            let s = source.scrollView(text: text, label: "Source"), w = writer.scrollView(text: text, label: "Write")
+            s.frame = NSRect(x: 0, y: 0, width: 450, height: 500); w.frame = NSRect(x: 450, y: 0, width: 450, height: 500)
+            content.addSubview(s); content.addSubview(w)
+            for handle in [source, writer] as [TextViewHandle] { handle.onText = { [unowned self] in self.set($0) } }
+            for view in [sv, wv] {
+                observers.append(NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: view.textStorage, queue: nil) { [unowned self] _ in
+                    MainActor.assumeIsolated {
+                        guard !self.source.isUpdating, !self.writer.isUpdating, view.textStorage!.editedMask.contains(.editedCharacters) else { return }
+                        let text = view.string
+                        DispatchQueue.main.async { self.set(text) }
+                    }
+                })
+            }
+        }
+
+        deinit { observers.forEach(NotificationCenter.default.removeObserver) }
+
+        /// The buffer changed (from a pane, or externally): store it and bring both views to it.
+        func set(_ text: String) {
+            guard text != doc else { return }
+            doc = text
+            source.sync(text)
+            writer.sync(text)
+        }
+
+        func pump() { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+
+        func key(_ view: NSTextView, _ chars: String, code: UInt16 = 0) {
+            window.makeFirstResponder(view) // a bare, unshown window: no app focus change
+            for c in chars {
+                window.sendEvent(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                                                  context: nil, characters: String(c), charactersIgnoringModifiers: String(c), isARepeat: false, keyCode: code)!)
+            }
+            pump()
+        }
+
+        func undo() { window.undoManager!.undo(); pump() }
+        func redo() { window.undoManager!.redo(); pump() }
+        func location(of needle: String) -> Int { (doc as NSString).range(of: needle).location }
+    }
+
+    /// Keystrokes typed in one pane, then the other, then the first again: each ⌘Z undoes one pane's typing
+    /// in reverse order, even when the other pane's edit shifted the first pane's typing range.
+    func testCrossPaneTypingUndoesInOrder() {
+        let pair = Pair("# Notes\n\nOne two.\n")
+        defer { pair.window.close() }
+        XCTAssertIdentical(pair.sv.undoManager, pair.wv.undoManager)
+        let one = pair.location(of: "One")
+        pair.sv.setSelectedRange(NSRange(location: one, length: 0)); pair.key(pair.sv, "ab")
+        pair.wv.setSelectedRange(NSRange(location: one, length: 0)); pair.key(pair.wv, "X") // before Source's typing
+        pair.sv.setSelectedRange(NSRange(location: pair.location(of: "bOne") + 1, length: 0)); pair.key(pair.sv, "c")
+        let typed = "# Notes\n\nXabcOne two.\n"
+        XCTAssertEqual(pair.doc, typed)
+        var steps: [String] = []
+        for _ in 0..<3 { pair.undo(); steps.append(pair.doc) }
+        XCTAssertEqual(steps, ["# Notes\n\nXabOne two.\n", "# Notes\n\nabOne two.\n", "# Notes\n\nOne two.\n"])
+        XCTAssertEqual(pair.sv.string, pair.doc)
+        XCTAssertEqual(pair.wv.string, pair.doc)
+        for _ in 0..<3 { pair.redo() }
+        XCTAssertEqual(pair.doc, typed)
+        XCTAssertEqual(pair.sv.string, typed)
+        XCTAssertEqual(pair.wv.string, typed)
+    }
+
+    /// In Write, Return inside fenced code is a plain newline; outside code it still continues a list.
+    func testReturnInFencedCodeNeverContinuesListsOrQuotes() {
+        let pair = Pair("- item\n\n```diff\n- removed\n> quoted\n```\n")
+        defer { pair.window.close() }
+        func returnAfter(_ needle: String) {
+            let r = (pair.doc as NSString).range(of: needle)
+            pair.wv.setSelectedRange(NSRange(location: NSMaxRange(r), length: 0))
+            pair.key(pair.wv, "\r", code: 36)
+        }
+        returnAfter("- removed")
+        returnAfter("> quoted")
+        XCTAssertEqual(pair.doc, "- item\n\n```diff\n- removed\n\n> quoted\n\n```\n")
+        pair.set("```\n- a") // unclosed fence runs to the end of the text
+        returnAfter("- a")
+        XCTAssertEqual(pair.doc, "```\n- a\n")
+        pair.set("- item")
+        returnAfter("- item")
+        XCTAssertEqual(pair.doc, "- item\n- ", "outside code, Return continues the list")
+    }
+
+    /// Moving the caret onto a hidden fence line reveals it without moving the text below.
+    func testRevealingAFenceLineDoesNotShiftTextBelow() {
+        let pair = Pair("Intro.\n\n```\ncode\n```\n\nAfter.\n")
+        defer { pair.window.close() }
+        pair.window.makeFirstResponder(pair.wv)
+        func afterY() -> CGFloat {
+            let layout = pair.wv.layoutManager!
+            layout.ensureLayout(for: pair.wv.textContainer!)
+            return layout.lineFragmentRect(forGlyphAt: layout.glyphIndexForCharacter(at: pair.location(of: "After")), effectiveRange: nil).minY
+        }
+        pair.wv.setSelectedRange(NSRange(location: 0, length: 0)); pair.pump()
+        let away = afterY()
+        pair.wv.setSelectedRange(NSRange(location: pair.location(of: "```") + 1, length: 0)); pair.pump()
+        XCTAssertEqual(afterY(), away)
+    }
+
+    /// A change from the other pane that shrinks the text across a fence (select-all-and-type, a reload) used to
+    /// restyle Write mid-edit from its selection callback and throw NSRangeException.
+    func testShrinkingSyncAcrossAFenceDoesNotRestyleMidEdit() {
+        let pair = Pair("- item\n\n```diff\n- removed\n> quoted\n```\n")
+        defer { pair.window.close() }
+        pair.window.makeFirstResponder(pair.wv)
+        pair.wv.setSelectedRange(NSRange(location: pair.location(of: "quoted"), length: 0)); pair.pump()
+        pair.set("```\n- a")
+        pair.set("- item")
+        XCTAssertEqual(pair.wv.string, "- item")
     }
 
     /// Typing in Write stays responsive on a 1 MiB document (measured ~16 ms per keystroke on Apple silicon).
