@@ -9,7 +9,7 @@
   --line: rgba(0, 0, 0, .10);
   --accent: #2563eb;
   --fill: #2563eb;
-  --ring: var(--accent);  /* own name: bb8.css redefines --accent (orange) inside the toggle */
+  --ring: var(--accent);
   --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 96px;
   --h: 44px;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
