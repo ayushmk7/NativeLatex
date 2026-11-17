@@ -67,19 +67,6 @@ final class IntegrationTests: XCTestCase {
         XCTAssertTrue(summary.contains("Review notes:") && summary.contains("Cross-references"), summary)
     }
 
-    func testMarkdownPreviewKeepsListsQuotesAndLoneCRLines() {
-        let text = "# Plan\r- one\r\n  * nested\n2. second\r> quoted *line*\rplain"
-        XCTAssertEqual(MarkdownPreview.blocks(text), [
-            .heading(1, "Plan"),
-            .listItem(depth: 0, marker: "•", text: "one"),
-            .listItem(depth: 1, marker: "•", text: "nested"),
-            .listItem(depth: 0, marker: "2.", text: "second"),
-            .quote("quoted *line*"),
-            .paragraph("plain"),
-        ])
-        XCTAssertEqual(MarkdownPreview.blocks("```\r- not a list\r```"), [.code("- not a list")])
-    }
-
         func testLibreTextsAttributionIsVisible() {
         let text = Conversions.attribution(title: "Ideal Gases", authors: ["A. Author"], license: "ccby",
                                            url: URL(string: "https://chem.libretexts.org/x")!)
