@@ -6,6 +6,14 @@ import SwiftUI
 @MainActor
 final class TextViewHandle: ObservableObject {
     weak var view: NSTextView?
+    /// Owned here so the one text view (and its undo history, caret and scroll) survives when the
+    /// window layout swaps panes, e.g. a narrow window switching between source and preview.
+    var scroll: NSScrollView?
+
+    func focus() {
+        guard let view else { return }
+        view.window?.makeFirstResponder(view)
+    }
 
     func reveal(line: Int) {
         guard let view else { return }
@@ -31,7 +39,20 @@ struct SourceTextView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    /// A fresh container each time; the scroll view inside is reused from `handle`.
+    func makeNSView(context: Context) -> NSView {
+        let scroll = handle.scroll ?? makeScrollView()
+        handle.scroll = scroll
+        // A reused view only needs the new coordinator; `updateNSView` syncs any text change.
+        (scroll.documentView as? NSTextView)?.delegate = context.coordinator
+        let container = NSView()
+        scroll.frame = container.bounds
+        scroll.autoresizingMask = [.width, .height]
+        container.addSubview(scroll) // moves it out of the previous container, if any
+        return container
+    }
+
+    private func makeScrollView() -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()
         let view = scroll.documentView as! NSTextView
         view.isRichText = false
@@ -51,18 +72,17 @@ struct SourceTextView: NSViewRepresentable {
         view.textColor = NSColor(Theme.foreground)
         view.insertionPointColor = NSColor(Theme.accent)
         scroll.backgroundColor = NSColor(Theme.background)
-        view.string = text
-        // Delegate after the initial text: setting `string` fires a selection change, which would
+        // Set before the delegate: setting `string` fires a selection change, which would
         // write SwiftUI @State (onCursor) during the view update.
-        view.delegate = context.coordinator
+        view.string = text
         view.setAccessibilityLabel("Source")
         handle.view = view
         return scroll
     }
 
-    func updateNSView(_ scroll: NSScrollView, context: Context) {
+    func updateNSView(_ container: NSView, context: Context) {
         context.coordinator.parent = self
-        guard let view = scroll.documentView as? NSTextView, view.string != text else { return }
+        guard let view = handle.view, view.string != text else { return }
         // External change (revert, reload): keep the caret where it was, clamped.
         let location = min(view.selectedRange().location, (text as NSString).length)
         context.coordinator.isUpdating = true

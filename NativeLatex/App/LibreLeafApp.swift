@@ -34,6 +34,9 @@ struct EditorView: View {
     @State private var error: String?
     @State private var showLog = false
     @State private var showPreview = true
+    /// Below `narrowWidth` the window shows source *or* preview, never two squeezed columns.
+    @State private var isNarrow = false
+    @State private var narrowShowsPreview = false
     @State private var showProblems = false
     @State private var line = 1
     @State private var column = 1
@@ -43,6 +46,9 @@ struct EditorView: View {
 
     private var isTeX: Bool { BuildService.rootExtensions.contains(fileURL?.pathExtension.lowercased() ?? "") }
     private var isMarkdown: Bool { ["md", "markdown"].contains(fileURL?.pathExtension.lowercased() ?? "") }
+    private var hasPreview: Bool { isTeX || isMarkdown }
+    /// Same breakpoint as the Design package's WorkspaceShell: 320pt editor + 280pt preview + room.
+    static let narrowWidth: CGFloat = 760
 
     private var buildState: BuildState {
         if builder.isRunning { return .building }
@@ -59,17 +65,16 @@ struct EditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             VSplitView {
+                // One split view in both widths, so resizing across the breakpoint keeps the editor in place
+                // (and focused); only a narrow window's Preview toggle swaps the source out.
                 HSplitView {
-                    SourceTextView(text: $document.text, handle: editor) { line = $0; column = $1 }
-                        .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
-                        .overlay(alignment: .top) { if diskChanged { diskBanner } }
-                    if showPreview, isMarkdown {
-                        MarkdownPreview(text: document.text).frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
-                    } else if showPreview, isTeX {
-                        texPreview.frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
-                    }
+                    if !(isNarrow && narrowShowsPreview && hasPreview) { source.frame(minWidth: 320) }
+                    if hasPreview, isNarrow ? narrowShowsPreview : showPreview { preview.frame(minWidth: 280) }
                 }
-                .frame(minHeight: 200, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
+                // On the whole pane, so the conflict banner stays visible while a narrow window shows the preview.
+                .overlay(alignment: .top) { if diskChanged { diskBanner } }
+                .onGeometryChange(for: Bool.self) { $0.size.width < Self.narrowWidth } action: { isNarrow = $0 }
                 .layoutPriority(1)
                 if showProblems, isTeX {
                     ProblemList(problems: problems, onSelect: reveal)
@@ -88,6 +93,10 @@ struct EditorView: View {
         // ponytail: 2 s poll + activation check; swap for NSFilePresenter/FSEvents if many windows stay open.
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in checkDisk() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in checkDisk() }
+        .onChange(of: narrowShowsPreview) {
+            // Back to source: return keyboard focus to the editor (the preview took its place).
+            if !narrowShowsPreview { DispatchQueue.main.async { editor.focus() } }
+        }
         .onChange(of: document.text) {
             // The PDF shows the text as of the last successful build; any other text makes it stale.
             if pdfData != nil, !lastFailed { isStale = document.text != builtText }
@@ -109,12 +118,24 @@ struct EditorView: View {
                         .disabled(log.isEmpty)
                         .help("Show Build Log")
                 }
-                if isTeX || isMarkdown {
-                    Toggle(isOn: $showPreview) { Label("Preview", systemImage: "sidebar.right") }
-                        .help(showPreview ? "Hide Preview" : "Show Preview")
+                if hasPreview {
+                    if isNarrow {
+                        // Narrow: preview replaces the source, so the toggle names itself in text.
+                        Toggle(isOn: $narrowShowsPreview) {
+                            Label("Preview", systemImage: "doc.richtext").labelStyle(.titleAndIcon)
+                        }
+                        .keyboardShortcut("p", modifiers: [.command, .option])
+                        .help(narrowShowsPreview ? "Show Source (⌥⌘P)" : "Show Preview Instead of Source (⌥⌘P)")
+                    } else {
+                        Toggle(isOn: $showPreview) { Label("Preview", systemImage: "sidebar.right") }
+                            .keyboardShortcut("p", modifiers: [.command, .option])
+                            .help(showPreview ? "Hide Preview (⌥⌘P)" : "Show Preview (⌥⌘P)")
+                    }
                 }
-                Menu { ConvertMenuItems(fileURL: fileURL) } label: { Label("Convert", systemImage: "arrow.left.arrow.right") }
-                    .help("Import or export a copy")
+                if !isNarrow { // narrow toolbars keep room for the labeled Preview toggle and BB-8; File ▸ Convert stays
+                    Menu { ConvertMenuItems(fileURL: fileURL) } label: { Label("Convert", systemImage: "arrow.left.arrow.right") }
+                        .help("Import or export a copy")
+                }
                 BB8Toggle()
             }
         }
@@ -131,24 +152,27 @@ struct EditorView: View {
     private var texPreview: some View {
         Group {
             if let pdfData {
+                // The toolbar's BuildStatusBadge says "Preview out of date" in text, symbol and color.
                 PDFPreview(data: pdfData)
-                    .overlay(alignment: .topTrailing) {
-                        if isStale {
-                            Label("Preview out of date", systemImage: "exclamationmark.triangle.fill")
-                                .font(Theme.captionFont)
-                                .foregroundStyle(Theme.foreground)
-                                .padding(.horizontal, Theme.s2).padding(.vertical, Theme.s1)
-                                .background(Theme.surface, in: Capsule())
-                                .overlay(Capsule().strokeBorder(Theme.warning))
-                                .padding(Theme.s2)
-                        }
-                    }
+                    .accessibilityLabel(isStale ? "PDF preview, out of date" : "PDF preview")
             } else {
                 ContentUnavailableView("No PDF yet", systemImage: "doc.richtext",
                                        description: Text("Build (⌘B) compiles this file locally."))
                     .background(Theme.surface)
             }
         }
+    }
+
+    private var source: some View {
+        SourceTextView(text: $document.text, handle: editor) { line = $0; column = $1 }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder private var preview: some View {
+        Group {
+            if isMarkdown { MarkdownPreview(text: document.text) } else { texPreview }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var diskBanner: some View {
@@ -196,7 +220,12 @@ struct EditorView: View {
     private func reveal(_ problem: Problem) {
         guard let diagnostic = diagnostics.first(where: { $0.id == problem.id }), let file = diagnostic.file else { return }
         if file.resolvingSymlinksInPath() == fileURL?.resolvingSymlinksInPath() {
-            editor.reveal(line: diagnostic.line ?? 1)
+            if isNarrow, narrowShowsPreview {
+                narrowShowsPreview = false // the source must be on screen to show the line
+                DispatchQueue.main.async { editor.reveal(line: diagnostic.line ?? 1) }
+            } else {
+                editor.reveal(line: diagnostic.line ?? 1)
+            }
         } else {
             NSDocumentController.shared.openDocument(withContentsOf: file, display: true) { _, _, _ in }
         }
@@ -282,6 +311,10 @@ struct MarkdownPreview: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 6) {
+                Label(Self.limitations, systemImage: "info.circle")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Theme.secondary)
+                    .padding(.bottom, Theme.s2)
                 ForEach(Array(Self.blocks(text).enumerated()), id: \.offset) { _, block in render(block) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -289,8 +322,11 @@ struct MarkdownPreview: View {
             .textSelection(.enabled)
         }
         .background(Theme.background)
+        .tint(Theme.accentText)
         .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
     }
+
+    static let limitations = "Basic preview: tables, images, math and footnotes may appear as source or simplified text."
 
     // ponytail: line-based parser; tables/images/math/nested quotes need Pandoc later.
     static func blocks(_ text: String) -> [Block] {
@@ -344,7 +380,15 @@ struct MarkdownPreview: View {
         }
     }
 
-    private func inline(_ line: String) -> Text {
-        Text((try? AttributedString(markdown: line)) ?? AttributedString(line))
+    private func inline(_ line: String) -> Text { Text(Self.inline(line)) }
+
+    /// Inline Markdown; links in the brand blue-text token and underlined, so color isn't the only cue.
+    static func inline(_ line: String) -> AttributedString {
+        var text = (try? AttributedString(markdown: line)) ?? AttributedString(line)
+        for run in text.runs where run.link != nil {
+            text[run.range].foregroundColor = Theme.accentText
+            text[run.range].underlineStyle = .single
+        }
+        return text
     }
 }
