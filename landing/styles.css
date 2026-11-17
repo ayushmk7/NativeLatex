@@ -59,7 +59,7 @@ h1 { margin: 0 0 var(--s5); font-size: clamp(42px, 7.5vw, 88px); font-weight: 80
 .button { display: inline-flex; align-items: center; gap: 10px; min-height: var(--h); padding: 0 22px; border: 1px solid var(--line); border-radius: 999px; font-size: 15px; font-weight: 600; transition: background-color .2s, border-color .2s; }
 .button:hover { border-color: var(--fg); }
 .button.primary { background: var(--fill); border-color: transparent; color: #fff; }
-.button.primary:hover { filter: brightness(1.1); }
+.button.primary:hover { border-color: var(--fg); } /* outline, not a lighter blue: #2563EB stays the only blue */
 .button.primary:active { transform: scale(.98); }
 
 .preview { margin-top: 88px; text-align: left; }

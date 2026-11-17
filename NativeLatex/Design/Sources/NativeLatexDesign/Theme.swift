@@ -109,6 +109,6 @@ public struct PillButtonStyle: ButtonStyle {
             .background(prominent ? Theme.accent : .clear, in: Capsule())
             .overlay(Capsule().strokeBorder(prominent ? .clear : Theme.line))
             .contentShape(Capsule())
-            .opacity(configuration.isPressed ? 0.8 : 1)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1) // not opacity: a faded fill would be an off-brand blue
     }
 }
