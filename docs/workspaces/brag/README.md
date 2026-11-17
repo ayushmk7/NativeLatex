@@ -39,5 +39,5 @@ Validated 2026-11-17 against the current `main` build (still and 2 s recording o
 
 ## Embedding
 
-- **Landing:** a `<video>` with `controls`, `muted`, `playsinline`, `preload="none"` and the poster, replacing the "Concept illustration" figure. Not autoplaying with sound.
+- **Landing:** a `<video>` with `controls`, `playsinline`, `preload="none"` and the poster, replacing the "Concept illustration" figure. No `autoplay` and no `muted`: playback starts only when a visitor presses Play, and the score plays with it. Page load fetches only the poster.
 - **README (GitHub):** GitHub strips `<video>` and shows `![](x.mp4)` as a broken image (checked with the GitHub Markdown API). The README uses the poster as a clickable image linked to the MP4 on the live site, plus a text link "Watch the 18-second demo", and the real window screenshot inline. The README does not claim an inline player.
