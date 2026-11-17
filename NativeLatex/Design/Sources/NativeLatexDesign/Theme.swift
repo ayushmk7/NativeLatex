@@ -95,10 +95,6 @@ public extension View {
             .foregroundStyle(Theme.foreground)
             .background(Theme.background)
     }
-
-    /// Old brand name, kept so app code builds until it moves to `libreWeaveTheme()`.
-    @available(*, deprecated, renamed: "libreWeaveTheme()")
-    func libreLeafTheme() -> some View { libreWeaveTheme() }
 }
 
 /// Capsule button matching the web tracker: hairline outline, or filled royal blue when `prominent`.
