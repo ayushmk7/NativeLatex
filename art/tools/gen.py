@@ -12,12 +12,13 @@ import os
 BLUE = "#2563EB"
 INK, PAPER = "#0A0A0A", "#FFFFFF"
 SHEETS = {"black": (INK, PAPER, BLUE), "white": (PAPER, INK, BLUE)}  # sheet, lines, threads
-# On the 1024 canvas, the macOS body is 824 px at a 100 px inset. Coordinates are multiples of 64,
-# so at 16 px the strands are 2 px with 1 px gaps. The system renders every size from this one geometry.
-WEFTS = [384, 640]          # line centres (y)
-WARPS = [384, 640]          # thread centres (x)
-START, END = 192, 832       # strand extent, both axes
-S, G = 128, 64              # strand width, gap beside a crossing
+# On the 1024 canvas, the macOS body is 824 px at a 100 px inset. The weave spans 480 px (58% of the
+# body), the glyph proportion of Apple's own icons. Coordinates are multiples of 48 so strands land on
+# whole pixels at 32 px (3 px strands, 1.5 px gaps). The system renders every size from this one geometry.
+WEFTS = [416, 608]          # line centres (y)
+WARPS = [416, 608]          # thread centres (x)
+START, END = 272, 752       # strand extent, both axes
+S, G = 96, 48               # strand width, gap beside a crossing
 H = S // 2
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
