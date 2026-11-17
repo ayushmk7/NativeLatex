@@ -16,10 +16,7 @@
         },
         {
           "glass" : false,
-          "image-name-specializations" : [
-            { "value" : "threads-on-black.svg" },
-            { "appearance" : "dark", "value" : "threads-on-white.svg" }
-          ],
+          "image-name" : "threads.svg",
           "name" : "threads"
         }
       ],

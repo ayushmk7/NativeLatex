@@ -4,7 +4,7 @@ Status: adaptive icon shipped · 2026-11-17. **LibreWeave** is the working app n
 
 ## Visual thesis
 
-Use a precise ink-and-paper identity: white and black form almost the entire interface, with the **Internship blue** marking the active action, selection, and brand. The character comes from a distinctive app icon, strong but readable typography, and a small animated appearance switch. The writing and PDF surfaces stay calm during long sessions.
+Use a precise ink-and-paper identity: white and black form almost the entire interface, with the one brand blue, **`#2563EB`**, marking the active action, selection, and brand. The character comes from a distinctive app icon, strong but readable typography, and a small animated appearance switch. The writing and PDF surfaces stay calm during long sessions.
 
 This interprets the four-vector approach in the supplied [frontend design guide](/Users/ayush/Downloads/distinctive-frontend.md): typography, color, motion, and background should form one system. Its web examples of thin body type, page-load choreography, and textured gradients are poor fits for a dense native editor, so the Mac plan uses strong headings, one accent, purposeful switch motion, and flat document surfaces.
 
@@ -16,18 +16,16 @@ This interprets the four-vector approach in the supplied [frontend design guide]
 | Secondary surface | Near-white `#F4F4F4` | Near-black `#141414` | Sidebar, toolbar, problems panel |
 | Primary ink | Near-black `#0A0A0A` | White `#FFFFFF` | Body and controls |
 | Divider | Neutral gray, adjusted for contrast | Neutral gray, adjusted for contrast | Pane edges, never decorative heavy borders |
-| Internship blue (`Internship/frontend/src/style.css` `--accent` / `--fill`) | `#0066CC` (fill and text) | Fill `#0071E3`; text, links and thin focus rings `#0A84FF` | Build action, selected tab, links, focus, small brand details |
+| Brand blue | `#2563EB` | `#2563EB` (same value; also high contrast) | Build action, selected tab, links, focus, small brand details |
 
-The blue values are design targets, not a promise that one hex value works on every surface. A local relative-luminance check measured these values:
+The blue is one value on every surface and in every appearance. A local relative-luminance check measured:
 
 | Colour | Against | Ratio |
 | --- | --- | --- |
-| `#0066CC` | white | 5.57:1 |
-| `#0071E3` | white text | 4.70:1 |
-| `#0A84FF` | black | 5.76:1 |
-| `#0A84FF` | white | 3.65:1 (fill only, never text on white) |
+| `#2563EB` | white (and white text on a `#2563EB` fill) | 5.17:1 |
+| `#2563EB` | black | 4.06:1 (large text, fills and graphics) |
 
- still validate actual controls, focus, and increased-contrast mode. Inactive chrome and errors must remain understandable in grayscale; never encode build status by blue alone. PDF paper stays white in both appearances because it represents the actual output. Respect native macOS material and semantic colors where they control legibility, then apply the Internship blue to chosen interactive states. The app's own colour tokens live in the Design package (`Theme.swift`), which Design owns. Art sets only the icon, favicon and `AccentColor`. Apple's [color guidance](https://developer.apple.com/design/human-interface-guidelines/color) calls for appearance and contrast testing.
+Still validate actual controls, focus, and increased-contrast mode. Inactive chrome and errors must remain understandable in grayscale; never encode build status by blue alone. PDF paper stays white in both appearances because it represents the actual output. Respect native macOS material and semantic colors where they control legibility, then apply the brand blue to chosen interactive states. The app's own colour tokens live in the Design package (`Theme.swift`), which Design owns. Art sets only the icon, favicon and `AccentColor`. Apple's [color guidance](https://developer.apple.com/design/human-interface-guidelines/color) calls for appearance and contrast testing.
 
 Use San Francisco for ordinary Mac controls and a clear monospaced face for source. Give start-screen titles and major section labels a bolder editorial weight; keep editor text regular and adjustable rather than using the guide's ultra-thin body example. The wordmark, if used, can pair a bold sans name with the standalone icon mark. Avoid downloaded web fonts in the app's core interface.
 
@@ -37,12 +35,12 @@ The first concept (a brace over a page on a black field) read as a box inside a 
 
 | Appearance | Sheet | Lines | Threads |
 | --- | --- | --- | --- |
-| Light | `#0A0A0A` | `#FFFFFF` | `#0A84FF` (blue on black) |
-| Dark | `#FFFFFF` | `#0A0A0A` | `#0066CC` (blue on white) |
-| Clear light / dark | System glass (replaces our fill) | White | Mid gray, derived from `#0A84FF` |
+| Light | `#0A0A0A` | `#FFFFFF` | `#2563EB` |
+| Dark | `#FFFFFF` | `#0A0A0A` | `#2563EB` |
+| Clear light / dark | System glass (replaces our fill) | White | Mid gray, derived from `#2563EB` |
 | Tinted light / dark | User's tint | White / tint | Tint, lighter / darker |
 
-macOS picks Clear and Tinted from the user's icon-style setting and composites Clear's backdrop translucency live in the Dock. In static renders, Clear is the same opaque neutral glass for our icon and for Apple's own icons. The app forces no alpha and needs no setting. There is no Mono (`tinted`) override: `#0A84FF` already greys between the Clear sheet and lines; measurements are in art/README. Tinted dark remains the lowest-contrast mode, readable at 32 px and up.
+macOS picks Clear and Tinted from the user's icon-style setting and composites Clear's backdrop translucency live in the Dock. In static renders, Clear is the same opaque neutral glass for our icon and for Apple's own icons. The app forces no alpha and needs no setting. There is no Mono (`tinted`) override: `#2563EB` already greys between the Clear sheet and lines; measurements are in art/README. Tinted dark remains the lowest-contrast mode, readable at 32 px and up.
 
 The landing favicon follows the same rule through `prefers-color-scheme`: black sheet on light pages, white sheet on dark pages.
 
@@ -62,7 +60,7 @@ The landing favicon follows the same rule through `prefers-color-scheme`: black 
 
 ## Appearance switch: the Website BB-8 (intentional palette exception)
 
-The shipped switch is the user's Website BB-8 toggle, kept in its own orange and gradient colours. The rest of the app stays black, white and Internship blue; this switch is the one deliberate exception.
+The shipped switch is the user's Website BB-8 toggle, kept in its own orange and gradient colours. The rest of the app stays black, white and `#2563EB`; this switch is the one deliberate exception.
 
 - **Landing page:** `landing/bb8.css` is `Website/src/components/pro/opt4/bb8.css` with the artwork unchanged. It replaces that file's header comment and adds ten hover rules: seven `.bb8-toggle__checkbox:hover` rules for the head and antennae, then three `.bb8:hover` resets.
 - **Mac app:** `NativeLatexDesign/BB8Toggle.swift` draws the native version.
