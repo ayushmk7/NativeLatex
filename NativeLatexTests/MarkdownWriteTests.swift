@@ -271,6 +271,7 @@ final class MarkdownWriteTests: XCTestCase {
         settle()
         XCTAssertFalse(layout.isEnabled(forSegment: Pane.both.rawValue), "narrow windows can't show both")
         XCTAssertNil(webView(in: window), "narrow: Both falls back to source")
+        XCTAssertEqual(try XCTUnwrap(segmented(2, in: window)).selectedSegment, -1, "narrow Both shows the source only: Document Mode selects neither Read nor Write")
         XCTAssertEqual(layout.selectedSegment, Pane.source.rawValue, "selection is truthful while narrow")
         let toolbar = try XCTUnwrap(window.toolbar)
         let visible = Set((toolbar.visibleItems ?? []).map(\.itemIdentifier))
@@ -298,7 +299,7 @@ final class MarkdownWriteTests: XCTestCase {
         let source = try XCTUnwrap(textView("Source", in: window))
         func check(_ pane: Pane, write: Bool, _ step: String, line: UInt = #line) async {
             XCTAssertEqual(layout.selectedSegment, pane.rawValue, "\(step): layout", line: line)
-            XCTAssertEqual(mode.selectedSegment, write ? 1 : 0, "\(step): mode", line: line)
+            XCTAssertEqual(mode.selectedSegment, pane == .source ? -1 : write ? 1 : 0, "\(step): mode shows what is on screen (none for source alone)", line: line)
             XCTAssertEqual(source.window != nil, pane != .preview, "\(step): source shown", line: line)
             let writer = textView("Write", in: window)
             XCTAssertEqual(writer != nil, write, "\(step): Write shown", line: line)
@@ -329,6 +330,13 @@ final class MarkdownWriteTests: XCTestCase {
         try show(.preview, in: window); await check(.preview, write: false, "Preview Only (Read)")
         try setWrite(true, in: window); await check(.preview, write: true, "Read → Write")
         try setWrite(false, in: window); await check(.preview, write: false, "Write → Read keeps Preview Only")
+        // A quick Read → Write: the pending Read focus hand-off never takes focus from Write.
+        mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+        mode.selectedSegment = 0; mode.sendAction(mode.action, to: mode.target)
+        mode.selectedSegment = 1; mode.sendAction(mode.action, to: mode.target)
+        settle(1.5)
+        XCTAssertIdentical(window.firstResponder, textView("Write", in: window), "Write keeps focus after a quick Read → Write")
+        try setWrite(false, in: window)
         let page = try XCTUnwrap(webView(in: window))
         for _ in 0..<20 where !((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false) { settle(0.1) }
         XCTAssertTrue((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false,
@@ -344,7 +352,7 @@ final class MarkdownWriteTests: XCTestCase {
         // Narrow: Both → Write → Read shows Read (Both would show only the source); same for Read from the initial state.
         try show(.both, in: window)
         window.setContentSize(NSSize(width: 640, height: 640)); settle()
-        await check(.source, write: false, "narrow default shows Source")
+        await check(.source, write: false, "narrow default shows Source, Document Mode selects neither")
         try setWrite(true, in: window); await check(.preview, write: true, "narrow: Write")
         try setWrite(false, in: window); await check(.preview, write: false, "narrow: Read is visible after Write")
         try show(.source, in: window)

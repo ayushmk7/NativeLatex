@@ -90,6 +90,12 @@ struct EditorView: View {
         return view
     }
 
+    /// Document Mode shows what is on screen: neither Read nor Write while only the source is visible
+    /// (Source Only, or Both in a narrow window, which keeps the editor so typing survives a resize).
+    private var modeSelection: Binding<Bool?> {
+        Binding(get: { shown == .source ? nil : panes.write }, set: { if let on = $0 { writeBinding.wrappedValue = on } })
+    }
+
     private var writeBinding: Binding<Bool> {
         Binding(get: { panes.write }, set: { on in if isMarkdown { panes.setWrite(on, narrow: isNarrow) } })
     }
@@ -195,9 +201,9 @@ struct EditorView: View {
                 }
                 if isMarkdown {
                     // In the toolbar, so every Markdown window offers it in every layout and width.
-                    Picker("Document Mode", selection: writeBinding) {
-                        Text("Read").tag(false)
-                        Text("Write").tag(true)
+                    Picker("Document Mode", selection: modeSelection) {
+                        Text("Read").tag(Bool?.some(false))
+                        Text("Write").tag(Bool?.some(true))
                     }
                     .pickerStyle(.segmented)
                     .help("Read: the Pandoc rendering beside or instead of the source. Write: edit the formatted document full width; markup shows on the line you’re editing, and tables, math and images stay as Markdown (⌥⌘E). Read or Source Only (⌥⌘1) leaves Write.")
@@ -222,13 +228,19 @@ struct EditorView: View {
 
     /// After Read: the source if it is on screen, else the Read page (scroll keys work there). The page
     /// appears once Pandoc has rendered, so this retries briefly.
+    /// Only fills a focus gap: a quick switch back to Write, or anything focused meanwhile, wins. If Pandoc
+    /// fails there is no page; the window keeps the keys and the banner's Try Again stays reachable by Tab.
     private func focusAfterRead(attempt: Int = 0) {
-        guard let window = writer.window ?? editor.window else { return }
+        guard !markdownWrite, let window = writer.window ?? editor.window else { return }
+        let responder = window.firstResponder
+        guard responder == nil || responder === window || (responder as? NSView)?.window !== window else { return }
         if shown != .preview { editor.focus(); return }
         if let page = Self.webView(in: window.contentView) {
             window.makeFirstResponder(page)
         } else if attempt < 30 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { focusAfterRead(attempt: attempt + 1) }
+        } else {
+            window.makeFirstResponder(nil)
         }
     }
 
