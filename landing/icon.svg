@@ -1,7 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NativeLatex source to page mark">
-  <rect width="64" height="64" rx="14" fill="#fff"/>
-  <path d="M42 10H24v44h22V22L42 10Z" fill="#101010"/>
-  <path d="M42 10v12h12" fill="none" stroke="#4169e1" stroke-width="4"/>
-  <path d="M16 19c-6 0-6 4-6 7v3c0 3-2 4-5 4 3 0 5 1 5 4v3c0 3 0 7 6 7" fill="none" stroke="#4169e1" stroke-width="5" stroke-linecap="round"/>
-  <path d="M31 32h9M31 39h9" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824" role="img" aria-label="LibreLeaf">
+  <!-- From the Art branch (8b2da78) art/source/app-icon-small.svg; viewBox cropped to the icon body for web use. -->
+  <g id="background">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="#0A0A0A"/>
+    <rect x="104" y="104" width="816" height="816" rx="181" fill="none" stroke="#FFFFFF" stroke-opacity=".18" stroke-width="8"/>
+  </g>
+  <g id="page">
+    <path d="M440 220H700L820 340V804H440Z" fill="#FFFFFF"/>
+    <path d="M700 220V340H820Z" fill="#4169E1"/>
+    <rect x="512" y="540" width="236" height="88" rx="16" fill="#0A0A0A"/>
+  </g>
+  <g id="brace" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M462 256C362 256 340 290 340 352V436C340 488 314 512 244 512C314 512 340 536 340 588V672C340 734 362 768 462 768" stroke="#0A0A0A" stroke-width="140"/>
+    <path d="M462 256C362 256 340 290 340 352V436C340 488 314 512 244 512C314 512 340 536 340 588V672C340 734 362 768 462 768" stroke="#4169E1" stroke-width="96"/>
+  </g>
 </svg>
