@@ -55,10 +55,11 @@ final class ThemeTests: XCTestCase {
         }
         func hex(_ v: UInt32) -> NSColor { NSColor.hex(v, 1).usingColorSpace(.sRGB)! }
 
-        XCTAssertEqual(color("accent", dark: false, hc: false), hex(0x4169E1))
-        XCTAssertEqual(color("accent", dark: true, hc: false), hex(0x4169E1))
-        XCTAssertEqual(color("accentText", dark: false, hc: false), hex(0x4169E1))
-        XCTAssertEqual(color("accentText", dark: true, hc: false), hex(0x8BA6FF))
+        // Website homepage opt7 palette.
+        XCTAssertEqual(color("accent", dark: false, hc: false), hex(0x0F2BFF))
+        XCTAssertEqual(color("accent", dark: true, hc: false), hex(0x2438FF))
+        XCTAssertEqual(color("accentText", dark: false, hc: false), hex(0x0F2BFF))
+        XCTAssertEqual(color("accentText", dark: true, hc: false), hex(0x7A93FF))
 
         for dark in [false, true] {
             for hc in [false, true] {
@@ -79,7 +80,7 @@ final class ThemeTests: XCTestCase {
         NSAppearance(named: .aqua)!.performAsCurrentDrawingAppearance { light = Theme.swatches["accentText"]!.nsColor.usingColorSpace(.sRGB)! }
         NSAppearance(named: .darkAqua)!.performAsCurrentDrawingAppearance { darkBG = Theme.swatches["background"]!.nsColor.usingColorSpace(.sRGB)! }
         if !NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast {
-            XCTAssertEqual(light, hex(0x4169E1))
+            XCTAssertEqual(light, hex(0x0F2BFF))
             XCTAssertEqual(darkBG, hex(0x000000))
         }
     }

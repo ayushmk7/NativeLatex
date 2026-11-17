@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Design tokens: paper-white / near-black with one royal-blue accent.
+/// Design tokens: paper-white / near-black with one electric-blue accent (Website homepage opt7).
 /// Every color is a dynamic `NSColor`, so it follows the window's effective
 /// appearance (including Increase Contrast) without SwiftUI environment plumbing.
 public enum Theme {
@@ -44,11 +44,11 @@ public enum Theme {
         "secondary": Swatch(0x6E6E73, 0x98989D, hc: (0x3A3A3C, 0xC7C7CC)),
         // ponytail: alpha only for normal contrast; HC swaps to opaque greys.
         "line": Swatch(0x000000, 0xFFFFFF, hc: (0x8E8E93, 0x8E8E93), alpha: (0.10, 0.14)),
-        // Shared brand tokens (Art AccentColor, Landing): royal blue #4169E1 is the fill in both
-        // appearances (4.85:1 with white text) and the blue text on white; #8BA6FF is blue text on black (9.0:1).
-        // Increase Contrast: deeper fills (#1E3FB8 8.5:1, #2F55D4 6.2:1 with white), lighter dark text (#B4C6FF 12.5:1).
-        "accent": Swatch(0x4169E1, 0x4169E1, hc: (0x1E3FB8, 0x2F55D4)),
-        "accentText": Swatch(0x4169E1, 0x8BA6FF, hc: (0x1E3FB8, 0xB4C6FF)),
+        // Website homepage (body.opt7): --electric #0F2BFF light, #2438FF filled in dark, --electric-ink #7A93FF
+        // as blue text on black. White on #0F2BFF 7.47:1, on #2438FF 6.81:1; #7A93FF on black 7.45:1.
+        // Increase Contrast keeps the hue: deeper fills #0A1FC2 (10.6:1) / #1A2BD9 (8.8:1), lighter dark text #A6B6FF (10.8:1).
+        "accent": Swatch(0x0F2BFF, 0x2438FF, hc: (0x0A1FC2, 0x1A2BD9)),
+        "accentText": Swatch(0x0F2BFF, 0x7A93FF, hc: (0x0A1FC2, 0xA6B6FF)),
         "error": Swatch(0xD70015, 0xFF453A),
         "warning": Swatch(0xB25000, 0xFF9F0A),
         "success": Swatch(0x1A7F37, 0x30D158),
@@ -97,7 +97,7 @@ public extension View {
     }
 }
 
-/// Capsule button matching the web tracker: hairline outline, or filled royal blue when `prominent`.
+/// Capsule button matching the web tracker: hairline outline, or filled electric blue when `prominent`.
 public struct PillButtonStyle: ButtonStyle {
     var prominent: Bool
     public init(prominent: Bool = false) { self.prominent = prominent }

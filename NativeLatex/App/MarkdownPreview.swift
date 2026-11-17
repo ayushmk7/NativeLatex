@@ -105,7 +105,7 @@ enum MarkdownRenderer {
         return html
     }
 
-    /// Whole page: strict CSP (no scripts, no network; images only from the local scheme), light/dark royal blue.
+    /// Whole page: strict CSP (no scripts, no network; images only from the local scheme), light/dark electric blue (Website opt7) with Increase Contrast variants.
     static func page(body: String) -> String {
         """
         <!doctype html><html><head><meta charset="utf-8">
@@ -116,8 +116,10 @@ enum MarkdownRenderer {
     }
 
     static let css = """
-    :root { --bg:#FFFFFF; --fg:#0A0A0A; --muted:#6E6E73; --line:rgba(0,0,0,.12); --code:#F5F5F7; --link:#4169E1; --accent:#4169E1; }
-    @media (prefers-color-scheme: dark) { :root { --bg:#000000; --fg:#F5F5F7; --muted:#98989D; --line:rgba(255,255,255,.16); --code:#141416; --link:#8BA6FF; } }
+    :root { --bg:#FFFFFF; --fg:#0A0A0A; --muted:#6E6E73; --line:rgba(0,0,0,.12); --code:#F5F5F7; --link:#0F2BFF; --accent:#0F2BFF; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#000000; --fg:#F5F5F7; --muted:#98989D; --line:rgba(255,255,255,.16); --code:#141416; --link:#7A93FF; --accent:#7A93FF; } }
+    @media (prefers-contrast: more) { :root { --muted:#3A3A3C; --link:#0A1FC2; --accent:#0A1FC2; } }
+    @media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root { --muted:#C7C7CC; --link:#A6B6FF; --accent:#A6B6FF; } }
     html { background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, system-ui, sans-serif; }
     body { margin:0; } main { max-width:46em; margin:0 auto; padding:16px 24px 48px; overflow-wrap:break-word; }
     h1,h2,h3,h4,h5,h6 { line-height:1.25; margin:1.4em 0 .5em; } h1 { font-size:2em; } h2 { font-size:1.5em; border-bottom:1px solid var(--line); padding-bottom:.2em; }

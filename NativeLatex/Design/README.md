@@ -57,7 +57,7 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 | `BB8Artwork(night:pressed:em:)` | Stateless art for previews and tests. |
 | `Theme` | Dynamic colors (`background`, `surface`, `foreground`, `secondary`, `line`, `accent`, `accentText`, `onAccent`, `error`, `warning`, `success`), spacing `s1…s6` (4–32), `controlHeight`, `editorFont`, `titleFont`, `captionFont`. Each color resolves per window appearance, with Increase Contrast variants. |
 | `View.libreWeaveTheme()` | Root modifier: accent tint, foreground, background. |
-| `PillButtonStyle(prominent:)` | Capsule button: hairline outline, or filled royal blue. |
+| `PillButtonStyle(prominent:)` | Capsule button: hairline outline, or filled electric blue. |
 | `WorkspaceShell` | Toolbar (sidebar · title/root · Build · status · preview · BB-8), sidebar, editor/preview `HSplitView`, resizable problems panel, status bar. Under 760 pt wide, the preview toggle swaps the preview in for the editor instead of squeezing two columns. |
 | `BuildStatusBadge`, `StatusBar`, `SourceTabBar`, `ProblemList` | Usable on their own. State always appears as symbol plus text, never color alone. |
 
@@ -69,12 +69,12 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 | surface | `#F5F5F7` | `#141416` |
 | foreground | `#0A0A0A` | `#F5F5F7` |
 | secondary | `#6E6E73` | `#98989D` |
-| accent (fill, white text) | `#4169E1` royal blue (4.85:1) | `#4169E1` (4.85:1) |
-| accentText | `#4169E1` (4.85:1 on white) | `#8BA6FF` (9.0:1 on black) |
-| accent, Increase Contrast | `#1E3FB8` (8.5:1) | `#2F55D4` (6.2:1) |
-| accentText, Increase Contrast | `#1E3FB8` | `#B4C6FF` (12.5:1) |
+| accent (fill, white text) | `#0F2BFF` electric (7.47:1) | `#2438FF` (6.81:1) |
+| accentText | `#0F2BFF` (7.47:1 on white) | `#7A93FF` (7.45:1 on black) |
+| accent, Increase Contrast | `#0A1FC2` (10.6:1) | `#1A2BD9` (8.8:1) |
+| accentText, Increase Contrast | `#0A1FC2` | `#A6B6FF` (10.8:1 on black) |
 
-These match the shared tokens in Art's `AccentColor` and Landing. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors; like the landing switch, its pill has an outline in `foreground` (1.5pt, 2.5pt with Increase Contrast) so the sky stays distinct from light and dark toolbars.
+The base values are the Website homepage palette (`body.opt7`: `--electric` light `#0F2BFF`, dark fill `#2438FF`, `--electric-ink` `#7A93FF`); Increase Contrast keeps that hue, deeper for fills and lighter for dark text. The Markdown preview CSS uses the same values, with `prefers-contrast: more` for Increase Contrast. Increase Contrast is detected from the window appearance (`bestMatch` against the high-contrast names) or `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`. The app sets its own accent with `.tint`, so a system accent override doesn't change the brand. BB-8 keeps its original orange and desert colors; like the landing switch, its pill has an outline in `foreground` (1.5pt, 2.5pt with Increase Contrast) so the sky stays distinct from light and dark toolbars.
 
 ## Check
 
@@ -86,6 +86,6 @@ swift run NativeLatexDesignDemo                             # LibreWeave sample 
 swift run NativeLatexDesignDemo --snapshot "$PWD/Screenshots"  # regenerate the PNGs above
 ```
 
-Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears them; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent hex values match the shared brand tokens; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ; rendered BB-8 pixels show a dark outline on light and a light outline on dark, and a focus ring that is a clean capsule (empty bounding-box corners) within the control bounds, absent when unfocused, with no layout change on focus. Set `BB8_RENDER_DIR` to save those renders as PNGs.
+Tests cover: the store starts on Use System and leaves `NSApp.appearance` nil; toggle overrides persist and Use System clears them; every token keeps 4.5:1 contrast in light, dark and both high-contrast appearances, including white on accent; the accent hex values match the Website opt7 palette; the Increase Contrast variants raise accent-text contrast (tested through `Swatch.resolve`, because `NSAppearance(named:)` cannot create high-contrast appearances); the BB-8 day and night renders differ; rendered BB-8 pixels show a dark outline on light and a light outline on dark, and a focus ring that is a clean capsule (empty bounding-box corners) within the control bounds, absent when unfocused, with no layout change on focus. Set `BB8_RENDER_DIR` to save those renders as PNGs.
 
 Still to check by hand in the real app: VoiceOver reading, Full Keyboard Access, Reduce Motion, and switching macOS appearance while two windows are open.
