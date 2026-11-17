@@ -9,6 +9,8 @@ import SwiftUI
 class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
     weak var view: NSTextView?
     var scroll: NSScrollView?
+    /// The window this pane was last shown in; stays set while the pane is hidden, for moving focus.
+    weak var window: NSWindow?
     /// Set by the representable each update: writes the buffer / reports the caret line and column.
     var onText: ((String) -> Void)?
     var onCursor: ((Int, Int) -> Void)?
@@ -152,7 +154,8 @@ struct HandleTextView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let scroll = handle.scrollView(text: text, label: label)
-        let container = NSView()
+        let container = PaneContainer()
+        container.handle = handle
         scroll.frame = container.bounds
         scroll.autoresizingMask = [.width, .height]
         container.addSubview(scroll) // moves it out of the previous container, if any
@@ -164,6 +167,15 @@ struct HandleTextView: NSViewRepresentable {
         handle.onText = { binding.wrappedValue = $0 }
         handle.onCursor = onCursor
         handle.sync(text)
+    }
+}
+
+/// Records its handle's window when shown.
+final class PaneContainer: NSView {
+    weak var handle: TextViewHandle?
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let window { handle?.window = window }
     }
 }
 

@@ -16,10 +16,11 @@ struct PaneState: Equatable {
     /// The layout Write replaced, restored by Read.
     var beforeWrite: PaneLayout?
 
-    /// What the window shows: no preview for plain text; a narrow window can't show both.
-    func shown(narrow: Bool, hasPreview: Bool = true) -> PaneLayout {
+    /// What the window shows: no preview for plain text; a narrow window can't show both. Write only
+    /// applies to Markdown (a window saved as .tex shows its layout, not a leftover Write).
+    func shown(narrow: Bool, hasPreview: Bool = true, markdown: Bool = true) -> PaneLayout {
         guard hasPreview else { return .source }
-        if write { return .preview }
+        if write, markdown { return .preview }
         return narrow && layout == .both ? .source : layout
     }
 
@@ -31,15 +32,17 @@ struct PaneState: Equatable {
         layout = new
     }
 
-    /// Write fills the window and remembers the layout it replaced. Read returns to that layout, except
-    /// that Source Only comes back as Source and Preview (Preview Only when narrow), so Read is visible.
+    /// Write fills the window and remembers the layout it replaced. Read returns to that layout unless Read
+    /// would be hidden there (Source Only, or Both in a narrow window, which shows only the source): then it
+    /// shows Source and Preview, or Preview Only when narrow. Read is never selected but off screen.
     mutating func setWrite(_ on: Bool, narrow: Bool) {
         if on {
             if !write { beforeWrite = layout }
             layout = .preview
         } else {
             let back = beforeWrite ?? layout
-            layout = back == .source ? (narrow ? .preview : .both) : back
+            let readHidden = back == .source || (narrow && back == .both)
+            layout = readHidden ? (narrow ? .preview : .both) : back
             beforeWrite = nil
         }
         write = on
@@ -74,6 +77,14 @@ struct PaneState: Equatable {
         expect(s, .preview, write: false, narrow: true, "narrow: Read after Source → Write shows Read alone")
         s = PaneState(); expect(s, .source, write: false, narrow: true, "narrow: Both shows Source")
         s.setWrite(true, narrow: true); expect(s, .preview, write: true, narrow: true, "narrow: Write fills the window")
+        s.setWrite(false, narrow: true); expect(s, .preview, write: false, narrow: true, "narrow: Both → Write → Read shows Read, not Source")
+        s = PaneState(); s.setWrite(false, narrow: true)
+        expect(s, .preview, write: false, narrow: true, "narrow: Read tapped from the initial Source shows Read")
+        s = PaneState(); s.choose(.source); s.setWrite(false, narrow: false)
+        expect(s, .both, write: false, "Read tapped in Source Only shows Read beside the source")
+        // Saved as .tex while in Write: no Write for non-Markdown, and leaving it restores the earlier layout.
+        s = PaneState(); s.setWrite(true, narrow: false)
+        s.setWrite(false, narrow: false); expect(s, .both, write: false, "leaving Write after a .tex save restores Both")
         if PaneState().shown(narrow: false, hasPreview: false) != .source { failures.append("plain text: source only") }
         return failures
     }

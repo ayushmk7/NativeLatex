@@ -2,6 +2,7 @@ import AppKit
 import NativeLatexDesign
 import PDFKit
 import SwiftUI
+import WebKit
 
 @main
 struct LibreWeaveApp: App {
@@ -71,7 +72,7 @@ struct EditorView: View {
     private var markdownWrite: Bool { panes.write }
 
     /// What the window shows: no preview for plain text; a narrow window can't show both; Write fills the window.
-    private var shown: PaneLayout { panes.shown(narrow: isNarrow, hasPreview: hasPreview) }
+    private var shown: PaneLayout { panes.shown(narrow: isNarrow, hasPreview: hasPreview, markdown: isMarkdown) }
 
     /// Controls show what is on screen; choosing sets the requested layout (Both returns when the window widens).
     private var shownBinding: Binding<PaneLayout> { Binding(get: { shown }, set: { panes.choose($0) }) }
@@ -132,6 +133,12 @@ struct EditorView: View {
         }
         .onChange(of: markdownWrite) {
             if markdownWrite, shown != .source { DispatchQueue.main.async { writer.focus() } }
+            // Leaving Write removes the focused editor; keep the keyboard in the window.
+            if !markdownWrite { DispatchQueue.main.async { focusAfterRead() } }
+        }
+        .onChange(of: isMarkdown) {
+            // Saved as another type (e.g. .tex) while in Write: Write is Markdown-only, so return to the earlier layout.
+            if !isMarkdown, panes.write { panes.setWrite(false, narrow: isNarrow) }
         }
         .onChange(of: document.text) {
             // Keep both text views on the buffer, visible or not, so undo in either stays valid.
@@ -172,13 +179,13 @@ struct EditorView: View {
                 }
                 if isMarkdown {
                     // In the toolbar, so every Markdown window offers it in every layout and width.
-                    Picker("Preview Mode", selection: writeBinding) {
+                    Picker("Document Mode", selection: writeBinding) {
                         Text("Read").tag(false)
                         Text("Write").tag(true)
                     }
                     .pickerStyle(.segmented)
                     .help("Read: the Pandoc rendering beside or instead of the source. Write: edit the formatted document full width; markup shows on the line you’re editing, and tables, math and images stay as Markdown (⌥⌘E). Read or Source Only (⌥⌘1) leaves Write.")
-                    .accessibilityLabel("Preview Mode")
+                    .accessibilityLabel("Document Mode")
                 }
                 if !isNarrow { // narrow toolbars keep room for the labeled Preview toggle and BB-8; File ▸ Convert stays
                     Menu { ConvertMenuItems(fileURL: fileURL) } label: { Label("Convert", systemImage: "arrow.left.arrow.right") }
@@ -195,6 +202,23 @@ struct EditorView: View {
         }
         .alert("Build", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
         } message: { Text(error ?? "") }
+    }
+
+    /// After Read: the source if it is on screen, else the Read page (scroll keys work there). The page
+    /// appears once Pandoc has rendered, so this retries briefly.
+    private func focusAfterRead(attempt: Int = 0) {
+        guard let window = writer.window ?? editor.window else { return }
+        if shown != .preview { editor.focus(); return }
+        if let page = Self.webView(in: window.contentView) {
+            window.makeFirstResponder(page)
+        } else if attempt < 30 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { focusAfterRead(attempt: attempt + 1) }
+        }
+    }
+
+    static func webView(in view: NSView?) -> WKWebView? {
+        guard let view else { return nil }
+        return (view as? WKWebView) ?? view.subviews.lazy.compactMap { webView(in: $0) }.first
     }
 
     private var texPreview: some View {

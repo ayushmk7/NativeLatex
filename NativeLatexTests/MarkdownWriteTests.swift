@@ -318,6 +318,10 @@ final class MarkdownWriteTests: XCTestCase {
         try show(.preview, in: window); await check(.preview, write: false, "Preview Only (Read)")
         try setWrite(true, in: window); await check(.preview, write: true, "Read → Write")
         try setWrite(false, in: window); await check(.preview, write: false, "Write → Read keeps Preview Only")
+        let page = try XCTUnwrap(webView(in: window))
+        for _ in 0..<20 where !((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false) { settle(0.1) }
+        XCTAssertTrue((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false,
+                      "Write → Read in Preview Only moves focus to the Read page: \(String(describing: window.firstResponder))")
 
         try setWrite(true, in: window)
         try show(.source, in: window); await check(.source, write: false, "Source Only leaves Write")
@@ -325,6 +329,16 @@ final class MarkdownWriteTests: XCTestCase {
         try setWrite(true, in: window)
         try show(.both, in: window); await check(.both, write: false, "Source and Preview leaves Write")
         XCTAssertFalse(document.isDocumentEdited, "mode changes never edit")
+
+        // Narrow: Both → Write → Read shows Read (Both would show only the source); same for Read from the initial state.
+        try show(.both, in: window)
+        window.setContentSize(NSSize(width: 640, height: 640)); settle()
+        await check(.source, write: false, "narrow default shows Source")
+        try setWrite(true, in: window); await check(.preview, write: true, "narrow: Write")
+        try setWrite(false, in: window); await check(.preview, write: false, "narrow: Read is visible after Write")
+        try show(.source, in: window)
+        try setWrite(false, in: window); await check(.preview, write: false, "narrow: tapping Read from Source shows Read")
+        window.setContentSize(NSSize(width: 1100, height: 640)); settle()
 
         XCTAssertEqual(PaneState.selfCheck(), [], "every transition, including narrow windows")
     }
@@ -709,7 +723,7 @@ final class MarkdownWriteTests: XCTestCase {
             for width: CGFloat in [1100, 640] {
                 let window = host(name, width: width)
                 defer { window.close() }
-                XCTAssertTrue(labels(window).contains("Preview Mode"), "\(name) @\(width): \(labels(window))")
+                XCTAssertTrue(labels(window).contains("Document Mode"), "\(name) @\(width): \(labels(window))")
                 try show(.source, in: window)
                 XCTAssertNil(textView("Write", in: window))
                 let mode = try XCTUnwrap(segmented(2, in: window), "\(name) @\(width): Read/Write reachable in Source Only")
@@ -726,10 +740,29 @@ final class MarkdownWriteTests: XCTestCase {
                 }
             }
         }
+        // An untitled Markdown window in Write, saved as .tex: Write ends, the earlier layout returns, no mode control.
+        do {
+            var stored = "# Title\n"
+            let binding = Binding<TextDocument>(get: { TextDocument(text: stored) }, set: { stored = $0.text })
+            let hosting = NSHostingView(rootView: EditorView(document: binding, fileURL: dir.appendingPathComponent("draft.md")))
+            hosting.sceneBridgingOptions = [.toolbars]
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 600), styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = hosting // never ordered in
+            defer { window.close() }
+            settle()
+            try setWrite(true, in: window)
+            XCTAssertNotNil(textView("Write", in: window))
+            hosting.rootView = EditorView(document: binding, fileURL: dir.appendingPathComponent("draft.tex")) // same view identity: state kept
+            settle()
+            XCTAssertNil(segmented(2, in: window), "no Read/Write for .tex")
+            XCTAssertNil(textView("Write", in: window), "Write left")
+            XCTAssertNotNil(textView("Source", in: window), "earlier layout (Both) restored: source visible beside the PDF preview")
+        }
         for name in ["paper.tex", "plain.txt"] {
             let window = host(name, width: 1100)
             defer { window.close() }
-            XCTAssertFalse(labels(window).contains("Preview Mode"), "\(name) has no Read/Write: \(labels(window))")
+            XCTAssertFalse(labels(window).contains("Document Mode"), "\(name) has no Read/Write: \(labels(window))")
         }
     }
 }
