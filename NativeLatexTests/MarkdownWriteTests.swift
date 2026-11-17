@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import WebKit
 import XCTest
 @testable import LibreWeave
@@ -47,12 +48,12 @@ final class MarkdownWriteTests: XCTestCase {
     private func open(_ name: String, _ text: String, width: CGFloat = 1100) async throws -> (NSDocument, NSWindow) {
         let url = dir.appendingPathComponent(name)
         try text.write(to: url, atomically: true, encoding: .utf8)
-        let (document, _) = try await NSDocumentController.shared.openDocument(withContentsOf: url, display: true)
+        // Never displayed or activated: the window is made but not ordered on screen, so tests don't take focus.
+        let (document, _) = try await NSDocumentController.shared.openDocument(withContentsOf: url, display: false)
         opened.append(document)
+        if document.windowControllers.isEmpty { document.makeWindowControllers() }
         let window = try XCTUnwrap(document.windowControllers.first?.window)
         window.setContentSize(NSSize(width: width, height: 640))
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
         settle()
         return (document, window)
     }
@@ -66,7 +67,9 @@ final class MarkdownWriteTests: XCTestCase {
             if let c = v as? NSSegmentedControl, c.segmentCount == count { return c }
             return v.subviews.lazy.compactMap(find).first
         }
-        return window.contentView?.superview.flatMap(find)
+        // Toolbar item views first (they exist even when the window was never shown), then the window's views.
+        return (window.toolbar?.items ?? []).lazy.compactMap { $0.view.flatMap(find) }.first
+            ?? window.contentView?.superview.flatMap(find)
     }
 
     private enum Pane: Int { case source, both, preview }
@@ -522,5 +525,52 @@ final class MarkdownWriteTests: XCTestCase {
             worst = max(worst, ContinuousClock.now - start)
         }
         XCTAssertLessThan(worst, .milliseconds(100), "worst keystroke \(worst)")
+    }
+
+    /// Read/Write sits in the toolbar of every Markdown window (.md and .markdown, wide and narrow), stays
+    /// reachable in Source Only, and choosing Write there reveals the Write pane. TeX and plain text don't get it.
+    /// Hosted in a window that is never put on screen, with SwiftUI's toolbar bridged into it.
+    func testReadWriteControlInEveryMarkdownWindowAndLayout() throws {
+        func host(_ name: String, width: CGFloat) -> NSWindow {
+            var stored = "# Title\n\nBody.\n"
+            let binding = Binding<TextDocument>(get: { TextDocument(text: stored) }, set: { stored = $0.text })
+            let hosting = NSHostingView(rootView: EditorView(document: binding, fileURL: dir.appendingPathComponent(name)))
+            hosting.sceneBridgingOptions = [.toolbars]
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 600),
+                                  styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = hosting // never ordered in
+            settle()
+            return window
+        }
+        func labels(_ window: NSWindow) -> [String] { (window.toolbar?.items ?? []).map(\.label) }
+
+        for name in ["notes.md", "notes.markdown"] {
+            for width: CGFloat in [1100, 640] {
+                let window = host(name, width: width)
+                defer { window.close() }
+                XCTAssertTrue(labels(window).contains("Preview Mode"), "\(name) @\(width): \(labels(window))")
+                try show(.source, in: window)
+                XCTAssertNil(textView("Write", in: window))
+                let mode = try XCTUnwrap(segmented(2, in: window), "\(name) @\(width): Read/Write reachable in Source Only")
+                XCTAssertEqual(mode.label(forSegment: 1), "Write")
+                mode.selectedSegment = 1
+                mode.sendAction(mode.action, to: mode.target)
+                settle()
+                XCTAssertNotNil(textView("Write", in: window), "\(name) @\(width): choosing Write reveals the Write pane")
+                XCTAssertEqual(textView("Source", in: window)?.window != nil, width > EditorView.narrowWidth,
+                               "\(name) @\(width): wide shows both, narrow shows the preview alone")
+                if width < EditorView.narrowWidth {
+                    let items = window.toolbar?.items.filter { $0.view != nil }.map(\.itemIdentifier) ?? []
+                    let visible = Set((window.toolbar?.visibleItems ?? window.toolbar?.items ?? []).map(\.itemIdentifier))
+                    XCTAssertTrue(items.allSatisfy(visible.contains), "\(name): nothing overflows at 640 pt: \(labels(window))")
+                }
+            }
+        }
+        for name in ["paper.tex", "plain.txt"] {
+            let window = host(name, width: 1100)
+            defer { window.close() }
+            XCTAssertFalse(labels(window).contains("Preview Mode"), "\(name) has no Read/Write: \(labels(window))")
+        }
     }
 }
