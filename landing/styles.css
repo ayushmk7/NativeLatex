@@ -55,12 +55,10 @@ code { font-family: var(--mono); font-size: .9em; }
 .bb8-toggle__checkbox:focus-visible + .bb8-toggle__container { outline: 3px solid var(--ring); outline-offset: 4px; }
 
 .hero { padding: var(--s8) 0; text-align: center; }
-.status { display: inline-flex; align-items: center; gap: var(--s2); padding: 4px var(--s3); border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--muted); }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fill); }
 h1 { margin: var(--s5) 0; font-size: clamp(40px, 7vw, 80px); font-weight: 800; line-height: 1.02; letter-spacing: -.035em; text-wrap: balance; }
 .lede { max-width: 36rem; margin-inline: auto; color: var(--muted); font-size: clamp(17px, 2vw, 19px); }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s3); margin-top: var(--s6); }
-.button { display: inline-flex; align-items: center; min-height: var(--h); padding: 0 22px; border: 1px solid var(--line); border-radius: 999px; font-size: 15px; font-weight: 600; transition: background-color .2s, border-color .2s; }
+.button { display: inline-flex; align-items: center; gap: 10px; min-height: var(--h); padding: 0 22px; border: 1px solid var(--line); border-radius: 999px; font-size: 15px; font-weight: 600; transition: background-color .2s, border-color .2s; }
 .button:hover { border-color: var(--fg); }
 .button.primary { background: var(--fill); border-color: transparent; color: #fff; }
 .button.primary:hover { filter: brightness(.9); }
