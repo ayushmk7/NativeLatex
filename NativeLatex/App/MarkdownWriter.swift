@@ -51,6 +51,12 @@ final class MarkdownLayoutManager: NSLayoutManager {
             _ = storage.attribute(.markdownCodeBlock, at: run.location, longestEffectiveRange: &block, in: NSRange(location: 0, length: storage.length))
             let glyphs = glyphRange(forCharacterRange: block, actualCharacterRange: nil)
             guard glyphs.length > 0 else { return }
+            // Lay out what this pass draws, through the block: an image or table above it on screen can have grown
+            // (MarkdownObjects attaching, an image decoding) since the last layout, and non-contiguous layout would
+            // hand back the old fragments, painting the box that much above its code. Growth above the viewport
+            // needs nothing (the view re-lays out before drawing). Laying out from glyph 0 also works but cost
+            // 836 ms on a 1 MiB first draw; this costs ~2 ms.
+            ensureLayout(forGlyphRange: NSUnionRange(glyphsToShow, glyphs))
             let top = lineFragmentRect(forGlyphAt: glyphs.location, effectiveRange: nil)
             let bottom = lineFragmentRect(forGlyphAt: NSMaxRange(glyphs) - 1, effectiveRange: nil)
             let padding = container.lineFragmentPadding

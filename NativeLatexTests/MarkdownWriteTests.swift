@@ -1,5 +1,6 @@
 import AppKit
 import NativeLatexDesign
+import NativeLatexMarkdownObjects
 import SwiftUI
 import WebKit
 import XCTest
@@ -204,6 +205,49 @@ final class MarkdownWriteTests: XCTestCase {
     }
 
     /// ⌘Z/⇧⌘Z from either pane, including after the pane that made the edit is hidden.
+    /// The first draw after an image and a table above a code fence grow their lines (MarkdownObjects attaching)
+    /// puts the code box around the code. It used to use the old line fragments and paint the box one image-plus-
+    /// table height above, behind the paragraph before the fence, leaving the code unboxed.
+    func testCodeBoxFirstDrawFollowsAnImageAndTableAbove() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("box-\(UUID())")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let dot = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 40, pixelsHigh: 20, bitsPerSample: 8, samplesPerPixel: 4,
+                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        for x in 0..<40 { for y in 0..<20 { dot.setColor(.red, atX: x, y: y) } }
+        try dot.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent("dot.png"))
+
+        let text = "# T\n\n| a | b |\n|---|--:|\n| 1 | 2 |\n\n![dot](dot.png)\n\nBefore code.\n\n```swift\nlet x = 1\n```\n\nAfter.\n"
+        let handle = WritingHandle()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let scroll = handle.scrollView(text: text, label: "Write")
+        scroll.frame = NSRect(x: 0, y: 0, width: 760, height: 600)
+        window.contentView = NSView(frame: scroll.frame) // never ordered in
+        window.contentView!.addSubview(scroll)
+        let view = try XCTUnwrap(handle.view)
+        settle(0.3)
+        XCTAssertNotNil(MarkdownObjects.attach(to: view, folder: folder, bodyFont: .systemFont(ofSize: MarkdownStyler.bodySize),
+                                               bodyColor: NSColor(Theme.foreground)))
+        settle(0.6) // image decoded; its line and the table rows are taller now
+
+        // One display pass, as the window's next frame would draw (no ensureLayout first).
+        let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.visibleRect))
+        view.cacheDisplay(in: view.visibleRect, to: rep)
+        let scale = CGFloat(rep.pixelsWide) / view.visibleRect.width
+        let background = try XCTUnwrap(rep.colorAt(x: 5, y: 5)?.brightnessComponent)
+        // The box is the only thing drawn across the middle of this narrow document.
+        let boxTop = (0..<rep.pixelsHigh).first { y in
+            abs((rep.colorAt(x: rep.pixelsWide / 2, y: y)?.brightnessComponent ?? background) - background) > 0.03
+        }.map { CGFloat($0) / scale }
+        let layout = try XCTUnwrap(view.layoutManager)
+        let code = layout.lineFragmentRect(forGlyphAt: layout.glyphIndexForCharacter(at: (text as NSString).range(of: "let x").location), effectiveRange: nil)
+        let codeTop = code.minY + view.textContainerOrigin.y - view.visibleRect.minY
+        let top = try XCTUnwrap(boxTop, "code box drawn")
+        XCTAssertEqual(codeTop - top, MarkdownLayoutManager.codePadding, accuracy: 2, "box starts one padding above the code, not above the paragraph before it")
+    }
+
     func testUndoAndRedoAcrossPanesAndLayoutSwitches() async throws {
         let original = "# Notes\n\nFirst line.\n"
         let (document, window) = try await open("undo.md", original)
