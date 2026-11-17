@@ -168,6 +168,16 @@ struct EditorView: View {
                                    : "Show Source (⌥⌘1), Both (⌥⌘2) or Preview (⌥⌘3)")
                     .accessibilityLabel("Layout")
                 }
+                if isMarkdown {
+                    // In the toolbar, so every Markdown window offers it in every layout and width.
+                    Picker("Preview Mode", selection: previewModeBinding) {
+                        Text("Read").tag(false)
+                        Text("Write").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .help("Read: the full rendering. Write: edit the Markdown with formatting shown and markup hidden except on the line you’re editing; tables, math and images stay as Markdown (⌥⌘E)")
+                    .accessibilityLabel("Preview Mode")
+                }
                 if !isNarrow { // narrow toolbars keep room for the labeled Preview toggle and BB-8; File ▸ Convert stays
                     Menu { ConvertMenuItems(fileURL: fileURL) } label: { Label("Convert", systemImage: "arrow.left.arrow.right") }
                         .help("Import or export a copy")
@@ -211,30 +221,22 @@ struct EditorView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Choosing Read or Write while the preview is hidden brings the preview into view.
+    private var previewModeBinding: Binding<Bool> {
+        Binding(get: { markdownWrite }, set: { write in
+            markdownWrite = write
+            if shown == .source { layout = isNarrow ? .preview : .both }
+        })
+    }
+
     private var markdownPane: some View {
         VStack(spacing: 0) {
-            HStack(spacing: Theme.s2) {
-                Picker("Preview Mode", selection: $markdownWrite) {
-                    Text("Read").tag(false)
-                    Text("Write").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .help("Read: the full rendering. Write: edit the Markdown with formatting shown and markup hidden except on the line you’re editing; tables, math and images stay as Markdown (⌥⌘E)")
-                if markdownWrite {
-                    MarkdownFormatBar { [editor, writer] in
-                        let responder = NSApp.keyWindow?.firstResponder
-                        return responder === editor.view ? editor.view : writer.view
-                    }
-                } else {
-                    Spacer()
-                }
-            }
-            .padding(.horizontal, Theme.s2)
-            .padding(.vertical, Theme.s1)
-            .background(Theme.surface)
             if markdownWrite {
+                MarkdownFormatBar { [editor, writer] in
+                    let responder = NSApp.keyWindow?.firstResponder
+                    return responder === editor.view ? editor.view : writer.view
+                }
+                .background(Theme.surface)
                 HandleTextView(text: $document.text, handle: writer, label: "Write") { line = $0; column = $1 }
             } else {
                 MarkdownPreview(text: document.text, fileURL: fileURL)
