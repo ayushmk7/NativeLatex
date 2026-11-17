@@ -12,6 +12,7 @@ struct LibreLeafApp: App {
             EditorView(document: file.$document, fileURL: file.fileURL)
         }
         .commands {
+            NewDocumentCommands()
             AppearanceCommands()
             ConvertCommands()
         }
