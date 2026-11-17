@@ -1,7 +1,7 @@
 import AppKit
 import ImageIO
 
-/// Finds pipe tables, TeX math and images in Markdown source, and resolves/loads local images.
+/// Finds pipe tables and images in Markdown source, and resolves/loads local images.
 public enum MarkdownSyntax {
     public enum Alignment: Equatable { case none, left, center, right }
 
@@ -104,35 +104,6 @@ public enum MarkdownSyntax {
         return tables
     }
 
-    // MARK: Math
-
-    public struct Math { public let range: NSRange; public let formula: String; public let display: Bool }
-
-    private static let display = try! NSRegularExpression(pattern: #"(?<![\\$])\$\$([\s\S]{1,4000}?)\$\$"#)
-    /// Pandoc's `tex_math_dollars`: no space just inside the dollars, no digit right after the closing one.
-    private static let inline = try! NSRegularExpression(pattern: #"(?<![\\$])\$(?![\s$])((?:\\.|[^$\\\n]){1,2000}?)(?<![\s\\])\$(?![$\d])"#)
-    private static let blankLine = try! NSRegularExpression(pattern: #"\n[ \t]*\n"#)
-
-    public static func math(in text: NSString, range: NSRange) -> [Math] {
-        // Only the block is bridged to String: bridging the whole storage per keystroke cost ~30 ms at 1 MiB.
-        let block = text.substring(with: range), local = block as NSString, all = NSRange(location: 0, length: local.length)
-        func shift(_ r: NSRange) -> NSRange { NSRange(location: r.location + range.location, length: r.length) }
-        var result: [Math] = []
-        var taken = IndexSet()
-        for m in display.matches(in: block, range: all) {
-            let body = m.range(at: 1)
-            guard blankLine.firstMatch(in: block, range: body) == nil else { continue }
-            let formula = local.substring(with: body).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !formula.isEmpty else { continue }
-            result.append(Math(range: shift(m.range), formula: formula, display: true))
-            taken.insert(integersIn: m.range.location..<NSMaxRange(m.range))
-        }
-        for m in inline.matches(in: block, range: all) where !taken.intersects(integersIn: m.range.location..<NSMaxRange(m.range)) {
-            result.append(Math(range: shift(m.range), formula: local.substring(with: m.range(at: 1)), display: false))
-        }
-        return result
-    }
-
     // MARK: Images
 
     public struct Image { public let range: NSRange; public let source: String }
@@ -183,6 +154,6 @@ public enum MarkdownSyntax {
         let size = NSSize(width: w, height: h)
         let image = NSImage(size: size)
         image.addRepresentation(NSBitmapImageRep(cgImage: thumb))
-        return MarkdownRendered(image: image, size: size, descent: 0)
+        return MarkdownRendered(image: image, size: size)
     }
 }

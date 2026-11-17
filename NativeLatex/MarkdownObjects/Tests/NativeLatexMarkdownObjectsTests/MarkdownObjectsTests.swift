@@ -11,7 +11,7 @@ final class MarkdownObjectsTests: XCTestCase {
     private let hostDelegate = HostGlyphDelegate()
 
     /// A Write-like view: TextKit 1, 15 pt system font, pipe-table lines styled literal mono as the Write view does.
-    private func make(_ text: String, folder: URL? = nil, math: MathRenderer.Render? = nil, width: CGFloat = 700) -> (NSTextView, MarkdownObjects) {
+    private func make(_ text: String, folder: URL? = nil, width: CGFloat = 700) -> (NSTextView, MarkdownObjects) {
         let scroll = NSTextView.scrollableTextView()
         scroll.frame = NSRect(x: 0, y: 0, width: width, height: 800)
         let view = scroll.documentView as! NSTextView
@@ -26,7 +26,7 @@ final class MarkdownObjectsTests: XCTestCase {
         view.textContainer!.replaceLayoutManager(manager)
         manager.delegate = hostDelegate
         restyle(view, nil)
-        let objects = MarkdownObjects.attach(to: view, folder: folder, renderMath: math)!
+        let objects = MarkdownObjects.attach(to: view, folder: folder)!
         return (view, objects)
     }
 
@@ -59,9 +59,9 @@ final class MarkdownObjectsTests: XCTestCase {
         view.textStorage!.attribute(.markdownObject, at: index, effectiveRange: nil) as? MarkdownObjectBox
     }
 
-    private func fakeImage(_ size: NSSize, descent: CGFloat = 0) -> MarkdownRendered {
+    private func fakeImage(_ size: NSSize) -> MarkdownRendered {
         let image = NSImage(size: size, flipped: false) { rect in NSColor.black.setFill(); rect.fill(); return true }
-        return MarkdownRendered(image: image, size: size, descent: descent)
+        return MarkdownRendered(image: image, size: size)
     }
 
     private func writePNG(_ url: URL, width: Int, height: Int) throws {
@@ -88,13 +88,12 @@ final class MarkdownObjectsTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: folder) }
         try writePNG(folder.appendingPathComponent("pic.png"), width: 40, height: 20)
         let source = "# T\r\n\n| a | b |\n|:--|--:|\n| 1 | 22 |\n\n![p](pic.png) and $x^2$ costs $5 and $10\n\n$$\n\\frac{a}{b}\n$$\n"
-        let fake: MathRenderer.Render = { jobs in jobs.map { _ in MarkdownRendered(image: NSImage(size: NSSize(width: 30, height: 12)), size: NSSize(width: 30, height: 12), descent: 3) } }
-        let (view, objects) = make(source, folder: folder, math: fake)
+        let (view, objects) = make(source, folder: folder)
         try await waitForRenders(objects)
         XCTAssertEqual(view.string, source)
         XCTAssertEqual(Array(view.string.utf8), Array(source.utf8))
-        // Table pipes (6) + delimiter rule + image + 2 math; `$5 and $10` is not math.
-        XCTAssertEqual(objectCount(view), 10)
+        // Table pipes (6) + delimiter rule + image; math stays source.
+        XCTAssertEqual(objectCount(view), 8)
         let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
         view.cacheDisplay(in: view.bounds, to: rep) // offscreen draw path runs
         XCTAssertEqual(view.string, source)
@@ -107,7 +106,7 @@ final class MarkdownObjectsTests: XCTestCase {
         let plain = PlainGlyphDelegate()
         view.layoutManager!.delegate = plain // hides markup only, like today's Write view
         let before = view.layoutManager!
-        XCTAssertNil(MarkdownObjects.attach(to: view, folder: nil, renderMath: nil))
+        XCTAssertNil(MarkdownObjects.attach(to: view, folder: nil))
         XCTAssertTrue(view.layoutManager === before && view.layoutManager!.delegate === plain, "host's layout manager and delegate kept")
         XCTAssertNil(view.textStorage!.delegate)
         XCTAssertEqual(objectCount(view), 0)
@@ -203,8 +202,7 @@ final class MarkdownObjectsTests: XCTestCase {
         let (view, objects) = make(source, folder: folder, width: 500)
         try await waitForRenders(objects)
         let at = (source as NSString).range(of: "![big]").location
-        guard case let .image(image, size, _, tint)? = box(view, at: at)?.content else { return XCTFail("image not shown") }
-        XCTAssertFalse(tint)
+        guard case let .image(image, size)? = box(view, at: at)?.content else { return XCTFail("image not shown") }
         let column = view.textContainer!.size.width - 2 * view.textContainer!.lineFragmentPadding
         XCTAssertLessThanOrEqual(size.width, column)
         XCTAssertEqual(size.width / size.height, 4, accuracy: 0.05)
@@ -220,73 +218,68 @@ final class MarkdownObjectsTests: XCTestCase {
 
     // MARK: Math
 
-    func testMathFollowsPandocDollarRules() {
-        func spans(_ s: String) -> [String] { MarkdownSyntax.math(in: s as NSString, range: NSRange(location: 0, length: (s as NSString).length)).map { ($0.display ? "D:" : "") + $0.formula } }
-        XCTAssertEqual(spans("costs $5 and $10 today"), [])
-        XCTAssertEqual(spans("$x$"), ["x"])
-        XCTAssertEqual(spans("a $x^2 + y$ b"), ["x^2 + y"])
-        XCTAssertEqual(spans("$ x$ and $x $"), [])
-        XCTAssertEqual(spans("\\$5 then $y$"), ["y"])
-        XCTAssertEqual(spans("$x$5"), [])
-        XCTAssertEqual(spans("$$\n\\int_0^1 x\\,dx\n$$"), ["D:\\int_0^1 x\\,dx"])
-        XCTAssertEqual(spans("$$a\n\nb$$"), [], "a blank line ends the paragraph")
-        XCTAssertEqual(spans("$a \\$ b$"), ["a \\$ b"])
-    }
-
-    func testMathFilterRefusesFileAccessAndDefinitions() {
-        for bad in ["\\input{/etc/hosts}", "\\include{x}", "\\csname input\\endcsname{x}", "^^5cinput{x}", "\\def\\x{y}", "a % comment",
-                    "\\catcode`\\a=0", "\\begin{document}", "\\end{preview}", "\\openin1=x", "\\read1to\\x", "\\immediate\\write18{ls}",
-                    "\\pdffilesize{x}", "\\everymath{}", "{", "a}", "\\the\\year", "\\newcommand\\x{}", "\\typeout{x}", "x@y",
-                    "\\expandafter\\x", String(repeating: "x", count: 2001), ""] {
-            XCTAssertFalse(MathRenderer.isAllowed(bad), bad)
+    /// Write never runs TeX (a filter bypass let a formula read a private file): math stays source. A fake
+    /// `pdflatex` first on PATH and in every searched folder would leave a marker if anything started it.
+    func testMathStaysSourceAndNoTeXEverStarts() async throws {
+        let fm = FileManager.default
+        let bin = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: bin, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: bin) }
+        let marker = bin.appendingPathComponent("started")
+        for tool in ["pdflatex", "latex", "lualatex", "xelatex", "tectonic", "latexmk", "pandoc"] {
+            let script = bin.appendingPathComponent(tool)
+            try "#!/bin/sh\ntouch '\(marker.path)'\n".write(to: script, atomically: true, encoding: .utf8)
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
         }
-        for good in ["x^2", "\\frac{a}{b}", "\\theta + \\therefore", "\\begin{aligned} a &= b \\\\ c &= d \\end{aligned}",
-                     "\\sqrt[3]{x}", "\\{ x \\}", "\\left( \\sum_{n=1}^\\infty \\frac{1}{n^2} \\right)", "\\text{if } x > 0",
-                     "\\begin{pmatrix} 1 & 0 \\\\ 0 & 1 \\end{pmatrix}", "\\mathbb{R}"] {
-            XCTAssertTrue(MathRenderer.isAllowed(good), good)
-        }
-    }
-
-    func testMathRendersWithTeXAndBadFormulasStayAlone() throws {
-        guard let tex = MathRenderer.discover() else { throw XCTSkip("pdflatex not installed") }
-        let jobs = [MathRenderer.Job(formula: "x^2", display: false, size: 15),
-                    MathRenderer.Job(formula: "\\undefinedmacro x", display: false, size: 15),
-                    MathRenderer.Job(formula: "\\frac{a}{b_j}", display: true, size: 15),
-                    MathRenderer.Job(formula: "\\input{/etc/hosts}", display: false, size: 15)]
-        let start = Date()
-        let results = MathRenderer.render(jobs, tex: tex)
-        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
-        XCTAssertEqual(results.count, 4)
-        XCTAssertNotNil(results[0]); XCTAssertNil(results[1]); XCTAssertNotNil(results[2]); XCTAssertNil(results[3])
-        let frac = try XCTUnwrap(results[2])
-        XCTAssertGreaterThan(frac.size.height, results[0]!.size.height, "display fraction is taller")
-        XCTAssertGreaterThan(frac.descent, 2, "fraction sits on the baseline with depth below")
-    }
-
-    func testMathWithoutTeXStaysSource() {
-        let source = "Energy $E=mc^2$ and $$\\int x$$\n"
-        let (view, objects) = make(source, math: nil)
-        XCTAssertEqual(objectCount(view), 0)
-        XCTAssertFalse(objects.isRendering, "nothing queued without a renderer")
-        XCTAssertEqual(view.string, source)
-    }
-
-    func testCaretLineShowsMathSourceOtherLinesShowFormula() {
-        let source = "first $x^2$ line\nsecond line\n"
+        let oldPath = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        setenv("PATH", bin.path + ":" + oldPath, 1)
+        defer { setenv("PATH", oldPath, 1) }
+        let source = "Energy $E=mc^2$, $\\input{/etc/hosts}$ and\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n| a | b |\n|---|---|\n| $x$ | y |\n"
         let (view, objects) = make(source)
-        objects.prime("I:x^2", fakeImage(NSSize(width: 24, height: 14), descent: 2))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertFalse(objects.isRendering)
+        XCTAssertFalse(fm.fileExists(atPath: marker.path), "a TeX tool was started")
+        XCTAssertEqual(view.string, source)
+        let text = source as NSString
+        for formula in ["$E=mc^2$", "$\\input{/etc/hosts}$", "$$\n\\int"] {
+            let r = text.range(of: formula)
+            var touched = false
+            view.textStorage!.enumerateAttributes(in: r) { a, _, _ in
+                if a[.markdownObject] != nil || a[.markdownObjectHidden] != nil || a[.markdownObjectSource] != nil { touched = true }
+            }
+            XCTAssertFalse(touched, "\(formula) is left exactly as the Write view styled it")
+        }
+        // And the package has no way to start a process at all.
+        let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources")
+        for file in try fm.subpathsOfDirectory(atPath: sources.path) where file.hasSuffix(".swift") {
+            let code = try String(contentsOf: sources.appendingPathComponent(file), encoding: .utf8)
+            for banned in ["Process(", "NSTask", "posix_spawn", "system(", "popen", "execv", "pdflatex", "NSWorkspace"] {
+                XCTAssertFalse(code.contains(banned), "\(file) contains \(banned)")
+            }
+        }
+    }
+
+    func testCaretLineShowsImageSourceOtherLinesShowImage() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try writePNG(folder.appendingPathComponent("p.png"), width: 8, height: 8)
+        let source = "first ![p](p.png) line\nsecond line\n"
+        let (view, objects) = make(source, folder: folder)
+        objects.prime("G:" + MarkdownSyntax.resolveImage("p.png", in: folder)!.path, fakeImage(NSSize(width: 24, height: 14)))
         objects.revealRange = { nil }
         objects.reprocess(nil)
-        let at = (source as NSString).range(of: "$x^2$").location
-        XCTAssertNotNil(box(view, at: at))
-        // The text after the formula moves to the formula's width.
-        XCTAssertEqual(x(view, at + 5) - x(view, at), 24, accuracy: 0.5)
-        objects.revealRange = { NSRange(location: 0, length: 17) } // caret on the first line
+        let span = (source as NSString).range(of: "![p](p.png)")
+        XCTAssertNotNil(box(view, at: span.location))
+        // The text after the image moves to the image's width.
+        XCTAssertEqual(x(view, NSMaxRange(span)) - x(view, span.location), 24, accuracy: 0.5)
+        objects.revealRange = { NSRange(location: 0, length: 23) } // caret on the first line
         restyle(view, NSRange(location: 0, length: 0))
-        XCTAssertNil(box(view, at: at), "caret line shows the source for editing")
-        objects.revealRange = { NSRange(location: 17, length: 12) }
+        XCTAssertNil(box(view, at: span.location), "caret line shows the source for editing")
+        objects.revealRange = { NSRange(location: 23, length: 12) }
         restyle(view, NSRange(location: 0, length: 0))
-        XCTAssertNotNil(box(view, at: at))
+        XCTAssertNotNil(box(view, at: span.location))
     }
 
     // MARK: Undo and speed
@@ -295,7 +288,6 @@ final class MarkdownObjectsTests: XCTestCase {
         let source = "| a | b |\n|---|---|\n| x | y |\n\n$q$\n"
         let (view, objects) = make(source)
         let host = UndoHost(); undo = host; view.delegate = host
-        objects.prime("I:q", fakeImage(NSSize(width: 10, height: 10)))
         objects.reprocess(nil)
         XCTAssertFalse(host.manager.canUndo, "presentation registered no undo")
         let at = (source as NSString).range(of: "x").location + 1
@@ -321,7 +313,7 @@ final class MarkdownObjectsTests: XCTestCase {
         }
         let source = parts.joined()
         let start = Date()
-        let (view, objects) = make(source, math: nil)
+        let (view, objects) = make(source)
         let full = Date().timeIntervalSince(start)
         XCTAssertLessThan(full, 4, "attach + full pass on 1 MiB")
         let text = view.string as NSString

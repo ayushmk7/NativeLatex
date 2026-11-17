@@ -2,11 +2,11 @@ import AppKit
 import ImageIO
 
 public extension NSAttributedString.Key {
-    /// On the first character of a span drawn as an object (table edge/rule, image, math): a `MarkdownObjectBox`.
+    /// On the first character of a span drawn as an object (table edge/rule, image): a `MarkdownObjectBox`.
     static let markdownObject = NSAttributedString.Key("LibreWeaveMarkdownObject")
     /// Characters of an object span (and table cell padding) drawn as nothing.
     static let markdownObjectHidden = NSAttributedString.Key("LibreWeaveMarkdownObjectHidden")
-    /// Cache key of an image or math span, rendered or not, so a finished render finds its spans.
+    /// Cache key of an image span, rendered or not, so a finished render finds its spans.
     static let markdownObjectSource = NSAttributedString.Key("LibreWeaveMarkdownObjectSource")
 }
 
@@ -20,8 +20,8 @@ public final class MarkdownObjectBox: NSObject {
         case edge(CGFloat, pad: CGFloat, rule: Bool)
         /// The delimiter row: a horizontal rule `width` wide.
         case rule(CGFloat)
-        /// An image or rendered formula; `tint` draws it in the text colour (TeX output is black).
-        case image(NSImage, size: NSSize, descent: CGFloat, tint: Bool)
+        /// A local image.
+        case image(NSImage, size: NSSize)
     }
     let content: Content
     init(_ content: Content) { self.content = content }
@@ -32,16 +32,15 @@ public struct MarkdownRendered {
     public let image: NSImage
     /// Natural size in points; images are scaled down to the column when shown.
     public let size: NSSize
-    /// Depth below the baseline (math).
-    public let descent: CGFloat
-    public init(image: NSImage, size: NSSize, descent: CGFloat) { self.image = image; self.size = size; self.descent = descent }
+    public init(image: NSImage, size: NSSize) { self.image = image; self.size = size }
 }
 
-/// Presents tables, local images and TeX math in a Markdown Write view without changing a character:
+/// Presents pipe tables and local images in a Markdown Write view without changing a character:
 /// objects are attributes plus glyph tricks (a control glyph sized to the object, the rest null glyphs), so
 /// saving, copying, undo and the caret all work on the Markdown source. A span on the caret's line shows its
-/// source so it can be edited; anything that can't be rendered (no TeX, outside the folder, too wide) stays as
-/// the Write view styled it. Runs after each restyle via the text storage delegate.
+/// source so it can be edited; anything that can't be rendered (outside the folder, too wide) stays as
+/// the Write view styled it. Math is never run through TeX here: it stays source (Read renders it with
+/// Pandoc MathML). Runs after each restyle via the text storage delegate.
 @MainActor
 public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     public private(set) weak var view: NSTextView?
@@ -49,15 +48,11 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     public private(set) var folder: URL?
     /// The caret's lines, whose objects show their source. Defaults to the caret line while the view has focus.
     public var revealRange: () -> NSRange? = { nil }
-    /// Renders a batch of formulas off the main thread; nil (no TeX) leaves math as source.
-    public var renderMath: MathRenderer.Render?
 
     private var cache: [String: MarkdownRendered?] = [:]
-    private var queuedMath: [String: MathRenderer.Job] = [:]
     private var queuedImages: [String: URL] = [:]
     private var flushScheduled = false
     private var inFlight = Set<String>()
-    private var mathInFlight = false
     private var ownEdit = false
     /// Body font for table cells (the view's font).
     private var bodyFont = NSFont.systemFont(ofSize: 15)
@@ -70,7 +65,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     /// `boundingBox`, and its layout manager `draw`. Until the delegate sizes control glyphs (implements
     /// `layoutManager(_:boundingBoxForControlGlyphAt:…)`) this does nothing, so the text stays as it is.
     @discardableResult
-    public static func attach(to view: NSTextView?, folder: URL?, renderMath: MathRenderer.Render? = MathRenderer.automatic) -> MarkdownObjects? {
+    public static func attach(to view: NSTextView?, folder: URL?) -> MarkdownObjects? {
         guard let view, let storage = view.textStorage,
               let delegate = view.layoutManager?.delegate,
               delegate.responds(to: #selector(NSLayoutManagerDelegate.layoutManager(_:boundingBoxForControlGlyphAt:for:proposedLineFragment:glyphPosition:characterIndex:)))
@@ -82,7 +77,6 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         let objects = MarkdownObjects()
         objects.view = view
         objects.folder = folder
-        objects.renderMath = renderMath
         objects.bodyFont = view.font ?? objects.bodyFont
         objects.revealRange = { [weak view] in
             guard let view, view.window?.firstResponder === view else { return nil }
@@ -160,25 +154,13 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         func free(_ r: NSRange) -> Bool {
             !taken.intersects(integersIn: r.location..<NSMaxRange(r)) && !isCode(storage, r)
         }
-        for span in MarkdownSyntax.math(in: text, range: target) where free(span.range) {
-            taken.insert(integersIn: span.range.location..<NSMaxRange(span.range))
-            let key = (span.display ? "D:" : "I:") + span.formula
-            storage.addAttribute(.markdownObjectSource, value: key, range: span.range)
-            guard !revealed(span.range) else { continue }
-            if let cached = cache[key] {
-                if let cached { place(cached, span.range, display: span.display, tint: true, in: storage) }
-            } else if renderMath != nil, !inFlight.contains(key), MathRenderer.isAllowed(span.formula) {
-                queuedMath[key] = MathRenderer.Job(formula: span.formula, display: span.display, size: bodyFont.pointSize)
-                scheduleFlush()
-            }
-        }
         for span in MarkdownSyntax.images(in: text, range: target) where free(span.range) {
             guard let url = MarkdownSyntax.resolveImage(span.source, in: folder) else { continue }
             let key = "G:" + url.path
             storage.addAttribute(.markdownObjectSource, value: key, range: span.range)
             guard !revealed(span.range) else { continue }
             if let cached = cache[key] {
-                if let cached { place(cached, span.range, display: false, tint: false, in: storage) }
+                if let cached { place(cached, span.range, in: storage) }
             } else if !inFlight.contains(key) {
                 queuedImages[key] = url
                 scheduleFlush()
@@ -198,36 +180,23 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     }
 
     /// Draws `rendered` in place of `range`, scaled to the column; tall objects make their line taller.
-    private func place(_ rendered: MarkdownRendered, _ range: NSRange, display: Bool, tint: Bool, in storage: NSTextStorage) {
+    private func place(_ rendered: MarkdownRendered, _ range: NSRange, in storage: NSTextStorage) {
         var size = rendered.size
         let scale = min(1, availableWidth / max(size.width, 1), Self.maxImageHeight / max(size.height, 1))
         size = NSSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
-        let descent = rendered.descent * scale
-        let box = MarkdownObjectBox(.image(rendered.image, size: size, descent: descent, tint: tint))
+        let box = MarkdownObjectBox(.image(rendered.image, size: size))
         storage.addAttribute(.markdownObject, value: box, range: NSRange(location: range.location, length: 1))
         if range.length > 1 { storage.addAttribute(.markdownObjectHidden, value: true, range: NSRange(location: range.location + 1, length: range.length - 1)) }
         let text = storage.mutableString
         let paragraph = text.paragraphRange(for: NSRange(location: range.location, length: 0))
         let font = storage.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont ?? bodyFont
         let style = (storage.attribute(.paragraphStyle, at: paragraph.location, effectiveRange: nil) as? NSParagraphStyle ?? .default).mutableCopy() as! NSMutableParagraphStyle
-        // Ascent part above the baseline plus the font's own descender below it; deeper formulas use the line gap.
-        let needed = (size.height - descent + abs(font.descender)).rounded(.up)
+        // The image sits on the baseline; the line is tall enough for it plus the font's descender.
+        let needed = (size.height + abs(font.descender)).rounded(.up)
         if needed > style.minimumLineHeight { style.minimumLineHeight = needed }
         if style.maximumLineHeight > 0, style.maximumLineHeight < needed { style.maximumLineHeight = needed }
-        if display { style.alignment = .center }
         storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
-        // Lines after the first of a multi-line `$$` block collapse.
-        if display, NSMaxRange(paragraph) < NSMaxRange(range) {
-            let rest = NSRange(location: NSMaxRange(paragraph), length: NSMaxRange(text.paragraphRange(for: range)) - NSMaxRange(paragraph))
-            storage.addAttribute(.paragraphStyle, value: Self.collapsed, range: rest)
-        }
     }
-
-    static let collapsed: NSParagraphStyle = {
-        let style = NSMutableParagraphStyle()
-        style.minimumLineHeight = 0.01; style.maximumLineHeight = 0.01
-        return style
-    }()
 
     private func layOut(_ table: MarkdownSyntax.Table, in storage: NSTextStorage, revealed: (NSRange) -> Bool) {
         let n = table.alignments.count
@@ -313,25 +282,6 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
                 await MainActor.run { [weak self] in self?.finish(done) }
             }
         }
-        if !queuedMath.isEmpty, !mathInFlight, let renderMath {
-            let keys = Array(queuedMath.keys.sorted().prefix(MathRenderer.maxBatch))
-            let jobs = keys.map { queuedMath[$0]! }
-            keys.forEach { queuedMath[$0] = nil }
-            inFlight.formUnion(keys)
-            mathInFlight = true
-            Task.detached(priority: .userInitiated) {
-                let rendered = renderMath(jobs)
-                var results: [String: MarkdownRendered?] = [:]
-                for (key, result) in zip(keys, rendered) { results[key] = result }
-                let done = results
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.mathInFlight = false
-                    self.finish(done)
-                    if !self.queuedMath.isEmpty { self.scheduleFlush() }
-                }
-            }
-        }
     }
 
     /// Stores results (nil = can't render: stays source) and re-presents the spans that use them.
@@ -349,7 +299,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
     /// Test hook: a result as if a render had finished.
     public func prime(_ key: String, _ rendered: MarkdownRendered?) { cache[key] = .some(rendered) }
     /// Whether any render is queued or running.
-    public var isRendering: Bool { flushScheduled || !inFlight.isEmpty || !queuedMath.isEmpty || !queuedImages.isEmpty }
+    public var isRendering: Bool { flushScheduled || !inFlight.isEmpty || !queuedImages.isEmpty }
 
     // MARK: Glyphs (called from the host's layout manager delegate)
 
@@ -373,7 +323,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         let width: CGFloat = switch box.content {
         case let .edge(edge, _, _): max(2, edge - position.x)
         case let .rule(width): width
-        case let .image(_, size, _, _): size.width
+        case let .image(_, size): size.width
         }
         return NSRect(x: position.x, y: 0, width: width, height: 1)
     }
@@ -405,24 +355,10 @@ extension NSLayoutManager {
             case let .rule(width):
                 NSColor.separatorColor.setFill()
                 NSRect(x: cell.minX, y: line.midY.rounded() - 0.5, width: width, height: 1).fill()
-            case let .image(image, size, descent, tint):
-                let rect = NSRect(x: cell.minX, y: baseline - size.height + descent, width: size.width, height: size.height)
-                NSLayoutManager.drawImage(image, in: rect, tint: tint ? storage.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? NSColor ?? .textColor : nil)
+            case let .image(image, size):
+                image.draw(in: NSRect(x: cell.minX, y: baseline - size.height, width: size.width, height: size.height),
+                           from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
             }
         }
-    }
-
-    fileprivate static func drawImage(_ image: NSImage, in rect: NSRect, tint: NSColor?) {
-        guard let tint, let context = NSGraphicsContext.current?.cgContext else {
-            image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-            return
-        }
-        context.saveGState()
-        context.beginTransparencyLayer(in: rect, auxiliaryInfo: nil)
-        image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-        tint.setFill()
-        rect.fill(using: .sourceIn)
-        context.endTransparencyLayer()
-        context.restoreGState()
     }
 }
