@@ -73,6 +73,8 @@ The first Mac release excludes a collaboration server, bundled TeX distribution,
 
 “Docs” means Google Docs here; “libretext” is treated as LibreTexts, with LibreOffice Writer covered too because the term could refer to it. Word and Writer exchange use DOCX/ODT copies. Google Docs begins with manual exchange and can gain a narrow, opt-in Drive connector. LibreTexts begins as a reviewed publishing handoff until its supported API and author workflow are verified. See the [integration evidence and limits](workspaces/integrations/integrations.md).
 
+AWS may serve the website and signed Mac download, while the native app keeps editing and builds local. The [AWS hosting plan](aws-hosting-plan.md) records the free-plan limits and the boundary for any later account or sync service.
+
 ## Product success checks
 
 1. A person opens a `.tex` file from Finder, edits it, builds it and sees the PDF without opening Terminal.

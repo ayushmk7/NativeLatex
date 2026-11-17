@@ -11,6 +11,7 @@ Status: planning only · 2026-11-16. The app plan covers LaTeX, Markdown, and ot
 5. [Mac UX plan](workspaces/ux/ux-plan.md) — windows, editing flows, recovery, accessibility.
 6. [Mac architecture](workspaces/backend/architecture.md) — native stack, files, compilation, preview.
 7. [Integrations](workspaces/integrations/integrations.md) — Word, Google Docs, LibreOffice, LibreTexts, Zotero, Git.
+8. [AWS hosting and cost plan](aws-hosting-plan.md) — static distribution first, optional cloud services later.
 
 ## Workspace layout
 

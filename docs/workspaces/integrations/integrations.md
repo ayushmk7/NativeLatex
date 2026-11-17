@@ -8,6 +8,26 @@ The local `.tex` or `.md` file and its project folder are the source of truth. C
 
 The name “libretext” is interpreted here as **LibreTexts**, the education publishing platform. **LibreOffice Writer** is covered separately through ODT. Confirm the intended product before implementing a provider-specific connector.
 
+## Free integration choices
+
+“Free” below means no separate fee for the integration itself at the stated usage level. A user may still pay for a provider account, storage, or Apple app distribution; AWS hosting has its own limits. The [AWS plan](../../aws-hosting-plan.md) keeps these costs separate.
+
+| Choice | Useful app action | Cost and access boundary | Plan |
+| --- | --- | --- | --- |
+| Finder / Files providers | Open and save ordinary project folders, including a user-chosen iCloud Drive or other Files location | No app backend or provider API charge; the user's storage plan may have limits | Core |
+| Pandoc and LibreOffice formats | Import/export DOCX, ODT, HTML, EPUB and Markdown copies | Local tools and formats; no service fee. Conversion fidelity needs review | File interchange |
+| Git and Zotero BibTeX/BibLaTeX | Keep projects Git-friendly; read a bibliography exported by Zotero | Local files; no service fee or sign-in | Core and power workflow |
+| Crossref REST API | Look up a DOI and propose a citation entry, with user review before writing `.bib` | Public API needs no sign-up; use its polite pool and respect rate limits. Metadata can be incomplete | Optional citation helper |
+| Google Docs via Drive API | Explicitly import/export a selected document as a new copy | Standard Drive API use has no additional cost within quota; requires Google sign-in, OAuth setup and internet. Google plans charges for requests beyond quota later in 2026 | Optional connected exchange |
+| Word / OneDrive via Microsoft Graph | Explicitly transfer DOCX copies from a user's OneDrive | Standard Graph operations have no additional API charge within limits and a qualifying user license; requires Microsoft sign-in and internet | Optional connected exchange |
+| LibreTexts | Export a reviewable file for an authorized author to submit | File handoff can be free; direct publishing needs platform permission and a supported API | Handoff first |
+
+Crossref documents public, no-sign-up access and recommends identification for its polite pool. [Crossref REST API](https://www.crossref.org/documentation/retrieve-metadata/rest-api/), [access options](https://www.crossref.org/documentation/retrieve-metadata/rest-api/access-and-authentication/). Zotero supports library or collection export and BibLaTeX quick copy. [Zotero export](https://www.zotero.org/support/kb/exporting), [BibLaTeX format](https://www.zotero.org/support/preferences/export).
+
+Google says standard Drive API use has no additional charge but plans charges above request quotas later in 2026. Use the narrow `drive.file` scope, and check the published pricing before shipping the connector. [Drive API limits and pricing](https://developers.google.com/workspace/drive/api/guides/limits), [Drive scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth). Microsoft says standard Graph APIs are included within usage thresholds under user licenses; its OneDrive file endpoint supports delegated personal accounts. [Graph metering](https://learn.microsoft.com/en-us/graph/metered-api-overview), [OneDrive upload](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content?view=graph-rest-1.0).
+
+For native sign-in, request user consent in the app and keep tokens in the device Keychain. File conversion and direct provider APIs do not require an AWS proxy. Never place a provider client secret in the app. A server is justified only by a feature that actually needs server-owned credentials or shared state.
+
 ## Priority and path
 
 | Destination/source | First useful path | Later path, only if proven | Main risk |
