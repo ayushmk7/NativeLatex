@@ -77,6 +77,19 @@ struct EditorView: View {
     /// Controls show what is on screen; choosing sets the requested layout (Both returns when the window widens).
     private var shownBinding: Binding<PaneLayout> { Binding(get: { shown }, set: { panes.choose($0) }) }
 
+    /// Formatting needs an editable Markdown view on screen: Write, or the source beside or instead of Read.
+    private var canFormat: Bool { panes.canFormat(narrow: isNarrow, markdown: isMarkdown) }
+
+    /// The view Format commands and the format bar act on: the focused Source or Write view of this window,
+    /// else the visible one (Write if shown, else Source), which then takes focus.
+    private func formatTarget() -> NSTextView? {
+        let visible = markdownWrite ? writer.view : (shown != .preview ? editor.view : nil)
+        let focused = (visible?.window?.firstResponder as? NSTextView).flatMap { $0 === editor.view || $0 === writer.view ? $0 : nil }
+        guard let view = focused ?? visible, view.window != nil else { return nil }
+        if view.window?.firstResponder !== view { view.window?.makeFirstResponder(view) }
+        return view
+    }
+
     private var writeBinding: Binding<Bool> {
         Binding(get: { panes.write }, set: { on in if isMarkdown { panes.setWrite(on, narrow: isNarrow) } })
     }
@@ -121,7 +134,8 @@ struct EditorView: View {
         .frame(minWidth: 640, minHeight: 420)
         .focusedSceneValue(\.documentFileURL, fileURL)
         .focusedSceneValue(\.paneControls, hasPreview ? PaneControls(layout: shownBinding, isNarrow: isNarrow,
-                                                                    write: isMarkdown ? writeBinding : nil) : nil)
+                                                                    write: isMarkdown ? writeBinding : nil,
+                                                                    formatTarget: canFormat ? formatTarget : nil) : nil)
         .task { reopenSymlinkAtTarget() }
         // ponytail: 2 s poll + activation check; swap for NSFilePresenter/FSEvents if many windows stay open.
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in checkDisk() }
@@ -250,10 +264,7 @@ struct EditorView: View {
     private var markdownPane: some View {
         VStack(spacing: 0) {
             if markdownWrite {
-                MarkdownFormatBar { [editor, writer] in
-                    let responder = NSApp.keyWindow?.firstResponder
-                    return responder === editor.view ? editor.view : writer.view
-                }
+                MarkdownFormatBar(target: formatTarget)
                 .background(Theme.surface)
                 HandleTextView(text: $document.text, handle: writer, label: "Write") { line = $0; column = $1 }
             } else {
@@ -409,6 +420,8 @@ struct PaneControls {
     var isNarrow: Bool
     /// Markdown only: Read/Write mode of the preview pane.
     var write: Binding<Bool>?
+    /// Markdown with an editable view on screen: the view Format commands act on. Nil disables them.
+    var formatTarget: (() -> NSTextView?)?
 }
 
 extension FocusedValues {
@@ -447,8 +460,9 @@ struct PaneCommands: Commands {
     }
 }
 
-/// Format menu for Markdown windows, acting on the focused Source or Write view. Its items only exist for
-/// Markdown, so ⌘B stays Build in LaTeX windows.
+/// Format menu for Markdown windows, acting on the window's focused (else visible) Source or Write view.
+/// Its items only exist for Markdown, so ⌘B stays Build in LaTeX windows; they are disabled when nothing
+/// editable is on screen (Read in Preview Only), instead of silently doing nothing.
 struct MarkdownFormatCommands: Commands {
     @FocusedValue(\.paneControls) private var controls
 
@@ -468,15 +482,10 @@ struct MarkdownFormatCommands: Commands {
         }
     }
 
-    /// The key window's Source or Write text view, if one has focus.
-    static func focusedEditor() -> NSTextView? {
-        guard let view = NSApp.keyWindow?.firstResponder as? NSTextView, ["Source", "Write"].contains(view.accessibilityLabel() ?? "") else { return nil }
-        return view
-    }
-
     @ViewBuilder
     private func item(_ title: String, _ key: KeyEquivalent?, action: @escaping (NSTextView) -> Void) -> some View {
-        let button = Button(title) { if let view = Self.focusedEditor() { action(view) } }
+        let button = Button(title) { if let view = controls?.formatTarget?() { action(view) } }
+            .disabled(controls?.formatTarget == nil)
         if let key { button.keyboardShortcut(key, modifiers: .command) } else { button }
     }
 }

@@ -24,6 +24,11 @@ struct PaneState: Equatable {
         return narrow && layout == .both ? .source : layout
     }
 
+    /// Format commands need an editable Markdown view on screen: Write, or the source (Read in Preview Only has none).
+    func canFormat(narrow: Bool, markdown: Bool) -> Bool {
+        markdown && (write || shown(narrow: narrow, markdown: markdown) != .preview)
+    }
+
     /// A layout chosen from the toolbar or View menu. Source Only and Source and Preview leave Write
     /// (the mode control then says Read); Preview Only keeps the current mode.
     mutating func choose(_ new: PaneLayout) {
@@ -85,6 +90,12 @@ struct PaneState: Equatable {
         // Saved as .tex while in Write: no Write for non-Markdown, and leaving it restores the earlier layout.
         s = PaneState(); s.setWrite(true, narrow: false)
         s.setWrite(false, narrow: false); expect(s, .both, write: false, "leaving Write after a .tex save restores Both")
+        var f = PaneState()
+        let formats = [(f.canFormat(narrow: false, markdown: true), true, "Both: source editable"),
+                       ({ f.choose(.preview); return f.canFormat(narrow: false, markdown: true) }(), false, "Read in Preview Only: nothing editable"),
+                       ({ f.setWrite(true, narrow: false); return f.canFormat(narrow: false, markdown: true) }(), true, "Write"),
+                       (f.canFormat(narrow: false, markdown: false), false, "not Markdown")]
+        for (got, want, step) in formats where got != want { failures.append("canFormat, \(step): \(got)") }
         if PaneState().shown(narrow: false, hasPreview: false) != .source { failures.append("plain text: source only") }
         return failures
     }
