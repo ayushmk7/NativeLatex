@@ -25,6 +25,8 @@ struct LibreWeaveApp: App {
         }
         .commands {
             NewDocumentCommands()
+            PaneCommands()
+            MarkdownFormatCommands()
             AppearanceCommands()
             ConvertCommands()
         }
@@ -37,6 +39,7 @@ struct EditorView: View {
     let fileURL: URL?
     @StateObject private var builder = BuildService()
     @StateObject private var editor = TextViewHandle()
+    @StateObject private var writer = WritingHandle()
     @State private var pdfData: Data?
     @State private var builtText: String?
     @State private var isStale = false
@@ -46,10 +49,12 @@ struct EditorView: View {
     @State private var diagnostics: [Diagnostic] = []
     @State private var error: String?
     @State private var showLog = false
-    @State private var showPreview = true
+    /// Per window: source only, both side by side, or preview only.
+    @State private var layout: PaneLayout = .both
+    /// Markdown preview pane: Read (Pandoc rendering) or Write (editable, formatted Markdown).
+    @State private var markdownWrite = false
     /// Below `narrowWidth` the window shows source *or* preview, never two squeezed columns.
     @State private var isNarrow = false
-    @State private var narrowShowsPreview = false
     @State private var showProblems = false
     @State private var line = 1
     @State private var column = 1
@@ -63,6 +68,15 @@ struct EditorView: View {
     private var hasPreview: Bool { isTeX || isMarkdown }
     /// Same breakpoint as the Design package's WorkspaceShell: 320pt editor + 280pt preview + room.
     static let narrowWidth: CGFloat = 760
+
+    /// What the window shows: no preview for plain text; a narrow window can't show both.
+    private var shown: PaneLayout {
+        guard hasPreview else { return .source }
+        return isNarrow && layout == .both ? .source : layout
+    }
+
+    /// Controls show what is on screen; choosing sets the requested layout (Both returns when the window widens).
+    private var shownBinding: Binding<PaneLayout> { Binding(get: { shown }, set: { layout = $0 }) }
 
     private var buildState: BuildState {
         if builder.isRunning { return .building }
@@ -82,8 +96,8 @@ struct EditorView: View {
                 // One split view in both widths, so resizing across the breakpoint keeps the editor in place
                 // (and focused); only a narrow window's Preview toggle swaps the source out.
                 HSplitView {
-                    if !(isNarrow && narrowShowsPreview && hasPreview) { source.frame(minWidth: 320) }
-                    if hasPreview, isNarrow ? narrowShowsPreview : showPreview { preview.frame(minWidth: 280) }
+                    if shown != .preview { source.frame(minWidth: 320) }
+                    if shown != .source { preview.frame(minWidth: 280) }
                 }
                 .frame(maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
                 // On the whole pane, so the conflict banner stays visible while a narrow window shows the preview.
@@ -103,15 +117,24 @@ struct EditorView: View {
         .libreWeaveTheme()
         .frame(minWidth: 640, minHeight: 420)
         .focusedSceneValue(\.documentFileURL, fileURL)
+        .focusedSceneValue(\.paneControls, hasPreview ? PaneControls(layout: shownBinding, isNarrow: isNarrow,
+                                                                    write: isMarkdown ? $markdownWrite : nil) : nil)
         .task { reopenSymlinkAtTarget() }
         // ponytail: 2 s poll + activation check; swap for NSFilePresenter/FSEvents if many windows stay open.
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in checkDisk() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in checkDisk() }
-        .onChange(of: narrowShowsPreview) {
-            // Back to source: return keyboard focus to the editor (the preview took its place).
-            if !narrowShowsPreview { DispatchQueue.main.async { editor.focus() } }
+        .onChange(of: shown) { old, new in
+            // Focus follows the pane that just appeared in place of the one holding it.
+            if old == .preview, new != .preview { DispatchQueue.main.async { editor.focus() } }
+            if new == .preview, isMarkdown, markdownWrite { DispatchQueue.main.async { writer.focus() } }
+        }
+        .onChange(of: markdownWrite) {
+            if markdownWrite, shown != .source { DispatchQueue.main.async { writer.focus() } }
         }
         .onChange(of: document.text) {
+            // Keep both text views on the buffer, visible or not, so undo in either stays valid.
+            editor.sync(document.text)
+            writer.sync(document.text)
             // The PDF shows the text as of the last successful build; any other text makes it stale.
             if pdfData != nil, !lastFailed { isStale = document.text != builtText }
         }
@@ -133,18 +156,17 @@ struct EditorView: View {
                         .help("Show Build Log")
                 }
                 if hasPreview {
-                    if isNarrow {
-                        // Narrow: preview replaces the source, so the toggle names itself in text.
-                        Toggle(isOn: $narrowShowsPreview) {
-                            Label("Preview", systemImage: "doc.richtext").labelStyle(.titleAndIcon)
-                        }
-                        .keyboardShortcut("p", modifiers: [.command, .option])
-                        .help(narrowShowsPreview ? "Show Source (⌥⌘P)" : "Show Preview Instead of Source (⌥⌘P)")
-                    } else {
-                        Toggle(isOn: $showPreview) { Label("Preview", systemImage: "sidebar.right") }
-                            .keyboardShortcut("p", modifiers: [.command, .option])
-                            .help(showPreview ? "Hide Preview (⌥⌘P)" : "Show Preview (⌥⌘P)")
+                    Picker("Layout", selection: shownBinding) {
+                        Label("Source", systemImage: "doc.plaintext").tag(PaneLayout.source)
+                        Label("Source and Preview", systemImage: "rectangle.split.2x1").tag(PaneLayout.both)
+                            .selectionDisabled(isNarrow)
+                        Label("Preview", systemImage: "doc.richtext").tag(PaneLayout.preview)
                     }
+                    .pickerStyle(.segmented)
+                    .labelStyle(.iconOnly)
+                    .help(isNarrow ? "Show Source or Preview (⌥⌘1, ⌥⌘3); widen the window to show both"
+                                   : "Show Source (⌥⌘1), Both (⌥⌘2) or Preview (⌥⌘3)")
+                    .accessibilityLabel("Layout")
                 }
                 if !isNarrow { // narrow toolbars keep room for the labeled Preview toggle and BB-8; File ▸ Convert stays
                     Menu { ConvertMenuItems(fileURL: fileURL) } label: { Label("Convert", systemImage: "arrow.left.arrow.right") }
@@ -184,9 +206,41 @@ struct EditorView: View {
 
     @ViewBuilder private var preview: some View {
         Group {
-            if isMarkdown { MarkdownPreview(text: document.text, fileURL: fileURL) } else { texPreview }
+            if isMarkdown { markdownPane } else { texPreview }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var markdownPane: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Theme.s2) {
+                Picker("Preview Mode", selection: $markdownWrite) {
+                    Text("Read").tag(false)
+                    Text("Write").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help("Read: the full rendering. Write: edit the Markdown with formatting shown and markup hidden except on the line you’re editing; tables, math and images stay as Markdown (⌥⌘E)")
+                if markdownWrite {
+                    MarkdownFormatBar { [editor, writer] in
+                        let responder = NSApp.keyWindow?.firstResponder
+                        return responder === editor.view ? editor.view : writer.view
+                    }
+                } else {
+                    Spacer()
+                }
+            }
+            .padding(.horizontal, Theme.s2)
+            .padding(.vertical, Theme.s1)
+            .background(Theme.surface)
+            if markdownWrite {
+                HandleTextView(text: $document.text, handle: writer, label: "Write") { line = $0; column = $1 }
+            } else {
+                MarkdownPreview(text: document.text, fileURL: fileURL)
+            }
+        }
+        .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
     }
 
     private var diskBanner: some View {
@@ -234,8 +288,8 @@ struct EditorView: View {
     private func reveal(_ problem: Problem) {
         guard let diagnostic = diagnostics.first(where: { $0.id == problem.id }), let file = diagnostic.file else { return }
         if file.resolvingSymlinksInPath() == fileURL?.resolvingSymlinksInPath() {
-            if isNarrow, narrowShowsPreview {
-                narrowShowsPreview = false // the source must be on screen to show the line
+            if shown == .preview {
+                layout = isNarrow ? .source : .both // the source must be on screen to show the line
                 DispatchQueue.main.async { editor.reveal(line: diagnostic.line ?? 1) }
             } else {
                 editor.reveal(line: diagnostic.line ?? 1)
@@ -326,5 +380,94 @@ struct PDFPreview: NSViewRepresentable {
             if !autoScales { view.scaleFactor = scale }
             if let restored = view.document?.page(at: page) { view.go(to: restored) }
         }
+    }
+}
+
+enum PaneLayout: Hashable {
+    case source, both, preview
+
+    /// ⌥⌘P: hide the preview, or bring it back beside the source (alone if the window is narrow).
+    func toggled(narrow: Bool) -> PaneLayout { self == .source ? (narrow ? .preview : .both) : .source }
+}
+
+/// The focused window's pane state, for the View menu.
+struct PaneControls {
+    var layout: Binding<PaneLayout>
+    var isNarrow: Bool
+    /// Markdown only: Read/Write mode of the preview pane.
+    var write: Binding<Bool>?
+}
+
+extension FocusedValues {
+    @Entry var paneControls: PaneControls? = nil
+}
+
+/// View ▸ Source Only / Source and Preview / Preview Only, and Write in Preview for Markdown.
+struct PaneCommands: Commands {
+    @FocusedValue(\.paneControls) private var controls
+
+    var body: some Commands {
+        CommandGroup(before: .toolbar) {
+            item("Source Only", .source, "1")
+            item("Source and Preview", .both, "2")
+                .disabled(controls == nil || controls?.isNarrow == true)
+            item("Preview Only", .preview, "3")
+            Button("Toggle Preview") {
+                guard let controls else { return }
+                controls.layout.wrappedValue = controls.layout.wrappedValue.toggled(narrow: controls.isNarrow)
+            }
+            .keyboardShortcut("p", modifiers: [.command, .option])
+            .disabled(controls == nil)
+            Toggle("Write in Preview", isOn: Binding(get: { controls?.write?.wrappedValue ?? false }, set: { on in
+                guard let controls else { return }
+                controls.write?.wrappedValue = on
+                // Turning Write on from Source Only brings the preview pane into view.
+                if on, controls.layout.wrappedValue == .source { controls.layout.wrappedValue = controls.isNarrow ? .preview : .both }
+            }))
+                .keyboardShortcut("e", modifiers: [.command, .option])
+                .disabled(controls?.write == nil)
+            Divider()
+        }
+    }
+
+    private func item(_ title: String, _ layout: PaneLayout, _ key: KeyEquivalent) -> some View {
+        Toggle(title, isOn: Binding(get: { controls?.layout.wrappedValue == layout },
+                                    set: { _ in controls?.layout.wrappedValue = layout }))
+            .keyboardShortcut(key, modifiers: [.command, .option])
+            .disabled(controls == nil)
+    }
+}
+
+/// Format menu for Markdown windows, acting on the focused Source or Write view. Its items only exist for
+/// Markdown, so ⌘B stays Build in LaTeX windows.
+struct MarkdownFormatCommands: Commands {
+    @FocusedValue(\.paneControls) private var controls
+
+    var body: some Commands {
+        CommandMenu("Format") {
+            if controls?.write != nil {
+                item("Bold", "b") { MarkdownFormat.wrap($0, marker: "**") }
+                item("Italic", "i") { MarkdownFormat.wrap($0, marker: "*") }
+                item("Link", "k") { MarkdownFormat.link($0) }
+                Divider()
+                item("Heading", nil) { MarkdownFormat.heading($0) }
+                item("Bulleted List", nil) { MarkdownFormat.togglePrefix($0, "- ") }
+                item("Quote", nil) { MarkdownFormat.togglePrefix($0, "> ") }
+            } else {
+                Text("Formatting is available in Markdown documents.")
+            }
+        }
+    }
+
+    /// The key window's Source or Write text view, if one has focus.
+    static func focusedEditor() -> NSTextView? {
+        guard let view = NSApp.keyWindow?.firstResponder as? NSTextView, ["Source", "Write"].contains(view.accessibilityLabel() ?? "") else { return nil }
+        return view
+    }
+
+    @ViewBuilder
+    private func item(_ title: String, _ key: KeyEquivalent?, action: @escaping (NSTextView) -> Void) -> some View {
+        let button = Button(title) { if let view = Self.focusedEditor() { action(view) } }
+        if let key { button.keyboardShortcut(key, modifiers: .command) } else { button }
     }
 }

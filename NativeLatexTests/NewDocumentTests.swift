@@ -115,10 +115,10 @@ final class NewDocumentTests: XCTestCase {
         defer { tex.close(); md.close(); txt.close() }
         let texLabels = try toolbarLabels(tex), mdLabels = try toolbarLabels(md), txtLabels = try toolbarLabels(txt)
         XCTAssertTrue(texLabels.contains("Build"), "untitled LaTeX has Build: \(texLabels)")
-        XCTAssertTrue(texLabels.contains("Preview"), "and its PDF preview toggle")
-        XCTAssertTrue(mdLabels.contains("Preview"), "untitled Markdown has its preview: \(mdLabels)")
+        XCTAssertTrue(texLabels.contains("Layout"), "and its PDF preview layout control")
+        XCTAssertTrue(mdLabels.contains("Layout"), "untitled Markdown has its preview: \(mdLabels)")
         XCTAssertFalse(mdLabels.contains("Build"))
-        XCTAssertFalse(txtLabels.contains("Build") || txtLabels.contains("Preview"), "plain text has neither: \(txtLabels)")
+        XCTAssertFalse(txtLabels.contains("Build") || txtLabels.contains("Layout"), "plain text has neither: \(txtLabels)")
     }
 
     /// File > Duplicate also makes a URL-less document; it keeps the source's format.
@@ -126,7 +126,7 @@ final class NewDocumentTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("dup-\(UUID())")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
-        for (name, tool, absent) in [("notes.md", "Preview", "Build"), ("paper.tex", "Build", nil)] {
+        for (name, tool, absent) in [("notes.md", "Layout", "Build"), ("paper.tex", "Build", nil)] {
             let url = dir.appendingPathComponent(name)
             try "x".write(to: url, atomically: true, encoding: .utf8)
             let original = try NSDocumentController.shared.makeDocument(withContentsOf: url, ofType: name.hasSuffix("md") ? "net.daringfireball.markdown" : "org.tug.tex")
