@@ -99,6 +99,38 @@ final class MarkdownObjectsTests: XCTestCase {
         XCTAssertEqual(view.string, source)
     }
 
+    /// The app's `.task` discards `attach`'s result and the storage's delegate is weak: the objects must live on
+    /// (edits re-present, image loads land) as long as the text does.
+    func testObjectsOutliveADiscardedAttachResult() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try writePNG(folder.appendingPathComponent("p.png"), width: 8, height: 8)
+        let source = "| a | b |\n|---|---|\n| x | y |\n\n![p](p.png)\n"
+        let scroll = NSTextView.scrollableTextView()
+        scroll.frame = NSRect(x: 0, y: 0, width: 700, height: 800)
+        let view = scroll.documentView as! NSTextView
+        view.font = .systemFont(ofSize: 15)
+        view.string = source
+        let manager = HostLayoutManager(); manager.allowsNonContiguousLayout = true
+        view.textContainer!.replaceLayoutManager(manager)
+        manager.delegate = hostDelegate
+        weak var objects: MarkdownObjects?
+        autoreleasepool { objects = MarkdownObjects.attach(to: view, folder: folder) } // result dropped, as in the app
+        XCTAssertNotNil(objects, "kept alive by the text storage")
+        XCTAssertTrue(view.textStorage!.delegate === objects)
+        // The image decoded after attach returned still lands.
+        let end = Date().addingTimeInterval(5)
+        while box(view, at: (source as NSString).range(of: "![p]").location) == nil, Date() < end { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertNotNil(box(view, at: (source as NSString).range(of: "![p]").location), "image load finished and was shown")
+        // An edit plus the writer's restyle still re-presents the table (header realigns to the wider cell).
+        let at = (source as NSString).range(of: "x").location + 1
+        let before = x(view, (source as NSString).range(of: "b").location)
+        view.textStorage!.replaceCharacters(in: NSRange(location: at, length: 0), with: "-much-longer")
+        restyle(view, NSRange(location: at, length: 0))
+        XCTAssertGreaterThan(x(view, (view.string as NSString).range(of: "b").location), before + 40)
+    }
+
     func testAttachIsInertUntilTheHostSizesObjectGlyphs() {
         let scroll = NSTextView.scrollableTextView()
         let view = scroll.documentView as! NSTextView

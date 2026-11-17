@@ -376,4 +376,22 @@ final class MarkdownPreviewTests: XCTestCase {
         XCTAssertEqual(metrics[1], 16, accuracy: 1, "first block at the top padding, like Write's 16 pt inset")
         XCTAssertGreaterThan(metrics[2], 3, "checkbox separated from its text")
     }
+
+    /// A header cell in a column with no alignment starts where its body cells do, as Write draws it (browsers
+    /// centre a bare `<th>`); explicit `:-:` / `--:` alignments still apply through Pandoc's inline styles.
+    func testReadTableHeadersFollowTheirColumnAlignment() async throws {
+        _ = try pandocOrSkip()
+        let html = try await MarkdownRenderer.render("| Species | Mid | Count |\n|---------|:---:|------:|\n| Sea star | x | 4 |\n")
+        let coordinator = MarkdownWebView.Coordinator()
+        let view = MarkdownWebView.makeWebView(coordinator)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = view // never ordered in
+        defer { window.close() }
+        coordinator.show(html, folder: nil, in: view)
+        for _ in 0..<100 where view.isLoading { try await Task.sleep(for: .milliseconds(50)) }
+        try await Task.sleep(for: .milliseconds(300))
+        let result = try await view.evaluateJavaScript("[...document.querySelectorAll('th')].map(e => getComputedStyle(e).textAlign)")
+        XCTAssertEqual(result as? [String], ["left", "center", "right"])
+    }
 }

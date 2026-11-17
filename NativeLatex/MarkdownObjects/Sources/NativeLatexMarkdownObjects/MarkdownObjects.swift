@@ -13,6 +13,8 @@ public extension NSAttributedString.Key {
 /// The Write view's markup key (`MarkdownStyler`'s `.markdownHidden`); this layout manager hides it too.
 let writerHiddenKey = NSAttributedString.Key("LibreWeaveMarkdownHidden")
 
+nonisolated(unsafe) private var ownerKey: UInt8 = 0
+
 /// What an object glyph draws.
 public final class MarkdownObjectBox: NSObject {
     enum Content {
@@ -97,6 +99,8 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         }
         guard storage.delegate == nil else { return nil } // ponytail: sole storage delegate; chain if the writer needs one
         storage.delegate = objects
+        // The storage's delegate is weak and callers (the Write view's `.task`) drop the result: the storage keeps it.
+        objc_setAssociatedObject(storage, &ownerKey, objects, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         objects.reprocess(nil)
         return objects
     }
