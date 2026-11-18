@@ -27,7 +27,7 @@ The existing Herdr **NativeLatex** workspace is the primary space. Art, UX, Back
 
 ## Implemented on main (checked 2026-11-17)
 
-These are verified facts about current `main`, separate from the plans linked above. The earlier 60-case app suite passed before the recent Markdown changes. The integrated app test target compiled headlessly; app-hosted tests were not rerun because they can bring windows over the owner’s work. The current Markdown Objects, Design, and Integrations package suites pass locally (20, 6, and 17 cases respectively; one live LibreTexts case is skipped by default).
+These are verified facts about current `main`, separate from the plans linked above. The earlier 60-case app suite passed before the recent Markdown changes. The integrated app test target compiled headlessly; app-hosted tests were not rerun because they can bring windows over the owner’s work. The current Markdown Objects, Design, and Integrations package suites pass locally (24, 6, and 17 cases respectively; one live LibreTexts case is skipped by default).
 
 | Area | Current state | Verified by |
 | --- | --- | --- |
