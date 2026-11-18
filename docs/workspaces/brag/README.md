@@ -1,14 +1,14 @@
 # Brag workspace: LibreWeave demo media
 
-Captured 2026-11-17 from app source at **`d3d862e`** (Write is the full-width editor, Document Mode, shared Format commands, table grid, code blocks and list gaps). Dark throughout. The only UI blue is `#2563EB`.
+Captured 2026-11-17 from app source at **`5070fb1`** (Write is the full-width editor with no Layout segment highlighted, Document Mode, shared Format commands, table grid with 6 pt cell padding, code blocks and list gaps). Dark throughout. The only UI blue is `#2563EB`.
 
 ## Published files in `landing/media/`
 
 | File | Spec |
 | --- | --- |
-| `libreweave-demo.mp4` | 18.0 s, 1920×1080, 30 fps (540 frames), H.264 High yuv420p + AAC 48 kHz stereo (peak −16 dBFS), `+faststart`, 2.6 MB |
+| `libreweave-demo.mp4` | 18.0 s, 1920×1080, 30 fps (540 frames), H.264 High yuv420p + AAC 48 kHz stereo (peak −16 dBFS), `+faststart`, 2.5 MB |
 | `libreweave-demo-poster.jpg` | 1280×720, frame at 8.2 s: Markdown source beside the Read rendering. Separate file; frame 0 of the video is the hook |
-| `libreweave-demo-preview.gif` | 18 s, 600×338, 10 fps, loops, silent, 1.4 MB. Built from the lossless render frames (not the MP4) with a 256-colour palette that includes exact `#2563EB` and its blends, no dithering. Embedded in the root README and linked to the MP4 |
+| `libreweave-demo-preview.gif` | 18 s, 600×338, 10 fps, loops, silent, 1.4 MB (180 frames). Built from the lossless render frames (not the MP4) with a 256-colour palette that includes exact `#2563EB` and its blends, no dithering. Embedded in the root README and linked to the MP4 |
 | `libreweave-hero.png` | 1600×944, dark window, `orbit.tex` source and built PDF ("Built") |
 | `libreweave-markdown.png` | 1600×944, light window, full-width **Write** with the format bar and Document Mode |
 | `libreweave-latex-light.png` | 1600×944, light window, `orbit.tex` source and built PDF |
@@ -43,7 +43,9 @@ Rebuild: `brag-output/work/tools/takes.sh <commit>`, then `tools/final.sh 8.9`. 
 ## Checks (final run)
 
 - `ffprobe`: 540 frames, 18.000 s, 1920×1080, 30 fps; AAC 48 kHz stereo, mean −29.1 dB, peak −16.0 dB. GIF 180 frames, 18 s, 600×338.
-- Frames pulled from the MP4 at 0.05, 1.2, 3.0, 4.3, 5.6, 7.0, 8.0, 8.9, 9.9, 11.0, 12.4, 13.6, 14.6, 15.2, 16.4 and 17.9 s, viewed at 900 px. Typing, live formatting, Document Mode → Read, the Read zoom (no source slivers), Building…/Built and the PDF zoom are legible, and captions stay in frame.
-- **Blue:** `#0F2BFF`, `#2438FF`, `#0A84FF` and `#0071E3` (±8%): 0 px across every 6th frame and all files. Every strongly blue pixel in the PNGs, the poster, sampled frames and GIF frames lies on the `#2563EB` → black/white blend line, except 1 px in the poster and 2 px in one GIF frame. Both are inside the BB-8 switch's night-sky art (top-right of the toolbar), which `b9e51b4` keeps separate from the brand accent.
+- Frames pulled from the MP4 at 0.05, 1.5, 3.0, 4.3, 5.6, 7.0, 8.2, 9.0, 9.9, 11.0, 12.4, 13.6, 14.6, 15.2, 16.6 and 17.9 s, viewed at 900 px. Typing, live formatting, Document Mode → Read, the Read zoom (no source slivers), Building…/Built and the PDF zoom are legible, and captions stay in frame.
+- **Blue:** `#0F2BFF`, `#2438FF`, `#0A84FF` and `#0071E3` (±8%): 0 px across every 6th frame and all files. Every strongly blue pixel in the three PNGs, the poster, 18 sampled render frames and 12 GIF frames lies on the `#2563EB` → black/white blend line: **0 off-brand pixels**. (The BB-8 switch's night-sky art, which `b9e51b4` keeps separate from the brand accent, sits below the scan's strong-blue threshold.)
 - **MP4 encoding note:** browsers need H.264 4:2:0, and chroma subsampling shifts the colour of pixels on sharp `#2563EB`/white edges (outro icon threads, URL). A decoded outro frame has about 1,200 such edge pixels; the lossless render has none. Flat areas decode to `#2563EB`. The GIF and PNGs don't have this (lossless sources); the 4:4:4 alternative doesn't play in Safari.
+- Landing (headless Chrome, local files; light, dark, 390 px phone): the MP4 autoplays, muted and looping (playing at 2.5 s, duration 18 s), with controls and the poster. Accent `rgb(37, 99, 235)`, BB-8 switch present, no horizontal scroll.
+- README rendered through the GitHub Markdown API: hero, GIF (linked to the MP4), Write and LaTeX PNGs all resolve; no `<video>`.
 - No app launched, no window shown, and no other app queried.
