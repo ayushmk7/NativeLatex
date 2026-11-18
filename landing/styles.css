@@ -51,7 +51,15 @@ html[data-theme="dark"] .site-nav a:hover, html[data-theme="dark"] .site-footer 
 .bb8-toggle__checkbox { display: block !important; position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .bb8-toggle__checkbox:focus-visible + .bb8-toggle__container { outline: 3px solid var(--ring); outline-offset: 4px; }
 
-.hero { padding: 120px 0 var(--s8); text-align: center; }
+.hero { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: calc(100svh - 72px); padding: var(--s7) 0 120px; text-align: center; }
+/* scroll cue: the Website's chevron, with a word and a bounce */
+.scroll-cue { position: absolute; bottom: var(--s6); left: 0; right: 0; width: fit-content; min-width: 44px; min-height: 44px; margin-inline: auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 8px; border-radius: 999px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; animation: cue-bounce 1.6s infinite; }
+.scroll-cue:hover { color: var(--fg); }
+@keyframes cue-bounce {
+  0%, 100% { transform: translateY(0); animation-timing-function: cubic-bezier(.8, 0, 1, 1); }
+  50% { transform: translateY(-10px); animation-timing-function: cubic-bezier(0, 0, .2, 1); }
+}
+.demo { padding: var(--s8) 0 0; scroll-margin-top: var(--s5); }
 h1 { margin: 0 0 var(--s5); font-size: clamp(42px, 7.5vw, 88px); font-weight: 800; line-height: 1; letter-spacing: -.04em; text-wrap: balance; }
 .lede { max-width: 34rem; margin-inline: auto; color: var(--muted); font-size: clamp(17px, 2vw, 20px); line-height: 1.5; text-wrap: pretty; }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s3); margin-top: var(--s6); }
@@ -61,7 +69,7 @@ h1 { margin: 0 0 var(--s5); font-size: clamp(42px, 7.5vw, 88px); font-weight: 80
 .button.primary:hover { border-color: var(--fg); } /* outline, not a lighter blue: #2563EB stays the only blue */
 .button.primary:active { transform: scale(.98); }
 
-.preview { margin-top: 88px; text-align: left; }
+.preview { text-align: left; }
 .preview figcaption { margin-top: var(--s4); font-size: 13px; color: var(--muted); text-align: center; }
 /* the video sits on a quiet surface "stage"; its fill matches the footage (white light demo, black dark demo), so nothing flashes before the poster loads */
 .preview-player { position: relative; padding: clamp(8px, 1.6vw, 20px); border-radius: 24px; background: var(--solid); }
@@ -102,8 +110,9 @@ h2 { max-width: 20ch; font-size: clamp(30px, 4.5vw, 52px); font-weight: 800; lin
   .site-nav { display: none; }
   /* padding grows the tap target to 44px; negative margin keeps the artwork in place */
   .bb8-toggle { --toggle-size: 5.8px; margin: -8px -8px -8px auto; padding: 8px; }
-  .hero { padding: 64px 0 var(--s7); }
-  .preview { margin-top: var(--s7); }
+  .hero { min-height: calc(100svh - 64px); padding: var(--s7) 0 104px; }
+  .scroll-cue { bottom: var(--s5); }
+  .demo { padding-top: var(--s7); }
   .preview-player { border-radius: 16px; }
   .preview video { border-radius: 10px; }
   .preview-play { min-height: 44px; padding: 0 18px 0 16px; font-size: 14px; box-shadow: 0 0 0 4px rgba(255, 255, 255, .55), 0 8px 24px rgba(0, 0, 0, .25); }
