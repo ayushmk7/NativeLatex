@@ -1,10 +1,10 @@
 # NativeLatex Mac product plan
 
-Status: plan, with a first implementation on main · revised 2026-11-18 · Mac only. **Virgule** is the app name (a candidate not yet cleared as a trademark; it replaced LibreWeave on 2026-11-18, and the bundle ID `app.libreweave.LibreWeave` is unchanged). NativeLatex remains the repository and project path. What is built today is listed under [Implemented on main](status.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
+Status: plan, with a first implementation on main · revised 2026-11-18 · Mac only. **Virgule** is the app name (a candidate not yet cleared as a trademark; it replaced LibreWeave on 2026-11-18, and the bundle ID `app.libreweave.LibreWeave` is unchanged). The repository is `ayushmk7/Virgule`; NativeLatex remains the Xcode project and source path. What is built today is listed under [Implemented on main](status.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
 
 ## Product promise
 
-Virgule (repository: NativeLatex) is planned as a native Mac app for opening ordinary LaTeX, Markdown and plain-text files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
+Virgule is planned as a native Mac app for opening ordinary LaTeX, Markdown and plain-text files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
 
 The app is for authors who want a faster local editing loop than switching among a text editor, terminal, PDF viewer and Finder. It should handle a single article quickly and remain dependable on multi-file projects with images and bibliographies.
 
@@ -75,7 +75,7 @@ The first release excludes a collaboration server, bundled TeX distribution, pac
 
 “Docs” means Google Docs here; “libretext” is treated as LibreTexts, with LibreOffice Writer covered too because the term could refer to it. Word and Writer exchange use reviewable DOCX/ODT copies. Google Docs begins with manual exchange and can gain a narrow, opt-in Drive connector for the owner's account. LibreTexts begins as a reviewed publishing handoff until its supported API and author workflow are verified. See the [integration evidence and limits](workspaces/integrations/integrations.md) and [conversion test](research/conversion-test-2026-11-17.md).
 
-AWS is planned to serve a signed Mac download once one exists. The landing page is live on GitHub Pages at <https://libreweave.ayushmadhav.com/> with no download; it still shows LibreWeave until the Virgule site cutover. The app itself runs locally and needs no website or server. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
+AWS is planned to serve a signed Mac download once one exists. The landing page is live on GitHub Pages at <https://virgule.ayushmadhav.com/> with no download; the old LibreWeave host redirects there. The app itself runs locally and needs no website or server. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
 
 ## Product success checks
 

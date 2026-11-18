@@ -1,6 +1,6 @@
 # Mac architecture and local release
 
-Status: target design, partly implemented · revised 2026-11-18. The app is named **Virgule** (`PRODUCT_NAME`; bundle ID `app.libreweave.LibreWeave`, target/scheme and Swift module `LibreWeave` unchanged; repository and project path: NativeLatex), minimum macOS 14.0. The integrated code (`5386b36`) is a `DocumentGroup` app with one file per window, an AppKit `NSTextView` editor, and the Design and Integrations packages linked; it is not yet the folder workspace below; see [Implemented on main](../../status.md#implemented-on-main-checked-2026-11-17).
+Status: target design, partly implemented · revised 2026-11-18. The app is named **Virgule** (`PRODUCT_NAME`; bundle ID `app.libreweave.LibreWeave`, target/scheme and Swift module `LibreWeave` unchanged; repository `ayushmk7/Virgule`, Xcode project and source path NativeLatex), minimum macOS 14.0. The integrated code (`5386b36`) is a `DocumentGroup` app with one file per window, an AppKit `NSTextView` editor, and the Design and Integrations packages linked; it is not yet the folder workspace below; see [Implemented on main](../../status.md#implemented-on-main-checked-2026-11-17).
 
 ## Decision
 

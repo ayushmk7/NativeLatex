@@ -54,20 +54,22 @@ Each document gets its own window, with the menus, find bar and undo you'd expec
 | [Pandoc](https://pandoc.org/installing.html) (`brew install pandoc`) | Markdown Read view, Export/Import Copy. LibreOffice is optional, for some office formats |
 
 ```sh
-git clone https://github.com/ayushmk7/NativeLatex.git
-cd NativeLatex
+git clone https://github.com/ayushmk7/Virgule.git
+cd Virgule
+# Only if `xcode-select -p` points to Command Line Tools:
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 xcodebuild -project NativeLatex.xcodeproj -scheme LibreWeave -configuration Release \
   -derivedDataPath build build
 open build/Build/Products/Release/Virgule.app
 ```
 
-The Xcode scheme is still called `LibreWeave`; it builds `Virgule.app`. Copy `Virgule.app` into `/Applications` to keep it. Virgule then appears under **Open With** for `.tex` and `.md` files. Whether it becomes the default app is up to you.
+The Xcode project is still `NativeLatex.xcodeproj` and its scheme `LibreWeave`; they build `Virgule.app`. `xcodebuild` needs the full Xcode, so set `DEVELOPER_DIR` as above if the active developer directory is Command Line Tools. This is a local, ad-hoc-signed build; there is no signed or notarized download. Copy `Virgule.app` into `/Applications` to keep it. Virgule then appears under **Open With** for `.tex` and `.md` files. Whether it becomes the default app is up to you.
 
 ## Under the hood
 
 - SwiftUI document windows, an AppKit `NSTextView` source editor and a PDFKit preview. The only web view is the sandboxed Markdown preview, and the app starts no server.
 - TeX builds run `latexmk -no-shell-escape` against tools found in `/Library/TeX/texbin`, `/opt/homebrew/bin` or `/usr/local/bin`. The output folder belongs to this install, and Virgule refuses to build into one that contains links or special files.
 - The Markdown preview runs Pandoc with `--sandbox`, shows raw HTML and TeX as text, and caps input, render time, memory and output size. Past a cap, it stops the preview and editing carries on.
-- The repository and Xcode project are named **NativeLatex** and the scheme **LibreWeave**; the app is **Virgule**. Design tokens live in the `NativeLatex/Design` package and converters in `NativeLatex/Integrations`, both local Swift packages with their own tests.
+- The repository is **Virgule**; the Xcode project and source folders keep the **NativeLatex** name and the scheme **LibreWeave**. Design tokens live in the `NativeLatex/Design` package and converters in `NativeLatex/Integrations`, both local Swift packages with their own tests.
 
 Status, plans and verified details: [docs/status.md](docs/status.md).
