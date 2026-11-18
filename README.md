@@ -12,15 +12,15 @@ A native Mac editor for LaTeX and Markdown that keeps the rendered page beside y
 </p>
 
 <p align="center">
-  <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><img src="landing/media/libreweave-demo-preview.gif" width="640" alt="Looping preview of LibreWeave editing Markdown, rendering the preview, and building a LaTeX PDF"></a><br>
+  <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><img src="landing/media/libreweave-demo-preview.gif" width="640" alt="Looping preview of LibreWeave: typing in full-width Write, switching to Read, and building a LaTeX PDF"></a><br>
   <a href="https://libreweave.ayushmadhav.com/media/libreweave-demo.mp4"><b>▶ Watch the 18-second demo with sound</b></a> · <a href="https://libreweave.ayushmadhav.com/">libreweave.ayushmadhav.com</a>
 </p>
 
-## Markdown you can read and write
+## Markdown you can write and read
 
-Open any `.md` file and its preview sits beside the source, updating from the unsaved text as you type. **Read** shows the full rendering: tables, footnotes, task lists and TeX math as native MathML, rendered by the [Pandoc](https://pandoc.org) on your Mac with JavaScript off and no network access. **Write** (<kbd>⌥⌘E</kbd>) lets you edit right in the preview pane. Read and Write sit in the toolbar of every Markdown window, even in Source Only and narrow windows. Headings, emphasis, links, lists and quotes look formatted, and their markup shows only on the line you're editing. The file underneath stays plain Markdown, character for character.
+**Write** (<kbd>⌥⌘E</kbd>) is a full-width editor. Headings, emphasis, links, lists, quotes, code blocks and tables look formatted as you type, and the file underneath stays plain Markdown, character for character. **Read** puts the full rendering beside the source: tables, footnotes, task lists and TeX math as native MathML, rendered by the [Pandoc](https://pandoc.org) on your Mac with JavaScript off and no network access. **Document Mode** in the toolbar of every Markdown window switches between them. Write takes the whole window, and Read shows the rendered preview again.
 
-<p align="center"><img src="landing/media/libreweave-markdown.png" width="760" alt="A Markdown note in Write mode: formatted text beside its source, with Read and Write in the toolbar"></p>
+<p align="center"><img src="landing/media/libreweave-markdown.png" width="760" alt="A Markdown note in full-width Write: formatted heading, paragraph and table, with the format bar and Document Mode in the toolbar"></p>
 
 ## LaTeX, built on your Mac
 
@@ -40,7 +40,7 @@ Press <kbd>⌘B</kbd> and LibreWeave builds with the TeX already installed on yo
 Each document gets its own window, with the menus, find bar and undo you'd expect.
 
 - **Your layout.** Show the source, the preview, or both side by side (<kbd>⌥⌘1</kbd> <kbd>⌥⌘2</kbd> <kbd>⌥⌘3</kbd>). <kbd>⌥⌘P</kbd> toggles the preview. Narrow windows give one pane the full width.
-- **Formatting keys for Markdown.** Bold <kbd>⌘B</kbd>, Italic <kbd>⌘I</kbd> and Link <kbd>⌘K</kbd> work in the source and in Write. In LaTeX windows, <kbd>⌘B</kbd> is Build.
+- **One set of Markdown formatting commands.** The Format menu and the format bar share them: bold <kbd>⌘B</kbd>, italic <kbd>⌘I</kbd>, strikethrough <kbd>⇧⌘X</kbd>, link <kbd>⌘K</kbd>, headings <kbd>⌃⌘1</kbd>–<kbd>⌃⌘3</kbd>, lists, checklists, quotes and code blocks. They work in the source and in Write. In LaTeX windows, <kbd>⌘B</kbd> is Build.
 - **Text left as you typed it.** Smart quotes, dashes and autocorrect are off in the source editor.
 - **Light and dark.** LibreWeave follows the system, and the BB-8 switch in the toolbar sets Light or Dark for LibreWeave alone.
 
