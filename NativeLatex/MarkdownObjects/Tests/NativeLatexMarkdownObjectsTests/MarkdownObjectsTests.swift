@@ -384,6 +384,30 @@ final class MarkdownObjectsTests: XCTestCase {
         XCTAssertTrue(hit == at || hit == at + 1, "hit \(hit) not at the image span \(at)")
     }
 
+    /// Natural size is the source's pixel size, rotated by EXIF orientation 5–8; the decoded pixels follow it.
+    func testImageSizeAndOrientationSurviveDecoding() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let ctx = CGContext(data: nil, width: 40, height: 10, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(NSColor.systemRed.cgColor); ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 10))
+        for (orientation, expected) in [(1, NSSize(width: 40, height: 10)), (6, NSSize(width: 10, height: 40))] {
+            let url = folder.appendingPathComponent("o\(orientation).jpg")
+            let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)!
+            CGImageDestinationAddImage(dest, ctx.makeImage()!, [kCGImagePropertyOrientation: orientation] as CFDictionary)
+            XCTAssertTrue(CGImageDestinationFinalize(dest))
+            let loaded = try XCTUnwrap(MarkdownSyntax.loadImage(url, maxPixels: 1600))
+            XCTAssertEqual(loaded.size, expected, "orientation \(orientation)")
+            let rep = try XCTUnwrap(loaded.image.representations.first)
+            XCTAssertEqual(rep.pixelsWide, Int(expected.width)); XCTAssertEqual(rep.pixelsHigh, Int(expected.height))
+            // Downsampled on the long side only.
+            let small = try XCTUnwrap(MarkdownSyntax.loadImage(url, maxPixels: 20))
+            XCTAssertEqual(small.size, expected, "natural size kept when downsampled")
+            XCTAssertEqual(max(small.image.representations.first!.pixelsWide, small.image.representations.first!.pixelsHigh), 20)
+        }
+    }
+
     func testImageDimensionsAreCappedBeforeDecoding() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

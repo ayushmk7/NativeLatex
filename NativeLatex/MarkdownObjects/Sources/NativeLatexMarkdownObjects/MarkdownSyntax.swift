@@ -151,7 +151,26 @@ public enum MarkdownSyntax {
         return "G:\(url.path)|\(date.timeIntervalSinceReferenceDate)|\(size)"
     }
 
+    /// A decoded, downsampled image: immutable and Sendable, so it can leave the decoding task.
+    struct Decoded: Sendable {
+        let image: CGImage
+        /// Natural size in points (the source's pixel size, oriented).
+        let size: NSSize
+        /// Wrapped for drawing, on the main actor where the objects use it.
+        @MainActor var rendered: MarkdownRendered { Self.wrap(self) }
+        static func wrap(_ d: Decoded) -> MarkdownRendered {
+            let wrapped = NSImage(size: d.size)
+            wrapped.addRepresentation(NSBitmapImageRep(cgImage: d.image))
+            return MarkdownRendered(image: wrapped, size: d.size)
+        }
+    }
+
     public static func loadImage(_ url: URL, maxPixels: Int, maxSourcePixels: Int = maxSourcePixels) -> MarkdownRendered? {
+        decodeImage(url, maxPixels: maxPixels, maxSourcePixels: maxSourcePixels).map(Decoded.wrap)
+    }
+
+    /// Reads the header first (refusing more than `maxSourcePixels`), then decodes at most `maxPixels` on the long side.
+    static func decodeImage(_ url: URL, maxPixels: Int, maxSourcePixels: Int = maxSourcePixels) -> Decoded? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               var w = props[kCGImagePropertyPixelWidth] as? Int, var h = props[kCGImagePropertyPixelHeight] as? Int,
@@ -162,9 +181,6 @@ public enum MarkdownSyntax {
                                         kCGImageSourceShouldCacheImmediately: true,
                                         kCGImageSourceThumbnailMaxPixelSize: min(max(w, h), max(maxPixels, 1))]
         guard let thumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        let size = NSSize(width: w, height: h)
-        let image = NSImage(size: size)
-        image.addRepresentation(NSBitmapImageRep(cgImage: thumb))
-        return MarkdownRendered(image: image, size: size)
+        return Decoded(image: thumb, size: NSSize(width: w, height: h))
     }
 }
