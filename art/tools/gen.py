@@ -1,76 +1,55 @@
-"""Writes every LibreWeave icon, mark, favicon and Icon Composer layer from one weave geometry.
+"""Writes every Virgule icon, mark, favicon and the Icon Composer document from one slash geometry.
 
-The mark: "lines of text" (wefts) woven over and under two blue threads
-(warps) on a single macOS icon silhouette. No frame, no inner box: the
-silhouette itself is the sheet. The app icon uses a white sheet in Light and
-a black sheet in Dark; the favicon reverses this for contrast on the page.
-Run: python3 -I art/tools/gen.py   (build.sh runs it)
+The mark: a single solidus (virgule) with rounded caps, drawn here from scratch, on the macOS icon
+silhouette. The silhouette is the only container: no inner box, frame, page or backing shape.
+Light and Dark draw the slash in the one brand blue; the Mono specialization (Clear and Tinted)
+draws it white on an ink sheet, because a lone blue element greys out there.
+Run: python3 -I art/tools/gen.py [out-root]   (build.sh runs it; validate.sh regenerates into a
+temporary root and diffs, so committed files must match this script.)
 """
+import json
+import math
 import os
+import sys
 
-# The one brand blue, in every appearance. The .icon adds a Mono override for Clear/Tinted.
-BLUE = "#2563EB"
+BLUE = "#2563EB"  # the one brand blue
 INK, PAPER = "#0A0A0A", "#FFFFFF"
-SHEETS = {"black": (INK, PAPER, BLUE), "white": (PAPER, INK, BLUE)}  # sheet, lines, threads
-# On the 1024 canvas, the macOS body is 824 px at a 100 px inset. The weave spans 480 px (58% of the
-# body), the glyph proportion of Apple's own icons. Coordinates are multiples of 48 so strands land on
-# whole pixels at 32 px (3 px strands, 1.5 px gaps). The system renders every size from this one geometry.
-WEFTS = [416, 608]          # line centres (y)
-WARPS = [416, 608]          # thread centres (x)
-START, END = 272, 752       # strand extent, both axes
-S, G = 96, 48               # strand width, gap beside a crossing
-H = S // 2
+# Apple's 1024 grid: 824 px body at a 100 px inset, 185 px corner radius. The centreline runs between
+# two points about 70 degrees from horizontal, centred on (512, 512). Stroke 176 px (2.75 px at 16 px):
+# chosen over 150 px, which measured weaker in Tinted dark at 16 px (see art/README.md).
+P0, P1 = (604, 262), (420, 762)
+STROKE = 176
+R = STROKE // 2
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 
 
-def over(i, j):
-    """True where thread j passes over line i (alternating = woven)."""
-    return (i + j) % 2 == 0
+def slash(fill="", cls=""):
+    """The slash as one filled capsule path (no stroke, so every renderer draws identical geometry)."""
+    (x0, y0), (x1, y1) = P0, P1
+    length = math.hypot(x1 - x0, y1 - y0)
+    nx, ny = (y1 - y0) / length * R, (x0 - x1) / length * R  # unit normal times radius
+    f = lambda v: f"{v:.2f}".rstrip("0").rstrip(".")
+    pt = lambda x, y: f"{f(x)} {f(y)}"
+    d = (f"M{pt(x0 + nx, y0 + ny)}L{pt(x1 + nx, y1 + ny)}"
+         f"A{R} {R} 0 0 1 {pt(x1 - nx, y1 - ny)}L{pt(x0 - nx, y0 - ny)}"
+         f"A{R} {R} 0 0 1 {pt(x0 + nx, y0 + ny)}Z")
+    attr = f'class="{cls}"' if cls else f'fill="{fill}"'
+    return f'<path d="{d}" {attr}/>'
 
 
-def split(cuts):
-    # Segments of START..END left after removing cut intervals; flags mark original (rounded) ends.
-    segs, pos = [], START
-    for c0, c1 in sorted(cuts):
-        segs.append((pos, c0, pos == START, False))
-        pos = c1
-    return segs + [(pos, END, pos == START, True)]
-
-
-def bar(a, b, c, round_a, round_b, vertical, fill):
-    # One strand segment from a to b along its axis, centred on c; rounded only at outer ends.
-    pt = (lambda u, v: f"{v} {u}") if vertical else (lambda u, v: f"{u} {v}")
-    sweep = 0 if vertical else 1  # swapping axes mirrors the arc direction
-    d = f"M{pt(a + H * round_a, c - H)}L{pt(b - H * round_b, c - H)}"
-    d += f"A{H} {H} 0 0 {sweep} {pt(b - H, c + H)}" if round_b else f"L{pt(b, c - H)}L{pt(b, c + H)}"
-    d += f"L{pt(a + H * round_a, c + H)}"
-    d += f"A{H} {H} 0 0 {sweep} {pt(a + H, c - H)}" if round_a else f"L{pt(a, c + H)}"
-    return f'<path d="{d}Z" fill="{fill}"/>'
-
-
-def lines(fill):
-    out = []
-    for i, y in enumerate(WEFTS):
-        cuts = [(x - H - G, x + H + G) for j, x in enumerate(WARPS) if over(i, j)]
-        out += [bar(p, q, y, ra, rb, False, fill) for p, q, ra, rb in split(cuts)]
-    return out
-
-
-def threads(blue):
-    out = []
-    for j, x in enumerate(WARPS):
-        cuts = [(y - H - G, y + H + G) for i, y in enumerate(WEFTS) if not over(i, j)]
-        out += [bar(p, q, x, ra, rb, True, blue) for p, q, ra, rb in split(cuts)]
-    return out
+def bounds():
+    xs, ys = (P0[0], P1[0]), (P0[1], P1[1])
+    return min(xs) - R, min(ys) - R, max(xs) - min(xs) + STROKE, max(ys) - min(ys) + STROKE
 
 
 def svg(view, size, title, parts, head=""):
+    w, h = size
     body = "\n  ".join(([f"<title>{title}</title>"] if title else []) + ([head] if head else []) + parts)
-    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view}" width="{size}" height="{size}">\n  {body}\n</svg>\n'
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view}" width="{w}" height="{h}">\n  {body}\n</svg>\n'
 
 
-def sheet(fill, cls=""):
+def sheet(fill="", cls=""):
     attr = f'class="{cls}"' if cls else f'fill="{fill}"'
     return f'<rect x="100" y="100" width="824" height="824" rx="185" {attr}/>'
 
@@ -78,27 +57,54 @@ def sheet(fill, cls=""):
 def write(path, text):
     path = os.path.join(ROOT, path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    open(path, "w").write(text)
+    with open(path, "w") as fh:
+        fh.write(text)
+
+
+def srgb(hexcolor):
+    return "srgb:" + ",".join(f"{int(hexcolor[i:i + 2], 16) / 255:.5f}" for i in (1, 3, 5)) + ",1.00000"
 
 
 # Flat icons on Apple's macOS grid, for previews and docs.
-for name, (bg, ink, blue) in SHEETS.items():
+for name, bg in (("white", PAPER), ("black", INK)):
     write(f"art/source/app-icon-{name}.svg",
-          svg("0 0 1024 1024", 1024, f"LibreWeave app icon, {name} sheet", [sheet(bg)] + lines(ink) + threads(blue)))
+          svg("0 0 1024 1024", (1024, 1024), f"Virgule app icon, {name} sheet", [sheet(bg), slash(BLUE)]))
 
-# One-color marks: gaps are real gaps, so they work on any background.
-for name, color in (("black", INK), ("white", PAPER)):
-    parts = lines(color) + threads(color)
-    write(f"art/source/mark-{name}.svg", svg(f"{START} {START} {END - START} {END - START}", 640, f"LibreWeave mark, {name}", parts))
+# One-color marks: the slash alone, cropped to its own bounds, for any background.
+bx, by, bw, bh = bounds()
+for name, color in (("black", INK), ("white", PAPER), ("blue", BLUE)):
+    write(f"art/source/mark-{name}.svg",
+          svg(f"{bx} {by} {bw} {bh}", (bw, bh), f"Virgule mark, {name}", [slash(color)]))
 
-# Icon Composer layers: transparent gaps, so the .icon fill is the sheet. 824 body scaled to the full canvas.
-for name, ink in (("lines-white", PAPER), ("lines-black", INK)):
-    write(f"NativeLatex/AppIcon.icon/Assets/{name}.svg", svg("100 100 824 824", 1024, "", lines(ink)))
-write("NativeLatex/AppIcon.icon/Assets/threads.svg", svg("100 100 824 824", 1024, "", threads(BLUE)))
+# Icon Composer layers: the slash only; the .icon fill is the sheet. 824 body scaled to the full canvas.
+for name, color in (("slash-blue", BLUE), ("slash-white", PAPER)):
+    write(f"NativeLatex/AppIcon.icon/Assets/{name}.svg", svg("100 100 824 824", (1024, 1024), "", [slash(color)]))
 
-# Landing favicon, same as the app icon: white sheet on light pages, black sheet on dark pages.
-style = (f"<style>.s{{fill:{PAPER}}}.i{{fill:{INK}}}.t{{fill:{BLUE}}}"
-         f"@media (prefers-color-scheme:dark){{.s{{fill:{INK}}}.i{{fill:{PAPER}}}}}</style>")
-fav = svg("100 100 824 824", 824, "", [sheet("", "s")] + [p.replace(f'fill="{PAPER}"', 'class="i"') for p in lines(PAPER)] + [p.replace(f'fill="{BLUE}"', 'class="t"') for p in threads(BLUE)],
+icon = {
+    "fill-specializations": [
+        {"value": {"solid": srgb(PAPER)}},
+        {"appearance": "dark", "value": {"solid": srgb(INK)}},
+        {"appearance": "tinted", "value": {"solid": srgb(INK)}},
+    ],
+    "groups": [{
+        "layers": [{
+            "glass": False,
+            "image-name-specializations": [
+                {"value": "slash-blue.svg"},
+                {"appearance": "tinted", "value": "slash-white.svg"},
+            ],
+            "name": "slash",
+        }],
+        "shadow": {"kind": "none", "opacity": 0},
+        "specular": False,
+        "translucency": {"enabled": False, "value": 0},
+    }],
+    "supported-platforms": {"squares": ["macOS"]},
+}
+write("NativeLatex/AppIcon.icon/icon.json", json.dumps(icon, indent=2, separators=(",", " : ")) + "\n")
+
+# Landing favicon, same as the app icon: white sheet on light pages, ink sheet on dark pages.
+style = f"<style>.s{{fill:{PAPER}}}.t{{fill:{BLUE}}}@media (prefers-color-scheme:dark){{.s{{fill:{INK}}}}}</style>"
+fav = svg("100 100 824 824", (824, 824), "", [sheet(cls="s"), slash(cls="t")],
           head="<!-- Generated by art/tools/gen.py; edit there. -->\n  " + style)
-write("landing/icon.svg", fav.replace('width="824" height="824"', 'role="img" aria-label="LibreWeave"', 1))
+write("landing/icon.svg", fav.replace('width="824" height="824"', 'role="img" aria-label="Virgule"', 1))

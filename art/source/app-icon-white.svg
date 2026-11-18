@@ -1,12 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <title>LibreWeave app icon, white sheet</title>
+  <title>Virgule app icon, white sheet</title>
   <rect x="100" y="100" width="824" height="824" rx="185" fill="#FFFFFF"/>
-  <path d="M320 368L320 368L320 368L320 464L320 464A48 48 0 0 1 320 368Z" fill="#0A0A0A"/>
-  <path d="M512 368L704 368A48 48 0 0 1 704 464L512 464L512 464Z" fill="#0A0A0A"/>
-  <path d="M320 560L512 560L512 560L512 656L320 656A48 48 0 0 1 320 560Z" fill="#0A0A0A"/>
-  <path d="M704 560L704 560A48 48 0 0 1 704 656L704 656L704 656Z" fill="#0A0A0A"/>
-  <path d="M368 320L368 512L368 512L464 512L464 320A48 48 0 0 0 368 320Z" fill="#2563EB"/>
-  <path d="M368 704L368 704A48 48 0 0 0 464 704L464 704L464 704Z" fill="#2563EB"/>
-  <path d="M560 320L560 320L560 320L656 320L656 320A48 48 0 0 0 560 320Z" fill="#2563EB"/>
-  <path d="M560 512L560 704A48 48 0 0 0 656 704L656 512L656 512Z" fill="#2563EB"/>
+  <path d="M686.59 292.39L502.59 792.39A88 88 0 0 1 337.41 731.61L521.41 231.61A88 88 0 0 1 686.59 292.39Z" fill="#2563EB"/>
 </svg>

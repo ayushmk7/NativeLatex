@@ -1,12 +1,12 @@
-# AppIcon renditions in a built LibreWeave.app (xcodebuild Release archive, Xcode 27.2, macOS 27.3, 2026-11-17)
+# AppIcon renditions in a built app with the Virgule slash icon (xcodebuild Release, PRODUCT_NAME still LibreWeave on this branch; Xcode 27.2, macOS 27.3, 2026-11-18)
 # assetutil --info Contents/Resources/Assets.car | AppIcon entries: AssetType, Appearance, PixelWidth
-Icon Image	(any)	1024
-Icon Image	(any)	1024
+Icon Image	(any)	32
+Icon Image	(any)	64
 Icon Image	(any)	128
 Icon Image	(any)	256
-Icon Image	(any)	32
 Icon Image	(any)	512
-Icon Image	(any)	64
+Icon Image	(any)	1024
+Icon Image	(any)	1024
 IconImageStack	ISAppearanceTintable	0
 IconImageStack	NSAppearanceNameAqua	0
 IconImageStack	NSAppearanceNameDarkAqua	0
@@ -14,13 +14,20 @@ MultiSized Image	(any)	0
 # Info.plist
   "CFBundleIconFile" => "AppIcon"
   "CFBundleIconName" => "AppIcon"
-  "CFBundleVersion" => "2"
-# IconServices render of the built app (art/tools/appearance-check.m), sheet = red channel above the weave
-light  16px sheet 1.00 alpha 1.00
-light  32px sheet 1.00 alpha 1.00
-light 256px sheet 1.00 alpha 1.00
-dark   16px sheet 0.04 alpha 1.00
-dark   32px sheet 0.04 alpha 1.00
-dark  256px sheet 0.04 alpha 1.00
-# NSWorkspace.icon(forFile:) with system appearance = Dark
-sheet 0.04
+# IconServices render of the built app (art/tools/appearance-check.m): sheet and slash RGB 0-255 (#2563EB = 37 99 235)
+light        16 sheet 255 255 255 slash  37  99 235
+light        32 sheet 255 254 255 slash  37  99 235
+light       256 sheet 255 255 255 slash  37  99 235
+light       512 sheet 255 255 255 slash  37  99 235
+dark         16 sheet  10  10   9 slash  37  99 235
+dark         32 sheet  10  10  10 slash  37  99 235
+dark        256 sheet  10  10  10 slash  37  99 235
+dark        512 sheet  11  10  10 slash  37  99 235
+clear-light  16 sheet 128 128 128 slash 254 254 254
+clear-light  32 sheet 128 128 128 slash 254 254 254
+clear-light 256 sheet 128 128 128 slash 254 254 254
+clear-light 512 sheet 128 128 128 slash 254 254 254
+clear-dark   16 sheet  43  43  43 slash 242 242 242
+clear-dark   32 sheet  43  43  43 slash 242 242 242
+clear-dark  256 sheet  43  43  43 slash 242 242 242
+clear-dark  512 sheet  43  43  43 slash 242 242 242

@@ -1,5 +1,7 @@
 # Art: Virgule candidate rebrand plan
 
+**Implementation, 2026-11-18:** the owner authorized local implementation. Phase 2 steps 1–3 and 5 landed directly, without the `art/prototype/` copy. The stroke is 176 px, chosen over 150 and 200 px. No wordmark was made: an outlined SF Pro wordmark is out, and the landing keeps live text. The Tinted dark gate is 45, not 50, because a white Mono glyph tops out near 50 in the system tint (see `art/README.md`). Still open: the live-Dock Clear light check, Safari and Firefox favicon checks, comparison with the Virgule news app's icon, and the name review.
+
 **Status:** planning only, revised 2026-11-18. The owner asked for a total rebrand, including a new icon. This plan replaces the woven LibreWeave icon with an original slash (virgule) mark. The weave stays in the plan only as the rollback target. Virgule is still a candidate name and is not cleared. This pass implements no art and renames no code, asset, bundle ID, URL, repo or release. Source of truth: `main` at `840319f`. None of the art, landing, icon or theme files differ between `main` and this branch.
 
 ## Name gate (blocks all public art)

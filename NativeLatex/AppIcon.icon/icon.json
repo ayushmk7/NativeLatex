@@ -1,8 +1,22 @@
 {
   "fill-specializations" : [
-    { "value" : { "solid" : "srgb:1.00000,1.00000,1.00000,1.00000" } },
-    { "appearance" : "dark", "value" : { "solid" : "srgb:0.03922,0.03922,0.03922,1.00000" } },
-    { "appearance" : "tinted", "value" : { "solid" : "srgb:0.03922,0.03922,0.03922,1.00000" } }
+    {
+      "value" : {
+        "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "srgb:0.03922,0.03922,0.03922,1.00000"
+      }
+    },
+    {
+      "appearance" : "tinted",
+      "value" : {
+        "solid" : "srgb:0.03922,0.03922,0.03922,1.00000"
+      }
+    }
   ],
   "groups" : [
     {
@@ -10,22 +24,31 @@
         {
           "glass" : false,
           "image-name-specializations" : [
-            { "value" : "lines-black.svg" },
-            { "appearance" : "dark", "value" : "lines-white.svg" },
-            { "appearance" : "tinted", "value" : "lines-white.svg" }
+            {
+              "value" : "slash-blue.svg"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "slash-white.svg"
+            }
           ],
-          "name" : "lines"
-        },
-        {
-          "glass" : false,
-          "image-name" : "threads.svg",
-          "name" : "threads"
+          "name" : "slash"
         }
       ],
-      "shadow" : { "kind" : "none", "opacity" : 0 },
+      "shadow" : {
+        "kind" : "none",
+        "opacity" : 0
+      },
       "specular" : false,
-      "translucency" : { "enabled" : false, "value" : 0 }
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0
+      }
     }
   ],
-  "supported-platforms" : { "squares" : [ "macOS" ] }
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
 }

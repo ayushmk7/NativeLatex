@@ -1,4 +1,4 @@
-// Rasterizes LibreLeaf SVG sources with the native macOS SVG renderer.
+// Rasterizes SVG sources with the native macOS SVG renderer.
 // Usage: swift art/tools/render.swift <in.svg> <out.png> <pixels-wide>
 import AppKit
 let a = CommandLine.arguments

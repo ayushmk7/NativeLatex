@@ -1,67 +1,67 @@
-# LibreWeave brand art
+# Virgule brand art
 
-LibreWeave is the working app name. The artwork has no words in it, so a rename only changes labels. Design brief: [art direction](../docs/workspaces/art/art-direction.md). Palette: ink `#0A0A0A`, paper `#FFFFFF`, and one brand blue, `#2563EB`, in every appearance (light, dark, high contrast). There are no other blue variants.
+Virgule is the candidate app name. It has not been cleared as a trademark (see the [coordinator plan](../docs/virgule-rebrand-plan.md)). The artwork has no words in it. Design brief: [art direction](../docs/workspaces/art/art-direction.md). Palette: ink `#0A0A0A`, paper `#FFFFFF`, and one brand blue, `#2563EB`, in every appearance. There are no other blue variants.
 
-The icon is a woven sheet. The macOS silhouette is the paper, with no inner box or frame. Two lines weave over and under two `#2563EB` threads.
+The icon is a single slash (a virgule): one stroke with rounded caps at about 70°, drawn from scratch in `tools/gen.py` rather than taken from a font. The macOS silhouette is the only container. There is no inner box, frame, page or backing shape, and the slash stays clear of the sheet edge.
 
-| Appearance | Sheet | Lines | Threads |
-| --- | --- | --- | --- |
-| Light | white | black | `#2563EB` (5.17:1 on white) |
-| Dark | black | white | `#2563EB` (3.83:1 on `#0A0A0A`) |
+| Appearance | Sheet | Slash |
+| --- | --- | --- |
+| Light | white | `#2563EB` (5.17:1) |
+| Dark | `#0A0A0A` | `#2563EB` (3.8:1, above the 3:1 graphics minimum) |
+| Clear light / dark | system glass | white (Mono) |
+| Tinted light / dark | user tint | white, tinted by the system (Mono) |
 
-**Clear and Tinted** are chosen by the user in macOS, not by the app, and there is no in-app setting. In macOS 27, System Settings ▸ Appearance offers Icon & widget style (Default, Dark, Clear, Tinted) and a Liquid Glass slider that moves icons from clear to heavily tinted. LibreWeave follows both, with no opacity control of its own ([Apple: change Appearance settings on Mac](https://support.apple.com/en-euro/guide/mac-help/mchlp1225/27/mac/27)). The system builds them from the same `.icon`, using the `ISAppearanceTintable` stack.
+**Geometry (1024 grid, 824 body at a 100 inset):** centreline from (604, 262) to (420, 762), stroke 176 px. That is 2.75 px at 16 px. Treatments compared on 2026-11-18 in Icon Composer renders (row of luma across the stroke at 16 px):
+- 150 px: two full pixels plus weak edges (66, 48 in Tinted dark). It reads, but the edge is the softest.
+- **176 px (chosen):** two full pixels plus stronger edges (78, 61).
+- 200 px: three full pixels, but at 512 px it reads as a pill rather than a slash.
 
-The Mono (`tinted`) override keeps an ink-dark sheet and white lines for Clear and Tinted after Light switches to a white sheet. The system greys Mono layers by luminance. Sheet / threads / lines brightness (0–255) in 1024 px `ictool` renders:
+**Clear and Tinted** are chosen by the user in macOS, not by the app, and there is no in-app setting. Both come from the `ISAppearanceTintable` stack. The Mono (`tinted`) override uses `slash-white.svg` on an ink sheet. A lone blue element greys into the sheet there, which was measured with the former icon.
 
-| Mode | Sheet | Threads | Lines |
-| --- | --- | --- | --- |
-| Clear light | 128 | 176 | white |
-| Clear dark | 43 | 118 | white |
-| Tinted dark | 36 | 53 | 97 |
+Measured by `tools/review.sh` on the compiled catalog (sRGB, 0–255; "diff" is slash luma minus sheet luma). The value is the same at 16, 32, 256 and 512 px unless a range is shown:
 
-- **Clear:** the system replaces our fill with its own glass sheet. Lines go white, threads go mid-gray, so the weave stays three-toned (sheet < threads < lines).
-- **Tinted:** the user's tint colour drives the sheet and threads. Tinted dark is the weakest mode: clear at 32 px and up, soft at 16 px.
+| Mode | Sheet | Slash | Result | Gate |
+| --- | --- | --- | --- | --- |
+| Light | 255 | 37, 98, 235 | 5.2:1 | ≥ 4.5:1; `#2563EB` ±4 at 256+ |
+| Dark | 10 | 37, 98, 235 | 3.8:1 | ≥ 3:1; `#2563EB` ±4 at 256+ |
+| Clear light | 128 | 254 | diff 126 | ≥ 60 |
+| Clear dark | 43 | 242 | diff 199 | ≥ 60 |
+| Tinted light | 113, 89, 207 | 252, 248, 255 | diff 147 | ≥ 50 |
+| Tinted dark | 34, 30, 43 | 96–97, 65–67, 177–181 | diff 48–50 | ≥ 45 |
+| Legacy `.icns` | 255 | 37, 99, 235 | 5.2:1 | as Light |
 
-We force no alpha. Mono keeps the dark sheet/white lines for legibility; thread opacity stays unchanged. Evidence, 2026-11-17 (Xcode 27.2, macOS 27.3):
-- **Fill, glass and translucency:** `tinted` fill specializations, layer `glass` and group `translucency` never changed the Clear sheet in `ictool` or IconServices. It stays 128 gray in Clear light and 44 in Clear dark.
-- **Native comparison:** in static renders Clear is opaque for Apple's own Safari, Calculator, Maps and Notes icons too. The Dock adds live backdrop translucency itself.
-- **Mono thread opacity:** lowering it under `tinted` fades the Clear threads into the sheet, so it is not used.
+- **Tinted dark is the weakest mode and is at the system ceiling.** The system tints a pure white Mono glyph to about 50 above its sheet. In `ictool`, layer glass, group specular and a black Mono fill all left it at sheet 32 / slash 82 (luma), so no layer setting can raise it. The former icon's white lines measured the same. The gate is 45 so it catches any regression from full white. The planned gate of 50 cannot be met by any white glyph.
+- **Clear is a regression check, not proof.** Static renders flatten Clear onto a fixed neutral glass (128 / 43). In the live Dock, macOS composites the wallpaper behind the glass, and a bright wallpaper lightens the sheet behind a white slash. Checking that requires the app in the Dock over light and grey wallpapers. It has not been done, because it changes the owner's desktop.
 
 | Path | What |
 | --- | --- |
-| `tools/gen.py` | Single source of the geometry. Writes every SVG below, the `.icon` layers and `../landing/icon.svg`. Edit here. |
-| `../NativeLatex/AppIcon.icon` | **The app icon.** Icon Composer document in the LibreWeave target's Resources. Sheet colour comes from `fill-specializations`. `lines-white.svg` / `lines-black.svg` swap per appearance; `threads.svg` is the same in every appearance. Clear/Tinted use the Mono specialization. |
-| `../NativeLatex/Assets.xcassets/AccentColor.colorset` | App accent: `#2563EB`, one universal value for light, dark and high contrast (5.17:1 with white text, AA). |
-| `source/app-icon-black.svg`, `app-icon-white.svg` | Flat icons on the macOS grid |
-| `source/mark-black.svg`, `mark-white.svg` | One-color mark with real gaps |
-| `../landing/icon.svg` | Favicon, same as the app icon: white sheet on light pages, black sheet on dark pages, via `prefers-color-scheme` inside the SVG |
-| `exports/review.png` | Review sheet (see below) |
-| `exports/built-app-evidence.txt` | Evidence from a real `xcodebuild` of LibreWeave.app: the `Assets.car` appearance stacks and Info.plist icon keys. `review.png` shows the current renders. |
-
-`exports/review.png` rows:
-One row per mode, each at 16 and 32 px (zoomed), then 256 px on a light and on a dark backdrop:
-- light, dark, clear-light, clear-dark: IconServices renders of the compiled bundle
-- tinted-light, tinted-dark: `ictool`
-- legacy: `AppIcon.icns` for macOS 14–25
+| `tools/gen.py` | Single source. Writes every SVG below, `AppIcon.icon` (layers and `icon.json`) and `../landing/icon.svg`. Edit here, then run `build.sh`. |
+| `../NativeLatex/AppIcon.icon` | **The app icon.** One group with one layer, `slash`: `slash-blue.svg` for Light and Dark, `slash-white.svg` for Mono. The sheet comes from `fill-specializations`. No glass, shadow, specular or translucency. |
+| `../NativeLatex/Assets.xcassets/AccentColor.colorset` | App accent: `#2563EB`, one universal value. Unchanged. |
+| `source/app-icon-white.svg`, `app-icon-black.svg` | Flat icons on the macOS grid. One `<rect>` (the sheet) plus the slash. |
+| `source/mark-black.svg`, `mark-white.svg`, `mark-blue.svg` | The slash alone, cropped to its bounds, with no backing shape |
+| `../landing/icon.svg` | Favicon, same as the app icon: white sheet on light pages, ink sheet on dark pages (`prefers-color-scheme` inside the SVG), `aria-label="Virgule"` |
+| `exports/*-512.png` | Previews of the sources above |
+| `exports/review.png` | One row per mode: 16 and 32 px zoomed, then 256 px on light and dark backdrops |
+| `exports/built-app-evidence.txt` | `assetutil` stacks, Info.plist icon keys and IconServices samples from a real `xcodebuild` Release app |
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-art/tools/build.sh      # gen.py → SVGs + .icon layers; PNG previews in exports/
-art/tools/validate.sh   # actool compiles catalog + .icon with no warnings; Aqua, DarkAqua and Tintable stacks exist
-art/tools/review.sh     # actool into a throwaway bundle → IconServices + ictool + .icns → exports/review.png
+art/tools/build.sh             # gen.py → SVGs, .icon, favicon; PNG previews in exports/
+art/tools/validate.sh          # committed files == gen.py output; actool clean; Aqua, DarkAqua, Tintable stacks
+art/tools/review.sh [dir]      # throwaway bundle → IconServices + ictool + .icns, gates, exports/review.png
 clang -fobjc-arc -framework AppKit art/tools/appearance-check.m -o /tmp/appearance-check
-/tmp/appearance-check path/to/LibreWeave.app /tmp/icon   # light/dark/clear renders of a built app, no system toggle
+/tmp/appearance-check path/to/App.app /tmp/icon   # light/dark/clear renders of a built app, no system toggle
 ```
 
-**No `.appiconset`:** when `AppIcon.icon` exists, actool builds the Dock icon, the macOS 14–25 `.icns`, and the flat `AppIcon` renditions from it. Removing the old set left `AppIcon.icns` byte-identical. `Assets.car` changed only in those 7 flat renditions, which are now drawn from `.icon` instead, and no app code reads them.
+**actool paths must be absolute.** actool hands its inputs to a shared `ibtoold` daemon that resolves relative paths against the daemon's own working directory. On 2026-11-18 that directory was a sibling worktree, so a relative `NativeLatex/AppIcon.icon` silently compiled that worktree's old icon. The scripts pass `$PWD/...`. Xcode builds already use absolute paths.
+
+**No word mark.** The landing header keeps live text. An outlined SF Pro wordmark is not used, because its licence for logo use is unsettled. If a lockup is needed, use an openly licensed face (for example, Inter under the SIL OFL) and keep the name separate from the icon geometry.
 
 **Appearance switch:** none here. The app and landing use the Website BB-8 (orange/gradient, Uiverse.io / Galahhad), an intentional exception to the palette; see the art direction.
 
-**Requirements:**
-- Xcode at `DEVELOPER_DIR`, for `actool`, `assetutil`, `ictool`, `swiftc` and `clang`
-- `python3`
-- ImageMagick `magick`, for `review.sh` only
+**Former brand:** LibreWeave's woven icon is preserved at the local tag `art-libreweave-weave`. To roll back: `git checkout art-libreweave-weave -- art NativeLatex/AppIcon.icon landing/icon.svg docs/workspaces/art/art-direction.md`, delete `AppIcon.icon/Assets/slash-*.svg`, then run `build.sh` and `validate.sh`.
 
-**Testing appearances:** `appearance-check.m` uses private IconServices classes, so it is a dev check only and must never ship. It renders each appearance without changing the system setting. Two things don't work as a test:
-- `NSWorkspace.icon(forFile:)` follows the system appearance and ignores per-process or drawing appearance.
-- Toggling the system to Light for a few seconds still returned the cached dark icon.
+**Requirements:** Xcode at `DEVELOPER_DIR` (`actool`, `assetutil`, `ictool`, `swiftc`, `clang`), `python3`, and ImageMagick `magick` for `review.sh`.
+
+**Testing appearances:** `appearance-check.m` uses private IconServices classes, so it is a dev check only and must never ship. `NSWorkspace.icon(forFile:)` follows the system appearance and caches, so it is not a test.

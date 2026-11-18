@@ -2,7 +2,8 @@
 // the system appearance or icon style. Static renders flatten Clear onto the system's neutral glass
 // (Apple's own icons do the same); the Dock adds live backdrop translucency itself. Uses private IconServices classes: a dev check only, never ship it.
 // Build: clang -fobjc-arc -framework AppKit art/tools/appearance-check.m -o /tmp/appearance-check
-// Usage: appearance-check path/to/LibreWeave.app out-prefix   → out-prefix-{light,dark,clear-light,clear-dark}-{16,32,256}.png
+// Usage: appearance-check path/to/Virgule.app out-prefix   → out-prefix-{light,dark,clear-light,clear-dark}-{16,32,256,512}.png
+// Prints sheet and slash RGB (0-255, the image's own components; its PNGs are written as Display P3, which review.sh converts back): sheet at 30%,30% (clear of the slash), slash at 46%,46% (inside the stroke at every size).
 #import <AppKit/AppKit.h>
 #import <dlfcn.h>
 #import <objc/message.h>
@@ -12,8 +13,8 @@ int main(int argc, char **argv) { @autoreleasepool {
   if (!dlopen("/System/Library/PrivateFrameworks/IconServices.framework/IconServices", RTLD_NOW)) return 1;
   id icon = ((id (*)(id, SEL, id))objc_msgSend)([NSClassFromString(@"ISBundleIcon") alloc],
       NSSelectorFromString(@"initWithBundleURL:"), [NSURL fileURLWithPath:@(argv[1])]);
-  for (long clear = 0; clear < 2; clear++) for (NSUInteger dark = 0; dark < 2; dark++) for (int i = 0; i < 3; i++) {
-    int px = (int[]){16, 32, 256}[i];
+  for (long clear = 0; clear < 2; clear++) for (NSUInteger dark = 0; dark < 2; dark++) for (int i = 0; i < 4; i++) {
+    int px = (int[]){16, 32, 256, 512}[i];
     id d = ((id (*)(id, SEL, CGSize, CGFloat))objc_msgSend)([NSClassFromString(@"ISImageDescriptor") alloc],
         NSSelectorFromString(@"initWithSize:scale:"), CGSizeMake(px, px), 1);
     ((void (*)(id, SEL, NSUInteger))objc_msgSend)(d, NSSelectorFromString(@"setAppearance:"), dark);
@@ -25,7 +26,10 @@ int main(int argc, char **argv) { @autoreleasepool {
     const char *mode = clear ? (dark ? "clear-dark" : "clear-light") : (dark ? "dark" : "light");
     NSString *out = [NSString stringWithFormat:@"%s-%s-%d.png", argv[2], mode, px];
     [[rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:out atomically:YES];
-    NSColor *c = [rep colorAtX:rep.pixelsWide / 2 y:rep.pixelsHigh * 22 / 100];  // on the sheet, above the weave
-    printf("%-11s %3dpx sheet %.2f alpha %.2f\n", mode, px, c.redComponent, c.alphaComponent);
+    NSColor *s = [rep colorAtX:px * 30 / 100 y:px * 30 / 100];
+    NSColor *m = [rep colorAtX:px * 46 / 100 y:px * 46 / 100];
+    printf("%-11s %3d sheet %3.0f %3.0f %3.0f slash %3.0f %3.0f %3.0f\n", mode, px,
+           s.redComponent * 255, s.greenComponent * 255, s.blueComponent * 255,
+           m.redComponent * 255, m.greenComponent * 255, m.blueComponent * 255);
   }
 }}
