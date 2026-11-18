@@ -131,6 +131,38 @@ final class MarkdownObjectsTests: XCTestCase {
         XCTAssertGreaterThan(x(view, (view.string as NSString).range(of: "b").location), before + 40)
     }
 
+    /// VoiceOver reads the Markdown source; drawn objects are reachable through Images and Tables rotors whose items
+    /// carry the alt text (or file name) and the table's size and header, and select the object's source span.
+    func testVoiceOverRotorsDescribeImagesAndTables() {
+        let source = "Intro ![A red fox](fox.png) and ![](diagrams/flow%20chart.png)\n\n| Name | Age |\n|---|--:|\n| Ann | 3 |\n| Bo | 4 |\n"
+        let (view, objects) = make(source)
+        func walk(_ label: String, _ direction: NSAccessibilityCustomRotor.SearchDirection = .next, filter: String = "") -> [String] {
+            guard let rotor = view.accessibilityCustomRotors().first(where: { $0.label == label }) else { return ["missing rotor"] }
+            var labels: [String] = [], current: NSAccessibilityCustomRotor.ItemResult?
+            while labels.count < 10 {
+                let search = NSAccessibilityCustomRotor.SearchParameters()
+                search.currentItem = current
+                search.searchDirection = direction
+                search.filterString = filter
+                guard let item = rotor.itemSearchDelegate?.rotor(rotor, resultFor: search) else { break }
+                XCTAssertTrue(item.targetElement === view)
+                let spanned = (source as NSString).substring(with: item.targetRange)
+                XCTAssertTrue(spanned.hasPrefix(label == "Images" ? "![" : "| Name"), spanned)
+                labels.append(item.customLabel ?? "")
+                current = item
+            }
+            return labels
+        }
+        XCTAssertEqual(walk("Images"), ["Image, A red fox", "Image, no description, flow chart.png"])
+        XCTAssertEqual(walk("Images", .previous), ["Image, no description, flow chart.png", "Image, A red fox"])
+        XCTAssertEqual(walk("Images", filter: "fox"), ["Image, A red fox"])
+        XCTAssertEqual(walk("Tables"), ["Table, 2 columns, 2 rows: Name, Age"])
+        // Attaching again (the Write view's `.task` re-runs) keeps one set of rotors, held by the same object.
+        XCTAssertTrue(MarkdownObjects.attach(to: view, folder: nil) === objects)
+        XCTAssertEqual(view.accessibilityCustomRotors().filter { $0.label == "Images" }.count, 1)
+        XCTAssertEqual(view.string, source, "accessibility adds nothing to the text")
+    }
+
     func testAttachIsInertUntilTheHostSizesObjectGlyphs() {
         let scroll = NSTextView.scrollableTextView()
         let view = scroll.documentView as! NSTextView
