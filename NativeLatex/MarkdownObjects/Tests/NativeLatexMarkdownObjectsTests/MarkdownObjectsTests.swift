@@ -476,7 +476,7 @@ final class MarkdownObjectsTests: XCTestCase {
         objects.finish([new: bitmapImage(4)])
         objects.finish([old: bitmapImage(4)]) // the stale one arrives last
         XCTAssertNotNil(objects.cache[new] ?? nil, "current decode kept")
-        XCTAssertNil(objects.cache[old], "stale decode dropped")
+        XCTAssertFalse(objects.cache.keys.contains(old), "stale decode dropped")
         XCTAssertEqual(objects.cachedImageCount, 1)
         XCTAssertEqual(objectCount(view), 1, "the image is still drawn")
     }
@@ -551,7 +551,7 @@ final class MarkdownObjectsTests: XCTestCase {
         // A decode from folder a that finishes after the switch is not cached: no span uses it.
         let stale = try key(a.appendingPathComponent("p6.png"))
         objects.finish([stale: bitmapImage(4)])
-        XCTAssertNil(objects.cache[stale], "old folder's late decode dropped")
+        XCTAssertFalse(objects.cache.keys.contains(stale), "old folder's late decode dropped")
         XCTAssertEqual(objects.cachedImageCount, 3)
 
         let (reopened, fresh) = make(source, folder: b) // reopening: a new presenter, its own budget
