@@ -51,13 +51,13 @@ public enum ConversionError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case let .toolMissing(tool, hint):
-            return "LibreWeave needs \(tool) for this conversion, and it is not installed. \(hint) Editing and PDF builds keep working."
+            return "Virgule needs \(tool) for this conversion, and it is not installed. \(hint) Editing and PDF builds keep working."
         case let .unsupported(from, to):
-            return "LibreWeave cannot convert \(from) to \(to)."
+            return "Virgule cannot convert \(from) to \(to)."
         case let .sourceMissing(url):
             return "The source file \(url.path) does not exist."
         case let .destinationExists(url):
-            return "\(url.path) already exists; LibreWeave never overwrites a previous copy."
+            return "\(url.path) already exists; Virgule never overwrites a previous copy."
         case let .converterFailed(tool, status, message):
             return "\(tool) failed (exit \(status)): \(message.isEmpty ? "no error output" : message)"
         case let .outputMissing(tool, message):

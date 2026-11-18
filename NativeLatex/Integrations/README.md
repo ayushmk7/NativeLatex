@@ -1,6 +1,6 @@
 # NativeLatexIntegrations
 
-Local import/export for LibreWeave (macOS 14+). Every conversion writes a **new copy**; sources are never modified and existing copies are never overwritten (`name 2.docx`).
+Local import/export for Virgule (macOS 14+). Every conversion writes a **new copy**; sources are never modified and existing copies are never overwritten (`name 2.docx`).
 
 | API | Engine | Notes |
 | --- | --- | --- |

@@ -136,7 +136,7 @@ final class ConversionTests: XCTestCase {
         let none = LocalConverter(tools: ToolPaths(pandoc: nil, soffice: nil))
         XCTAssertThrowsError(try none.convert(work.appendingPathComponent("notes.md"), to: .docx, in: work)) { error in
             guard case .toolMissing("Pandoc", _) = error as? ConversionError else { return XCTFail("\(error)") }
-            XCTAssertTrue(error.localizedDescription.contains("LibreWeave needs Pandoc"))
+            XCTAssertTrue(error.localizedDescription.contains("Virgule needs Pandoc"))
         }
         let fakeDocx = work.appendingPathComponent("x.docx")
         FileManager.default.createFile(atPath: fakeDocx.path, contents: Data())
