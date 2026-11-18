@@ -219,7 +219,7 @@ enum MarkdownStyler {
         !line.allSatisfy(\.isWhitespace) && line.firstMatch(of: #/^ {0,3}(#|>|```|~~~|[-*+][ \t]|\d{1,9}[.)][ \t])/#) == nil
     }
 
-    /// Width of a task box with its gap, as Read's checkbox CSS: 13 px + `margin-right: .5em`.
+    /// Width of a task box with its gap, as Read's checkbox CSS: 13 px + `margin-right: .5rem`.
     static let taskWidth: CGFloat = 13 + 0.5 * bodySize
 
     /// Pandoc needs a blank line (or a block boundary) before a list: `- x` right under paragraph text is

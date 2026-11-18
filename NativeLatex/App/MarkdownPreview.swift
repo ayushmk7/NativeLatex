@@ -118,7 +118,7 @@ enum MarkdownRenderer {
     static let css = """
     :root { --bg:#FFFFFF; --fg:#0A0A0A; --muted:#6E6E73; --line:rgba(0,0,0,.12); --code:#F5F5F7; --link:#2563EB; --accent:#2563EB; }
     @media (prefers-color-scheme: dark) { :root { --bg:#000000; --fg:#F5F5F7; --muted:#98989D; --line:rgba(255,255,255,.16); --code:#141416; --link:#F5F5F7; --accent:#2563EB; } }
-    @media (prefers-contrast: more) { :root { --muted:#3A3A3C; } }
+    @media (prefers-contrast: more) { :root { --muted:#3A3A3C; --link:#0A0A0A; } }
     @media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root { --muted:#C7C7CC; --link:#FFFFFF; } }
     html { background:var(--bg); color:var(--fg); font:\(Int(MarkdownStyler.bodySize))px/\(MarkdownStyler.lineHeight) -apple-system, system-ui, sans-serif; }
     body { margin:0; } main { max-width:\(Int(MarkdownStyler.columnWidth))px; margin:0 auto; padding:16px 24px 48px; overflow-wrap:break-word; }
@@ -137,9 +137,9 @@ enum MarkdownRenderer {
     p, ul, ol, dl, blockquote, pre, table, figure, math[display="block"] { margin-top:\(MarkdownStyler.blockGap)px; margin-bottom:\(MarkdownStyler.blockGap)px; }
     li > ul, li > ol { margin-top:0; margin-bottom:0; }
     main > :first-child, blockquote > :first-child { margin-top:0; } main > :last-child, blockquote > :last-child { margin-bottom:0; }
-    ul.task-list input[type="checkbox"] { margin:0 .5em 0 0; }
-    ul.task-list input[type=checkbox] { appearance:none; -webkit-appearance:none; width:13px; height:13px; vertical-align:-1px; border:1px solid var(--muted); border-radius:3px; opacity:1; }
-    ul.task-list input[type=checkbox]:checked { background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13'%3E%3Cpath d='M3.2 6.5L5.6 9.6L10 3.4' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/13px no-repeat; border-color:var(--accent); }
+    li:has(> label > input[type=checkbox]) { list-style:none; }
+    input[type=checkbox] { margin:0 .5rem 0 0; appearance:none; -webkit-appearance:none; width:13px; height:13px; vertical-align:-1px; border:1px solid var(--muted); border-radius:3px; opacity:1; }
+    input[type=checkbox]:checked { background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13'%3E%3Cpath d='M3.2 6.5L5.6 9.6L10 3.4' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/13px no-repeat; border-color:var(--accent); }
     """
 }
 

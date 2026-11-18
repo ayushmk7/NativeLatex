@@ -315,13 +315,14 @@ final class MarkdownPreviewTests: XCTestCase {
         let mathHeight = try await js("document.querySelector('math[display=block]').getBoundingClientRect().height") as? Double ?? 0
         XCTAssertGreaterThan(mathHeight, 20, "display math is typeset as MathML, not raw TeX")
         let linkColor = try await js("getComputedStyle(document.querySelector('a')).color") as? String
-        // Increase Contrast swaps to the deeper #0A1FC2 via prefers-contrast.
+        // Design README accentText: #2563EB links; Increase Contrast makes small link text neutral #0A0A0A.
         let increased = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
-        XCTAssertEqual(linkColor, increased ? "rgb(10, 31, 194)" : "rgb(15, 43, 255)", "electric-blue links")
+        XCTAssertEqual(linkColor, increased ? "rgb(10, 10, 10)" : "rgb(37, 99, 235)", "#2563EB links")
 
         try await snapshot(view, name: "libreleaf-markdown-light.png")
         window.appearance = NSAppearance(named: .darkAqua)
-        let darkLink = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast ? "rgb(166, 182, 255)" : "rgb(122, 147, 255)"
+        // Blue is under 4.5:1 on black for small text, so dark links are neutral #F5F5F7 (#FFFFFF with Increase Contrast).
+        let darkLink = increased ? "rgb(255, 255, 255)" : "rgb(245, 245, 247)"
         try await waitFor("getComputedStyle(document.querySelector('a')).color === '\(darkLink)'")
         try await snapshot(view, name: "libreleaf-markdown-dark.png")
 
