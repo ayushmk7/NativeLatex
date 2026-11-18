@@ -62,6 +62,11 @@ final class MarkdownWriteTests: XCTestCase {
 
     private func settle(_ seconds: TimeInterval = 0.4) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
 
+    /// Like `settle`, but suspends instead of spinning a nested run loop. The test body runs inside a main-queue
+    /// callout, where a nested run loop never drains `DispatchQueue.main.async` blocks or main-actor tasks (the
+    /// app's focus hand-offs and Read's render); suspending returns to the real run loop, as user events do.
+    private func pause(_ seconds: TimeInterval = 0.4) async { try? await Task.sleep(for: .seconds(seconds)) }
+
     /// The window's segmented controls: the toolbar's Source / Both / Preview and the pane's Read / Write.
     /// (The View menu mirrors them, but menu validation needs a key window, which a background test host never gets.)
     private func segmented(_ count: Int, in window: NSWindow) -> NSSegmentedControl? {
@@ -76,19 +81,19 @@ final class MarkdownWriteTests: XCTestCase {
 
     private enum Pane: Int { case source, both, preview }
 
-    private func show(_ pane: Pane, in window: NSWindow, file: StaticString = #filePath, line: UInt = #line) throws {
+    private func show(_ pane: Pane, in window: NSWindow, file: StaticString = #filePath, line: UInt = #line) async throws {
         let control = try XCTUnwrap(segmented(3, in: window), "layout control", file: file, line: line)
         XCTAssertTrue(control.isEnabled(forSegment: pane.rawValue), "\(pane) enabled", file: file, line: line)
         control.selectedSegment = pane.rawValue
         control.sendAction(control.action, to: control.target)
-        settle()
+        await pause()
     }
 
-    private func setWrite(_ on: Bool, in window: NSWindow, file: StaticString = #filePath, line: UInt = #line) throws {
+    private func setWrite(_ on: Bool, in window: NSWindow, file: StaticString = #filePath, line: UInt = #line) async throws {
         let control = try XCTUnwrap(segmented(2, in: window), "Read/Write control", file: file, line: line)
         control.selectedSegment = on ? 1 : 0
         control.sendAction(control.action, to: control.target)
-        settle()
+        await pause()
     }
 
     private func textView(_ label: String, in window: NSWindow) -> NSTextView? {
@@ -128,7 +133,7 @@ final class MarkdownWriteTests: XCTestCase {
     func testWriteModeEditsTheSameBufferAndPreservesUntouchedMarkdown() async throws {
         let (document, window) = try await open("notes.md", Self.fixture)
         let source = try XCTUnwrap(textView("Source", in: window))
-        try setWrite(true, in: window)
+        try await setWrite(true, in: window)
         let writer = try XCTUnwrap(textView("Write", in: window), "Write view shown")
         XCTAssertNil(source.window, "Write fills the window")
         XCTAssertEqual(writer.string, Self.fixture)
@@ -252,7 +257,7 @@ final class MarkdownWriteTests: XCTestCase {
         let original = "# Notes\n\nFirst line.\n"
         let (document, window) = try await open("undo.md", original)
         let source = try XCTUnwrap(textView("Source", in: window))
-        try setWrite(true, in: window)
+        try await setWrite(true, in: window)
         let writer = try XCTUnwrap(textView("Write", in: window))
         // ⌘Z's path: the action travels up the responder chain from the focused view to the window's undo manager.
         func send(_ action: String) { _ = window.firstResponder?.tryToPerform(Selector((action)), with: nil); settle(0.2) }
@@ -263,7 +268,7 @@ final class MarkdownWriteTests: XCTestCase {
         writer.insertText("Written.", replacementRange: writer.selectedRange())
         settle()
         XCTAssertEqual(try text(document), original + "Written.")
-        try show(.source, in: window)
+        try await show(.source, in: window)
         XCTAssertNil(writer.window, "Write pane hidden")
         window.makeFirstResponder(source)
         send("undo:")
@@ -277,7 +282,7 @@ final class MarkdownWriteTests: XCTestCase {
         source.insertText("Top. ", replacementRange: source.selectedRange())
         settle()
         XCTAssertEqual(try text(document), "Top. " + original + "Written.")
-        try setWrite(true, in: window)
+        try await setWrite(true, in: window)
         XCTAssertNil(source.window, "Source pane hidden")
         XCTAssertEqual(writer.string, "Top. " + original + "Written.", "hidden edits reached Write")
         window.makeFirstResponder(writer)
@@ -287,7 +292,7 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertEqual(try text(document), original)
         XCTAssertEqual(writer.string, original)
         XCTAssertEqual(source.string, original, "hidden Source kept in sync")
-        try show(.both, in: window)
+        try await show(.both, in: window)
         XCTAssertEqual(textView("Source", in: window)?.string, original)
     }
 
@@ -298,19 +303,19 @@ final class MarkdownWriteTests: XCTestCase {
         let source = try XCTUnwrap(textView("Source", in: window))
         do { let p = await renderedPreview(in: window); XCTAssertNotNil(p, "both panes by default") }
 
-        try show(.source, in: window)
+        try await show(.source, in: window)
         XCTAssertNil(webView(in: window))
         XCTAssertGreaterThan(try XCTUnwrap(source.enclosingScrollView).frame.width, width - 40, "source full width")
 
-        try show(.preview, in: window)
+        try await show(.preview, in: window)
         XCTAssertNil(source.window, "source hidden")
         let full = await renderedPreview(in: window)
         XCTAssertGreaterThan(try XCTUnwrap(full).frame.width, width - 40, "preview full width")
-        try setWrite(true, in: window)
+        try await setWrite(true, in: window)
         XCTAssertGreaterThan(try XCTUnwrap(textView("Write", in: window)?.enclosingScrollView).frame.width, width - 40, "Write full width")
-        try setWrite(false, in: window) // back to Read
+        try await setWrite(false, in: window) // back to Read
 
-        try show(.both, in: window)
+        try await show(.both, in: window)
         XCTAssertNotNil(source.window)
         do { let p = await renderedPreview(in: window); XCTAssertNotNil(p) }
 
@@ -333,7 +338,7 @@ final class MarkdownWriteTests: XCTestCase {
 
         window.setContentSize(NSSize(width: 640, height: 640))
         settle()
-        try show(.preview, in: window)
+        try await show(.preview, in: window)
         do { let p = await renderedPreview(in: window); XCTAssertNotNil(p) }
         XCTAssertNil(source.window)
         XCTAssertEqual(layout.selectedSegment, Pane.preview.rawValue)
@@ -343,7 +348,6 @@ final class MarkdownWriteTests: XCTestCase {
     /// Source Only or Source and Preview leave Write; Read returns to the layout Write replaced.
     func testWriteIsFullWidthAndModeMatchesTheVisibleLayout() async throws {
         let (document, window) = try await open("modes.md", "# Modes\n\nText.\n")
-        let width = try XCTUnwrap(window.contentView).bounds.width
         let layout = try XCTUnwrap(segmented(3, in: window)), mode = try XCTUnwrap(segmented(2, in: window))
         let source = try XCTUnwrap(textView("Source", in: window))
         func check(_ pane: Pane, write: Bool, _ step: String, line: UInt = #line) async {
@@ -352,6 +356,7 @@ final class MarkdownWriteTests: XCTestCase {
             XCTAssertEqual(source.window != nil, pane != .preview, "\(step): source shown", line: line)
             let writer = textView("Write", in: window)
             XCTAssertEqual(writer != nil, write, "\(step): Write shown", line: line)
+            let width = window.contentView?.bounds.width ?? 0 // narrow steps shrink the window
             if let scroll = writer?.enclosingScrollView { XCTAssertGreaterThan(scroll.frame.width, width - 40, "\(step): Write full width", line: line) }
             if pane != .source, !write { let p = await renderedPreview(in: window); XCTAssertNotNil(p, "\(step): Read shown", line: line) }
             if pane == .source { XCTAssertNil(webView(in: window), "\(step): no Read", line: line) }
@@ -362,56 +367,56 @@ final class MarkdownWriteTests: XCTestCase {
         // Write replaces the source in place: caret (and so scroll position) carries over both ways, and Write has focus.
         let writeAt = ("# Modes\n\nTe" as NSString).length
         source.setSelectedRange(NSRange(location: writeAt, length: 0))
-        try setWrite(true, in: window)
+        try await setWrite(true, in: window)
         let writer = try XCTUnwrap(textView("Write", in: window))
         XCTAssertEqual(writer.selectedRange(), NSRange(location: writeAt, length: 0), "Source caret carried into Write")
         XCTAssertIdentical(window.firstResponder, writer, "Write focused")
         writer.setSelectedRange(NSRange(location: 2, length: 3))
-        try setWrite(false, in: window)
+        try await setWrite(false, in: window)
         XCTAssertEqual(source.selectedRange(), NSRange(location: 2, length: 3), "Write selection carried back to Source")
         XCTAssertIdentical(window.firstResponder, source, "Source focused after Read")
         XCTAssertIdentical(webView(in: window), firstPage, "Read → Write → Read keeps the same rendered page (no re-render)")
-        try setWrite(true, in: window); await check(.preview, write: true, "Both → Write")
-        try setWrite(false, in: window); await check(.both, write: false, "Write → Read restores Both")
+        try await setWrite(true, in: window); await check(.preview, write: true, "Both → Write")
+        try await setWrite(false, in: window); await check(.both, write: false, "Write → Read restores Both")
 
-        try show(.source, in: window); await check(.source, write: false, "Source Only")
-        try setWrite(true, in: window); await check(.preview, write: true, "Source → Write")
-        try setWrite(false, in: window); await check(.both, write: false, "Read from Write that replaced Source shows Read beside it")
+        try await show(.source, in: window); await check(.source, write: false, "Source Only")
+        try await setWrite(true, in: window); await check(.preview, write: true, "Source → Write")
+        try await setWrite(false, in: window); await check(.both, write: false, "Read from Write that replaced Source shows Read beside it")
 
-        try show(.preview, in: window); await check(.preview, write: false, "Preview Only (Read)")
-        try setWrite(true, in: window); await check(.preview, write: true, "Read → Write")
-        try setWrite(false, in: window); await check(.preview, write: false, "Write → Read keeps Preview Only")
+        try await show(.preview, in: window); await check(.preview, write: false, "Preview Only (Read)")
+        try await setWrite(true, in: window); await check(.preview, write: true, "Read → Write")
+        try await setWrite(false, in: window); await check(.preview, write: false, "Write → Read keeps Preview Only")
         // A quick Write → Read → Write, with run-loop turns between so each switch is laid out and the Read
         // hand-off is requested, then a wait past the render: Write keeps focus.
-        func choose(_ segment: Int) { mode.selectedSegment = segment; mode.sendAction(mode.action, to: mode.target); settle(0.05) }
-        choose(1); choose(0)
+        func choose(_ segment: Int) async { mode.selectedSegment = segment; mode.sendAction(mode.action, to: mode.target); await pause(0.05) }
+        await choose(1); await choose(0)
         XCTAssertNil(textView("Write", in: window), "Read was really shown between the switches")
-        choose(1)
+        await choose(1)
         let rewriter = try XCTUnwrap(textView("Write", in: window))
-        settle(2)
+        await pause(2)
         XCTAssertIdentical(window.firstResponder, rewriter, "Write keeps focus after a quick Read → Write")
-        try setWrite(false, in: window)
+        try await setWrite(false, in: window)
         let page = try XCTUnwrap(webView(in: window))
-        for _ in 0..<20 where !((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false) { settle(0.1) }
+        for _ in 0..<20 where !((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false) { await pause(0.1) }
         XCTAssertTrue((window.firstResponder as? NSView)?.isDescendant(of: page) ?? false,
                       "Write → Read in Preview Only moves focus to the Read page: \(String(describing: window.firstResponder))")
 
-        try setWrite(true, in: window)
-        try show(.source, in: window); await check(.source, write: false, "Source Only leaves Write")
-        try show(.preview, in: window); await check(.preview, write: false, "Preview Only after leaving Write is Read")
-        try setWrite(true, in: window)
-        try show(.both, in: window); await check(.both, write: false, "Source and Preview leaves Write")
+        try await setWrite(true, in: window)
+        try await show(.source, in: window); await check(.source, write: false, "Source Only leaves Write")
+        try await show(.preview, in: window); await check(.preview, write: false, "Preview Only after leaving Write is Read")
+        try await setWrite(true, in: window)
+        try await show(.both, in: window); await check(.both, write: false, "Source and Preview leaves Write")
         XCTAssertFalse(document.isDocumentEdited, "mode changes never edit")
 
         // Narrow: Both → Write → Read shows Read (Both would show only the source); same for Read from the initial state.
-        try show(.both, in: window)
-        window.setContentSize(NSSize(width: 640, height: 640)); settle()
+        try await show(.both, in: window)
+        window.setContentSize(NSSize(width: 640, height: 640)); await pause()
         await check(.source, write: false, "narrow default shows Source, Document Mode selects neither")
-        try setWrite(true, in: window); await check(.preview, write: true, "narrow: Write")
-        try setWrite(false, in: window); await check(.preview, write: false, "narrow: Read is visible after Write")
-        try show(.source, in: window)
-        try setWrite(false, in: window); await check(.preview, write: false, "narrow: tapping Read from Source shows Read")
-        window.setContentSize(NSSize(width: 1100, height: 640)); settle()
+        try await setWrite(true, in: window); await check(.preview, write: true, "narrow: Write")
+        try await setWrite(false, in: window); await check(.preview, write: false, "narrow: Read is visible after Write")
+        try await show(.source, in: window)
+        try await setWrite(false, in: window); await check(.preview, write: false, "narrow: tapping Read from Source shows Read")
+        window.setContentSize(NSSize(width: 1100, height: 640)); await pause()
 
         XCTAssertEqual(PaneState.selfCheck(), [], "every transition, including narrow windows")
     }
@@ -434,15 +439,15 @@ final class MarkdownWriteTests: XCTestCase {
             window.contentView = root // never ordered in
             return (window, box, other)
         }
-        func wait(_ seconds: TimeInterval, until done: () -> Bool) {
+        func wait(_ seconds: TimeInterval, until done: () -> Bool) async {
             let end = Date().addingTimeInterval(seconds)
-            while !done(), Date() < end { settle(0.05) }
+            while !done(), Date() < end { await pause(0.05) }
         }
 
         // Slow success (4 s, past the old 3 s retry window): the page gets focus.
         let (slow, slowBox, _) = host({ _ in try await Task.sleep(for: .seconds(4)); return "<h1>Hi</h1>" })
         defer { slow.close() }
-        wait(8) { !slowBox.request }
+        await wait(8) { !slowBox.request }
         let page = try XCTUnwrap(webView(in: slow), "page rendered")
         XCTAssertFalse(slowBox.request, "request cleared once handled")
         XCTAssertTrue((slow.firstResponder as? NSView)?.isDescendant(of: page) ?? false, "page focused: \(String(describing: slow.firstResponder))")
@@ -450,10 +455,10 @@ final class MarkdownWriteTests: XCTestCase {
         // Something focused before the render settles keeps focus.
         let (busy, busyBox, field) = host({ _ in try await Task.sleep(for: .milliseconds(600)); return "<p>x</p>" }, field: true)
         defer { busy.close() }
-        settle(0.1)
+        await pause(0.1)
         busy.makeFirstResponder(field)
         let editor = busy.firstResponder
-        wait(5) { !busyBox.request }
+        await wait(5) { !busyBox.request }
         XCTAssertNotNil(webView(in: busy))
         XCTAssertFalse(busyBox.request)
         XCTAssertIdentical(busy.firstResponder, editor, "a view focused meanwhile keeps focus")
@@ -461,7 +466,7 @@ final class MarkdownWriteTests: XCTestCase {
         // Failure (e.g. no Pandoc): no page, Try Again takes the keys.
         let (failed, failedBox, _) = host({ _ in throw MarkdownRenderer.Failure.missingPandoc })
         defer { failed.close() }
-        wait(5) { !failedBox.request }
+        await wait(5) { !failedBox.request }
         XCTAssertNil(webView(in: failed))
         XCTAssertFalse(failedBox.request)
         let responder = try XCTUnwrap(failed.firstResponder as? NSView, "something in the banner has focus, not the bare window")
@@ -471,13 +476,13 @@ final class MarkdownWriteTests: XCTestCase {
         let (late, lateBox, _) = host({ _ in throw MarkdownRenderer.Failure.missingPandoc })
         defer { late.close() }
         lateBox.request = false
-        settle(0.5) // render has failed; nobody asked for focus yet
+        await pause(0.5) // render has failed; nobody asked for focus yet
         late.makeFirstResponder(nil)
         lateBox.request = true
         (late.contentView?.subviews.first as? NSHostingView<MarkdownPreview>)?.rootView = MarkdownPreview(
             text: "# Hi", fileURL: nil, focusRequest: Binding(get: { lateBox.request }, set: { lateBox.request = $0 }),
             render: { _ in throw MarkdownRenderer.Failure.missingPandoc })
-        wait(3) { !lateBox.request }
+        await wait(3) { !lateBox.request }
         XCTAssertFalse(lateBox.request, "late request handled")
         let lateResponder = try XCTUnwrap(late.firstResponder as? NSView, "late request: Try Again focused, not the bare window")
         XCTAssertTrue(lateResponder.window === late)
@@ -591,7 +596,7 @@ final class MarkdownWriteTests: XCTestCase {
     func testWriteIsMarkdownOnly() async throws {
         let (_, tex) = try await open("paper.tex", "\\documentclass{article}\n")
         XCTAssertNil(segmented(2, in: tex), "no Read/Write for TeX: its PDF preview is read-only")
-        try show(.preview, in: tex) // layout still works for the PDF preview
+        try await show(.preview, in: tex) // layout still works for the PDF preview
         XCTAssertNil(textView("Source", in: tex)?.window)
 
         let (_, plain) = try await open("plain.txt", "hello")
@@ -604,11 +609,11 @@ final class MarkdownWriteTests: XCTestCase {
         let url = try XCTUnwrap(document.fileURL)
         let before = try Data(contentsOf: url)
         for _ in 0..<2 {
-            try setWrite(true, in: window)
-            try show(.preview, in: window)
-            try show(.source, in: window)
-            try show(.both, in: window)
-            try setWrite(false, in: window)
+            try await setWrite(true, in: window)
+            try await show(.preview, in: window)
+            try await show(.source, in: window)
+            try await show(.both, in: window)
+            try await setWrite(false, in: window)
         }
         XCTAssertEqual(try text(document), Self.fixture)
         XCTAssertFalse(document.undoManager?.canUndo ?? false, "nothing registered as an edit")
@@ -620,7 +625,7 @@ final class MarkdownWriteTests: XCTestCase {
     func testExternalChangeReloadsCleanWriteAndWarnsInPreviewOnly() async throws {
         let (document, window) = try await open("external.md", "# One\n")
         let url = try XCTUnwrap(document.fileURL)
-        try setWrite(true, in: window) // fills the window, like Preview Only
+        try await setWrite(true, in: window) // fills the window, like Preview Only
         try "# Two\n".write(to: url, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: url.path)
         var reloaded = false
@@ -640,7 +645,7 @@ final class MarkdownWriteTests: XCTestCase {
     func testSelectionKeepsLayoutAndHidesFences() async throws {
         let text = "Intro **bold** here.\n\n```\ncode\n```\n\nOther **line**.\n"
         let (_, window) = try await open("select.md", text)
-        try setWrite(true, in: window)
+        try await setWrite(true, in: window)
         let writer = try XCTUnwrap(textView("Write", in: window))
         let storage = try XCTUnwrap(writer.textStorage)
         let ns = text as NSString
@@ -672,6 +677,7 @@ final class MarkdownWriteTests: XCTestCase {
         let handle = WritingHandle()
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 560), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: .aqua) // the pixels below assume light, whatever the host's appearance
         window.contentView = handle.scrollView(text: text, label: "Write") // never ordered in
         defer { window.close() }
         settle(0.3)
@@ -705,7 +711,8 @@ final class MarkdownWriteTests: XCTestCase {
         let top = layout.lineFragmentRect(forGlyphAt: layout.glyphIndexForCharacter(at: box.location), effectiveRange: nil)
         let inset = view.textContainerOrigin
         let inside = pixel(inset.x + top.minX + 8, inset.y + top.minY + 4) // in the fence line's padding, left of any text
-        let surface = NSColor(Theme.surface).usingColorSpace(.sRGB)!
+        var surface = NSColor.clear
+        window.appearance!.performAsCurrentDrawingAppearance { surface = NSColor(Theme.surface).usingColorSpace(.sRGB)! }
         XCTAssertEqual(inside.redComponent, surface.redComponent, accuracy: 0.02, "padding is inside the box: \(inside)")
         let above = pixel(inset.x + top.minX + 8, inset.y + top.minY - 6)
         XCTAssertGreaterThan(above.redComponent, surface.redComponent + 0.01, "the box starts at the opening fence (white above)")
@@ -818,10 +825,20 @@ final class MarkdownWriteTests: XCTestCase {
         let pair = Pair("# Notes\n\nOne two.\n")
         defer { pair.window.close() }
         XCTAssertIdentical(pair.sv.undoManager, pair.wv.undoManager)
+        // One undo group per burst, as one user event each: the test body runs inside a main-queue callout,
+        // where the per-event group never closes and every burst would land in one group.
+        let undo = pair.window.undoManager!
+        undo.groupsByEvent = false
+        defer { undo.groupsByEvent = true }
+        func type(_ view: NSTextView, at location: Int, _ chars: String) {
+            view.setSelectedRange(NSRange(location: location, length: 0))
+            undo.beginUndoGrouping(); pair.key(view, chars, settle: false); undo.endUndoGrouping()
+            pair.pump()
+        }
         let one = pair.location(of: "One")
-        pair.sv.setSelectedRange(NSRange(location: one, length: 0)); pair.key(pair.sv, "ab")
-        pair.wv.setSelectedRange(NSRange(location: one, length: 0)); pair.key(pair.wv, "X") // before Source's typing
-        pair.sv.setSelectedRange(NSRange(location: pair.location(of: "bOne") + 1, length: 0)); pair.key(pair.sv, "c")
+        type(pair.sv, at: one, "ab")
+        type(pair.wv, at: one, "X") // before Source's typing
+        type(pair.sv, at: pair.location(of: "bOne") + 1, "c")
         let typed = "# Notes\n\nXabcOne two.\n"
         XCTAssertEqual(pair.doc, typed)
         var steps: [String] = []
@@ -1481,7 +1498,7 @@ final class MarkdownWriteTests: XCTestCase {
     /// Read/Write sits in the toolbar of every Markdown window (.md and .markdown, wide and narrow), stays
     /// reachable in Source Only, and choosing Write there reveals the Write pane. TeX and plain text don't get it.
     /// Hosted in a window that is never put on screen, with SwiftUI's toolbar bridged into it.
-    func testReadWriteControlInEveryMarkdownWindowAndLayout() throws {
+    func testReadWriteControlInEveryMarkdownWindowAndLayout() async throws {
         func host(_ name: String, width: CGFloat) -> NSWindow {
             var stored = "# Title\n\nBody.\n"
             let binding = Binding<TextDocument>(get: { TextDocument(text: stored) }, set: { stored = $0.text })
@@ -1501,7 +1518,7 @@ final class MarkdownWriteTests: XCTestCase {
                 let window = host(name, width: width)
                 defer { window.close() }
                 XCTAssertTrue(labels(window).contains("Document Mode"), "\(name) @\(width): \(labels(window))")
-                try show(.source, in: window)
+                try await show(.source, in: window)
                 XCTAssertNil(textView("Write", in: window))
                 let mode = try XCTUnwrap(segmented(2, in: window), "\(name) @\(width): Read/Write reachable in Source Only")
                 XCTAssertEqual(mode.label(forSegment: 1), "Write")
@@ -1528,7 +1545,7 @@ final class MarkdownWriteTests: XCTestCase {
             window.contentView = hosting // never ordered in
             defer { window.close() }
             settle()
-            try setWrite(true, in: window)
+            try await setWrite(true, in: window)
             XCTAssertNotNil(textView("Write", in: window))
             hosting.rootView = EditorView(document: binding, fileURL: dir.appendingPathComponent("draft.tex")) // same view identity: state kept
             settle()
