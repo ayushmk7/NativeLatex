@@ -43,7 +43,7 @@ public struct LibreTextsClient: Sendable {
 
     public static let urlSessionFetch: Fetch = { url in
         var request = URLRequest(url: url, timeoutInterval: 30)
-        request.setValue("LibreWeave/0.1 (local import)", forHTTPHeaderField: "User-Agent")
+        request.setValue("Virgule/0.1 (local import)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }

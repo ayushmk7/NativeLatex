@@ -26,7 +26,7 @@ Virgule is a candidate name. It is not cleared and not approved. This plan renam
 | `NativeLatex/App/Conversions.swift:19` | "…was not saved, so LibreWeave stopped…" |
 | `NativeLatex/App/Conversions.swift:103` | Import Copy open-panel message |
 
-**Sent to an external service:** `…/LibreTexts.swift:46` sets `User-Agent: LibreWeave/0.1 (local import)` on every request to the public LibreTexts Deki API.
+**Sent to an external service:** `…/LibreTexts.swift:46` sets `User-Agent: Virgule/0.1 (local import)` (changed from `LibreWeave/0.1` after the owner authorized the rebrand, 2026-11-18) on every request to the public LibreTexts Deki API.
 
 **Tests that assert the brand:** `NativeLatex/Integrations/Tests/NativeLatexIntegrationsTests/ConversionTests.swift:139` ("LibreWeave needs Pandoc"), `…/ProviderTests.swift:38` and `NativeLatexTests/IntegrationTests.swift:29` ("not available in this LibreWeave build"), and `NativeLatexTests/IntegrationTests.swift:3` (`@testable import LibreWeave`, which belongs to the Backend module rename).
 
@@ -57,7 +57,7 @@ Because of this, a rename has no effect on files already exported or imported, a
 1. In `Process.swift`, add one internal constant `let appName = "LibreWeave"`. Replace "LibreWeave" with it in the nine package strings listed above (Conversion ×3, Process ×1, GoogleDocs ×2, LibreTexts ×3); edit the GoogleDocs doc comment as plain text. Keep the constant internal; the package has one consumer.
 2. Make `appName` public, or pass it in, so `Conversions.swift:19` and `:103` use the same value. Otherwise those two lines are edited by hand. Coordinator decides (D2).
 3. Change the three test assertions so they check text without the brand ("needs Pandoc", "not available in this") or interpolate `appName`. They then survive any later rename.
-4. Leave `User-Agent` at `LibreWeave/0.1` while the public hold stands. Change it only at public release, together with the bundle ID (D3).
+4. Done: `User-Agent` is `Virgule/0.1` (owner authorized the rebrand, 2026-11-18; D3).
 5. Update `NativeLatex/Integrations/README.md:3` and the "Implemented" paragraph in `docs/workspaces/integrations/integrations.md` only when the public name is approved.
 
 For the internal prototype, set `appName` to "Virgule". Nothing else in the package changes.
@@ -74,14 +74,14 @@ Not needed: renaming the package or module, the temp prefixes, or the env var. T
 
 ## Validation that proves completion
 
-- `git grep -n LibreWeave -- NativeLatex/Integrations NativeLatex/App/Conversions.swift` returns only the `appName` definition and the held `User-Agent`.
+- `git grep -n LibreWeave -- NativeLatex/Integrations NativeLatex/App/Conversions.swift` returns only the two app-owned `Conversions.swift` strings (lines 19, 103); the package has none, and `User-Agent` is `Virgule/0.1`.
 - `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` in `NativeLatex/Integrations` passes: 17 pass and 1 live test is skipped, as on `main`. The `xcodebuild test` app suite passes `IntegrationTests` under the renamed module.
 - Manual check in the built app:
   - Export Copy ▸ Word with Pandoc hidden from `PATH` shows the missing-tool alert with the prototype name.
   - Google Docs: Not Connected… shows the prototype name.
   - Import LibreTexts Page with a non-LibreTexts URL shows the prototype name.
 - Data check: export the shared fixtures from `docs/research/conversion-fixtures` before and after the change. Then confirm that the output file names, `_media/` folder names, and DOCX `docProps/*.xml` and HTML `<meta>` contain no app name. `unzip -p out.docx docProps/app.xml docProps/core.xml | grep -i -e libreweave -e virgule` should print nothing.
-- With `NATIVELATEX_LIVE_NETWORK=1`, the live LibreTexts test still passes, and the outgoing `User-Agent` is still `LibreWeave/0.1` while the hold stands.
+- With `NATIVELATEX_LIVE_NETWORK=1`, the live LibreTexts test still passes, and the outgoing `User-Agent` is `Virgule/0.1`.
 
 ## Migration and rollback risks
 
@@ -89,7 +89,7 @@ Not needed: renaming the package or module, the temp prefixes, or the env var. T
 | --- | --- | --- |
 | Data in user files | None found | The app writes no brand into outputs. The validation step above guards against a regression. |
 | Settings, tokens, or provider registrations | None today | Nothing is stored. Future connectors must use brand-free Keychain and redirect identifiers (sequencing step 5). |
-| Candidate name leaks to LibreTexts | Low, avoidable | Keep the `User-Agent` held. Leaving it unchanged is the safe default. |
+| Candidate name leaks to LibreTexts | Accepted | Owner authorized the rebrand; `User-Agent` sends `Virgule/0.1`. |
 | Tests break on the next rename | Low | Brand-free assertions (step 3). |
 | Rollback | Trivial | Revert the one commit, or set `appName` back. Files and settings have nothing to undo. |
 | Mixed brand in UI if `Conversions.swift` is edited separately | Low | Use the shared constant (D2) or edit both in the same commit. |
@@ -98,6 +98,6 @@ Not needed: renaming the package or module, the temp prefixes, or the env var. T
 
 - **D1.** Approve an internal prototype branch with `appName = "Virgule"`, or wait for the name review.
 - **D2.** Expose one `public` `appName` from the integrations package for the app to reuse, or have the app keep its own two literals or read `CFBundleDisplayName`. Recommendation: public constant. It is the smallest change and works in `swift test`, where `Bundle.main` is the test runner.
-- **D3.** Confirm the `User-Agent` stays `LibreWeave/0.1` until the public release.
+- **D3.** Decided 2026-11-18: owner authorized the rebrand; `User-Agent` is now `Virgule/0.1`.
 - **D4.** Confirm the internal `NativeLatexIntegrations` and `nativelatex-*` names stay. Recommendation: they stay.
 - **D5.** Fallback name if Virgule is rejected. It drops into the same constant at no extra cost.
