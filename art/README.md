@@ -34,7 +34,7 @@ We force no alpha. Mono keeps the dark sheet/white lines for legibility; thread 
 | `../NativeLatex/Assets.xcassets/AccentColor.colorset` | App accent: `#2563EB`, one universal value for light, dark and high contrast (5.17:1 with white text, AA). |
 | `source/app-icon-black.svg`, `app-icon-white.svg` | Flat icons on the macOS grid |
 | `source/mark-black.svg`, `mark-white.svg` | One-color mark with real gaps |
-| `../landing/icon.svg` | Favicon: black sheet on light pages, white sheet on dark pages, via `prefers-color-scheme` inside the SVG |
+| `../landing/icon.svg` | Favicon, same as the app icon: white sheet on light pages, black sheet on dark pages, via `prefers-color-scheme` inside the SVG |
 | `exports/review.png` | Review sheet (see below) |
 | `exports/built-app-evidence.txt` | Evidence from a real `xcodebuild` of LibreWeave.app: the `Assets.car` appearance stacks and Info.plist icon keys. `review.png` shows the current renders. |
 

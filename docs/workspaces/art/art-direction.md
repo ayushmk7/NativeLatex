@@ -42,7 +42,7 @@ The first concept (a brace over a page on a black field) read as a box inside a 
 
 macOS picks Clear and Tinted from the user's icon-style setting and composites Clear's backdrop translucency live in the Dock. In static renders, Clear is the same opaque neutral glass for our icon and for Apple's own icons. The app forces no alpha and needs no setting. A Mono (`tinted`) override keeps the sheet dark and lines white so the mark stays legible; measurements are in art/README. Tinted dark remains the lowest-contrast mode, readable at 32 px and up.
 
-The landing favicon uses the reverse sheet colours for contrast with the page: black on light pages, white on dark pages.
+The landing favicon matches the app icon: white sheet on light pages, black sheet on dark pages.
 
 - **Grid:** Apple's macOS icon template: one 824 px silhouette, 100 px inset, 185 px corner radius on a 1024 canvas.
 - **One geometry for every size:** macOS draws the `.icon` at every size from a single vector, so the mark uses a 2×2 weave. It spans 480 px of the 824 px body (58%), the same glyph proportion as Apple's own icons such as Calculator; an earlier full-bleed weave (78%) looked oversized next to them. Coordinates are multiples of 48: 3 px strands at 32 px; at 16 px the weave is soft but still reads. An earlier 3-line weave looked richer at 512 px but blurred into a clump at 16 px, so it was removed.
