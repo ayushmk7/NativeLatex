@@ -532,19 +532,24 @@ extension MarkdownObjects: NSAccessibilityCustomRotorItemSearchDelegate {
 
     public nonisolated func rotor(_ rotor: NSAccessibilityCustomRotor,
                                   resultFor search: NSAccessibilityCustomRotor.SearchParameters) -> NSAccessibilityCustomRotor.ItemResult? {
+        // AppKit asks on the main thread (assumeIsolated traps otherwise); the rotor, query and result are AppKit
+        // objects that aren't Sendable, so they cross assumeIsolated unchecked and the closure returns Void (Swift 6).
+        nonisolated(unsafe) let rotor = rotor, search = search
+        nonisolated(unsafe) var result: NSAccessibilityCustomRotor.ItemResult?
         MainActor.assumeIsolated {
-            guard let view else { return nil }
+            guard let view else { return }
             var items = rotorItems(rotor.label)
             if !search.filterString.isEmpty { items = items.filter { $0.label.localizedCaseInsensitiveContains(search.filterString) } }
             let current = search.currentItem?.targetRange.location
             let item = search.searchDirection == .previous
                 ? (current.map { c in items.last { $0.range.location < c } } ?? items.last)
                 : (current.map { c in items.first { $0.range.location > c } } ?? items.first)
-            guard let item else { return nil }
-            let result = NSAccessibilityCustomRotor.ItemResult(targetElement: view)
-            result.targetRange = item.range
-            result.customLabel = item.label
-            return result
+            guard let item else { return }
+            let found = NSAccessibilityCustomRotor.ItemResult(targetElement: view)
+            found.targetRange = item.range
+            found.customLabel = item.label
+            result = found
         }
+        return result
     }
 }
