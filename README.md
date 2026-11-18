@@ -42,7 +42,7 @@ Each document gets its own window, with the menus, find bar and undo you'd expec
 - **Your layout.** Show the source, the preview, or both side by side (<kbd>⌥⌘1</kbd> <kbd>⌥⌘2</kbd> <kbd>⌥⌘3</kbd>). <kbd>⌥⌘P</kbd> toggles the preview. Narrow windows give one pane the full width.
 - **One set of Markdown formatting commands.** The Format menu and the format bar share them: bold <kbd>⌘B</kbd>, italic <kbd>⌘I</kbd>, strikethrough <kbd>⇧⌘X</kbd>, link <kbd>⌘K</kbd>, headings <kbd>⌃⌘1</kbd>–<kbd>⌃⌘3</kbd>, lists, checklists, quotes and code blocks. They work in the source and in Write. In LaTeX windows, <kbd>⌘B</kbd> is Build.
 - **Text left as you typed it.** Smart quotes, dashes and autocorrect are off in the source editor.
-- **Light and dark.** Virgule follows the system, and the BB-8 switch in the toolbar sets Light or Dark for Virgule alone.
+- **Light and dark.** Virgule follows the system, and the BB-8 switch in the toolbar sets Light or Dark for Virgule alone. Choose Use System in Settings or View ▸ Appearance to follow macOS again.
 
 ## Build it locally
 
