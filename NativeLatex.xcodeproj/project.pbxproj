@@ -25,7 +25,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A10000000000000000000006 /* LibreWeave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LibreWeave.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000006 /* Virgule.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Virgule.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000007 /* LibreWeaveTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LibreWeaveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000014 /* LibreWeave-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "LibreWeave-Info.plist"; sourceTree = "<group>"; };
 		A10000000000000000000020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = NativeLatex/Assets.xcassets; sourceTree = "<group>"; };
@@ -58,7 +58,7 @@
 		A10000000000000000000013 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000006 /* LibreWeave.app */,
+				A10000000000000000000006 /* Virgule.app */,
 				A10000000000000000000007 /* LibreWeaveTests.xctest */,
 			);
 			name = Products;
@@ -81,7 +81,7 @@
 			name = LibreWeave;
 			packageProductDependencies = (A10000000000000000000025 /* NativeLatexDesign */, A10000000000000000000026 /* NativeLatexIntegrations */, A10000000000000000000042 /* NativeLatexMarkdownObjects */);
 			productName = LibreWeave;
-			productReference = A10000000000000000000006 /* LibreWeave.app */;
+			productReference = A10000000000000000000006 /* Virgule.app */;
 			productType = "com.apple.product-type.application";
 		};
 		A1000000000000000000000E /* LibreWeaveTests */ = {
@@ -189,14 +189,14 @@
 				INFOPLIST_FILE = "LibreWeave-Info.plist";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				INFOPLIST_KEY_CFBundleDisplayName = LibreWeave;
+				INFOPLIST_KEY_CFBundleDisplayName = Virgule;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = app.libreweave.LibreWeave;
 				PRODUCT_MODULE_NAME = LibreWeave;
-				PRODUCT_NAME = LibreWeave;
+				PRODUCT_NAME = Virgule;
 			};
 			name = Debug;
 		};
@@ -210,14 +210,14 @@
 				INFOPLIST_FILE = "LibreWeave-Info.plist";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				INFOPLIST_KEY_CFBundleDisplayName = LibreWeave;
+				INFOPLIST_KEY_CFBundleDisplayName = Virgule;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = app.libreweave.LibreWeave;
 				PRODUCT_MODULE_NAME = LibreWeave;
-				PRODUCT_NAME = LibreWeave;
+				PRODUCT_NAME = Virgule;
 			};
 			name = Release;
 		};
@@ -228,7 +228,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = app.libreweave.LibreWeaveTests;
 				PRODUCT_NAME = LibreWeaveTests;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LibreWeave.app/Contents/MacOS/LibreWeave";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Virgule.app/Contents/MacOS/Virgule";
 			};
 			name = Debug;
 		};
@@ -239,7 +239,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = app.libreweave.LibreWeaveTests;
 				PRODUCT_NAME = LibreWeaveTests;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LibreWeave.app/Contents/MacOS/LibreWeave";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Virgule.app/Contents/MacOS/Virgule";
 			};
 			name = Release;
 		};
