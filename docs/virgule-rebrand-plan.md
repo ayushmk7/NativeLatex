@@ -1,6 +1,8 @@
 # Virgule candidate: coordinated rebrand plan
 
-**Status:** planning only, 2026-11-18. LibreWeave remains the installed and public name. This document plans a possible **total visible rebrand**, including a genuinely new icon; it does not authorize a rename or deployment. The agents planned against `main` at `840319f`; the later planning-brief commit changed no app code.
+**Update, 2026-11-18:** the owner later authorized the local implementation ([brief](prompts/virgule-implementation.md)). Virgule is now the app name on `main` and in the local install, with the bundle ID kept; the public site, hostname, repository name and media are not yet cut over. See [status](status.md) for what has landed. The plan below is kept as written.
+
+**Original status:** planning only, 2026-11-18. LibreWeave remains the installed and public name. This document plans a possible **total visible rebrand**, including a genuinely new icon; it does not authorize a rename or deployment. The agents planned against `main` at `840319f`; the later planning-brief commit changed no app code.
 
 ## Decision before implementation
 

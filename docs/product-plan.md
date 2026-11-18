@@ -1,10 +1,10 @@
 # NativeLatex Mac product plan
 
-Status: plan, with a first implementation on main · revised 2026-11-17 · Mac only. **LibreWeave** is the working app name; NativeLatex remains the repository and project path. What is built today is listed under [Implemented on main](status.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
+Status: plan, with a first implementation on main · revised 2026-11-18 · Mac only. **Virgule** is the app name (a candidate not yet cleared as a trademark; it replaced LibreWeave on 2026-11-18, and the bundle ID `app.libreweave.LibreWeave` is unchanged). NativeLatex remains the repository and project path. What is built today is listed under [Implemented on main](status.md#implemented-on-main-checked-2026-11-17); this file describes the target product.
 
 ## Product promise
 
-LibreWeave (repository: NativeLatex) is planned as a native Mac app for opening ordinary LaTeX and Markdown files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
+Virgule (repository: NativeLatex) is planned as a native Mac app for opening ordinary LaTeX, Markdown and plain-text files, editing them locally, and rendering a preview beside the source. LaTeX compiles with the Mac's TeX installation; Markdown renders locally. No account or network connection is required for local projects. This is a single-user product with no phone or tablet target.
 
 The app is for authors who want a faster local editing loop than switching among a text editor, terminal, PDF viewer and Finder. It should handle a single article quickly and remain dependable on multi-file projects with images and bibliographies.
 
@@ -28,7 +28,7 @@ Technical detail and source references are in the [architecture](workspaces/back
 
 ## First usable release: Mac
 
-1. Open a `.tex`, `.md` or `.markdown` file directly from Finder/Open With or File > Open, or open/create a folder workspace. A direct file opens its containing folder as a workspace and selects that file. Support multiple windows, recent folders, a file tree and source tabs for text assets. Register these types as openable; the user chooses whether macOS makes NativeLatex their default app. [Apple document type registration](https://developer.apple.com/documentation/SwiftUI/DocumentGroup).
+1. Open a `.tex`, `.md` or `.markdown` file directly from Finder/Open With or File > Open, or open/create a folder workspace. A direct file opens its containing folder as a workspace and selects that file. Support multiple windows, recent folders, a file tree and source tabs for text assets. Register these types as openable; the user chooses whether macOS makes Virgule their default app. [Apple document type registration](https://developer.apple.com/documentation/SwiftUI/DocumentGroup).
 2. Provide a strong editor: undo/redo, syntax color, matching delimiters, line numbers, find/replace, comment toggle, indentation and standard macOS keyboard/menu behavior.
 3. Save safely. Detect changes made by Finder, Git, cloud file providers or another editor; never silently overwrite a dirty buffer.
 4. Build a selected root `.tex` file with local TeX, or Render the active Markdown file locally. The same keyboard command chooses the action from the file type. Show progress/cancel; retain TeX logs and link reliable errors to source lines.
@@ -75,7 +75,7 @@ The first release excludes a collaboration server, bundled TeX distribution, pac
 
 “Docs” means Google Docs here; “libretext” is treated as LibreTexts, with LibreOffice Writer covered too because the term could refer to it. Word and Writer exchange use reviewable DOCX/ODT copies. Google Docs begins with manual exchange and can gain a narrow, opt-in Drive connector for the owner's account. LibreTexts begins as a reviewed publishing handoff until its supported API and author workflow are verified. See the [integration evidence and limits](workspaces/integrations/integrations.md) and [conversion test](research/conversion-test-2026-11-17.md).
 
-AWS is planned to serve a signed Mac download once one exists. The landing page is live on GitHub Pages at <https://libreweave.ayushmadhav.com/> with no download. The app itself runs locally and needs no website or server. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
+AWS is planned to serve a signed Mac download once one exists. The landing page is live on GitHub Pages at <https://libreweave.ayushmadhav.com/> with no download; it still shows LibreWeave until the Virgule site cutover. The app itself runs locally and needs no website or server. The [deployment plan](deployment-plan.md) records signing, artifact hosting, account prerequisites, and release checks.
 
 ## Product success checks
 
@@ -83,7 +83,7 @@ AWS is planned to serve a signed Mac download once one exists. The landing page 
 2. A person opens a `.md` file from Finder, edits it and sees a local rendered preview without installing TeX or Pandoc.
 3. Two workspace windows build distinct roots concurrently without mixing files, errors or output.
 4. A multi-file paper with an image and bibliography builds; clicking a reported error opens the correct file and line.
-5. If an external editor changes an open file, NativeLatex never silently replaces that edit.
+5. If an external editor changes an open file, Virgule never silently replaces that edit.
 6. If a build fails, the PDF remains available and is unmistakably marked as previous output.
 7. With TeX absent, a user can still edit and save, and Build gives actionable setup guidance.
 8. These flows can be completed by keyboard; essential state and errors are announced to VoiceOver.

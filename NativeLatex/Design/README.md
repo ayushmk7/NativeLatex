@@ -1,6 +1,6 @@
 # NativeLatexDesign
 
-SwiftUI design system for the LibreWeave Mac app (code paths keep the `NativeLatex` name). macOS 14+, Swift 6, no dependencies.
+SwiftUI design system for the Virgule Mac app (code paths keep the `NativeLatex` name; the app's entry point `LibreWeaveApp` and the `libreWeaveTheme()` modifier keep the earlier name on purpose). macOS 14+, Swift 6, no dependencies.
 
 Sources of the look: the Internship tracker (`~/Downloads/Internship/frontend/src/style.css`: white/black and pill controls), the Website base blue `#2563EB`, and the website's BB-8 switch (`~/Downloads/Website/src/components/pro/opt4/bb8.css`). Rules come from `docs/workspaces/ux/ux-plan.md` → *Appearance and BB-8 control*.
 
@@ -76,8 +76,8 @@ The shell already puts `BB8Toggle()` in the trailing toolbar. Use it alone elsew
 ```sh
 cd NativeLatex/Design
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-swift test                                                  # 4 XCTest cases
-swift run NativeLatexDesignDemo                             # LibreWeave sample window
+swift test                                                  # 6 XCTest cases
+swift run NativeLatexDesignDemo                             # Virgule sample window
 swift run NativeLatexDesignDemo --snapshot "$PWD/Screenshots"  # optional snapshots (opens a window)
 ```
 
