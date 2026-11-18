@@ -55,7 +55,7 @@ public final class AppearanceStore: ObservableObject {
     }
 }
 
-/// NativeLatex > Settings > Appearance.
+/// Virgule > Settings > Appearance.
 public struct AppearanceSettingsView: View {
     @ObservedObject private var appearance = AppearanceStore.shared
 

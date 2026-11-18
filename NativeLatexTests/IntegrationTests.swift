@@ -26,7 +26,7 @@ final class IntegrationTests: XCTestCase {
 
     func testGoogleDocsIsHonestlyNotConfigured() async throws {
         XCTAssertEqual(Conversions.googleDocs.status, .liveNotConfigured)
-        XCTAssertTrue(Conversions.googleDocsMessage.contains("not available in this LibreWeave build"))
+        XCTAssertTrue(Conversions.googleDocsMessage.contains("Google sign-in is not available in this"))
         XCTAssertFalse(Conversions.googleDocsMessage.localizedCaseInsensitiveContains("signed in"))
 
         // A fake transport is the only way to reach `.ready`.

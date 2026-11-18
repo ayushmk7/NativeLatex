@@ -331,7 +331,7 @@ struct EditorView: View {
             try doc.revert(toContentsOf: fileURL, ofType: doc.fileType ?? "public.plain-text")
             diskChanged = false
         } catch {
-            self.error = "LibreWeave couldn’t reload “\(fileURL.lastPathComponent)”: \(error.localizedDescription)"
+            self.error = "Virgule couldn’t reload “\(fileURL.lastPathComponent)”: \(error.localizedDescription)"
         }
     }
 

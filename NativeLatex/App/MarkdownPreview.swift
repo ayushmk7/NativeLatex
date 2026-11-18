@@ -89,7 +89,7 @@ enum MarkdownRenderer {
                 if Task.isCancelled { stop(process) }
             }
         } onCancel: { stop(process) } onTimeout: { stop(process) }
-        if let launchError { throw Failure.failed("LibreWeave couldn’t start \(pandoc.path): \(launchError.localizedDescription)") }
+        if let launchError { throw Failure.failed("Pandoc at \(pandoc.path) couldn’t start: \(launchError.localizedDescription)") }
         try Task.checkCancellation()
         guard process.terminationReason == .exit else { throw Failure.timedOut } // not cancelled, so the timer stopped it
         let message = ((try? String(contentsOf: errors, encoding: .utf8)) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

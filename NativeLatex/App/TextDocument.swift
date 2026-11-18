@@ -13,7 +13,7 @@ enum SourceFileError: LocalizedError {
     case unsupportedEncoding
 
     var errorDescription: String? {
-        "This file is not UTF-8 text. LibreWeave left it unchanged."
+        "This file is not UTF-8 text. Virgule left it unchanged."
     }
 }
 

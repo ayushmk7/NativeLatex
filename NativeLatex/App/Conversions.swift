@@ -16,7 +16,7 @@ extension NSDocument {
         guard isDocumentEdited, let url = fileURL else { return }
         guard await runSave() else {
             throw CocoaError(.userCancelled, userInfo: [NSLocalizedDescriptionKey:
-                "“\(url.lastPathComponent)” was not saved, so LibreWeave stopped. Save it (or resolve the change made by another app), then try again."])
+                "“\(url.lastPathComponent)” was not saved, so Virgule stopped. Save it (or resolve the change made by another app), then try again."])
         }
     }
 
@@ -100,7 +100,7 @@ enum Conversions {
 
     static func importCopy(as format: DocumentFormat) {
         let panel = NSOpenPanel()
-        panel.message = "Choose a file. LibreWeave writes a new \(format.displayName) copy next to it; the original is not changed."
+        panel.message = "Choose a file. Virgule writes a new \(format.displayName) copy next to it; the original is not changed."
         panel.prompt = "Import Copy"
         panel.allowedContentTypes = ["docx", "odt", "md", "markdown", "tex", "ltx", "latex"].compactMap { UTType(filenameExtension: $0) }
         guard panel.runModal() == .OK, let source = panel.url else { return }

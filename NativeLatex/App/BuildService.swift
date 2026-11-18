@@ -28,9 +28,9 @@ enum BuildError: LocalizedError, Equatable {
         switch self {
         case .missingTeX: "No LaTeX engine (latexmk, pdflatex, xelatex or lualatex) was found. Install MacTeX or BasicTeX, then try Build again."
         case .unsafeName(let name): "“\(name)” can’t be built safely. Rename it using only letters, digits, spaces, “.”, “_” and “-” (not starting with “-” or “.”), ending in .tex, .ltx or .latex."
-        case .unownedOutputDirectory(let path): "\(path) was not created by LibreWeave on this Mac, or contains links. Nothing was changed; remove or rename it to build."
+        case .unownedOutputDirectory(let path): "\(path) was not created by Virgule on this Mac, or contains links. Nothing was changed; remove or rename it to build."
         case .cancelled: "Build cancelled."
-        case .unsafeFolder(let path): "LibreWeave can’t build in “\(path)”: its path contains a character TeX treats as special ($ ; : { } ` \\ % \" or !!), which breaks bibliography and input lookup. Move or rename the folder, then build again."
+        case .unsafeFolder(let path): "Virgule can’t build in “\(path)”: its path contains a character TeX treats as special ($ ; : { } ` \\ % \" or !!), which breaks bibliography and input lookup. Move or rename the folder, then build again."
         case .logTooLarge(let bytes): "The build was stopped after writing \(bytes / (1 << 20)) MB of log output, which usually means a runaway loop in the document. Check the start of the log, fix the source, then build again."
         }
     }
