@@ -91,6 +91,12 @@ struct EditorView: View {
         return view
     }
 
+    /// The layout control shows what is on screen: nothing while Write fills the window (Write is not the Read
+    /// preview), so each segment, Preview included, leaves Write for that layout.
+    private var layoutSelection: Binding<PaneLayout?> {
+        Binding(get: { isMarkdown && markdownWrite ? nil : shown }, set: { if let new = $0 { shownBinding.wrappedValue = new } })
+    }
+
     /// Document Mode shows what is on screen: neither Read nor Write while only the source is visible
     /// (Source Only, or Both in a narrow window, which keeps the editor so typing survives a resize).
     private var modeSelection: Binding<Bool?> {
@@ -190,11 +196,11 @@ struct EditorView: View {
                         .help("Show Build Log")
                 }
                 if hasPreview {
-                    Picker("Layout", selection: shownBinding) {
-                        Label("Source", systemImage: "doc.plaintext").tag(PaneLayout.source)
-                        Label("Source and Preview", systemImage: "rectangle.split.2x1").tag(PaneLayout.both)
+                    Picker("Layout", selection: layoutSelection) {
+                        Label("Source", systemImage: "doc.plaintext").tag(PaneLayout?.some(.source))
+                        Label("Source and Preview", systemImage: "rectangle.split.2x1").tag(PaneLayout?.some(.both))
                             .selectionDisabled(isNarrow)
-                        Label("Preview", systemImage: "doc.richtext").tag(PaneLayout.preview)
+                        Label("Preview", systemImage: "doc.richtext").tag(PaneLayout?.some(.preview))
                     }
                     .pickerStyle(.segmented)
                     .labelStyle(.iconOnly)
@@ -466,7 +472,8 @@ struct PaneCommands: Commands {
     }
 
     private func item(_ title: String, _ layout: PaneLayout, _ key: KeyEquivalent) -> some View {
-        Toggle(title, isOn: Binding(get: { controls?.layout.wrappedValue == layout },
+        // Unchecked while Write fills the window, matching the toolbar's layout control.
+        Toggle(title, isOn: Binding(get: { controls?.write?.wrappedValue != true && controls?.layout.wrappedValue == layout },
                                     set: { _ in controls?.layout.wrappedValue = layout }))
             .keyboardShortcut(key, modifiers: [.command, .option])
             .disabled(controls == nil)

@@ -37,10 +37,10 @@ struct PaneState: Equatable {
         return shown(narrow: narrow, markdown: markdown) != .preview ? .source : nil
     }
 
-    /// A layout chosen from the toolbar or View menu. Source Only and Source and Preview leave Write
-    /// (the mode control then says Read); Preview Only keeps the current mode.
+    /// A layout chosen from the toolbar or View menu. Every layout leaves Write: the layout control shows
+    /// nothing selected while Write fills the window, so choosing Preview there means the Read preview.
     mutating func choose(_ new: PaneLayout) {
-        if new != .preview { write = false }
+        write = false
         beforeWrite = nil
         layout = new
     }
@@ -83,6 +83,7 @@ struct PaneState: Equatable {
         s.setWrite(false, narrow: false); expect(s, .preview, write: false, "Write → Read keeps Preview Only")
         s.setWrite(true, narrow: false); s.choose(.source); expect(s, .source, write: false, "Source Only leaves Write")
         s.choose(.preview); expect(s, .preview, write: false, "Preview Only after leaving Write is Read")
+        s.setWrite(true, narrow: false); s.choose(.preview); expect(s, .preview, write: false, "Preview chosen in Write shows Read")
         s.setWrite(true, narrow: false); s.choose(.both); expect(s, .both, write: false, "Source and Preview leaves Write")
         s.setWrite(true, narrow: false); s.choose(s.shown(narrow: false).toggled(narrow: false))
         expect(s, .source, write: false, "⌥⌘P from Write shows Source, mode Read")

@@ -347,7 +347,7 @@ final class MarkdownWriteTests: XCTestCase {
         let layout = try XCTUnwrap(segmented(3, in: window)), mode = try XCTUnwrap(segmented(2, in: window))
         let source = try XCTUnwrap(textView("Source", in: window))
         func check(_ pane: Pane, write: Bool, _ step: String, line: UInt = #line) async {
-            XCTAssertEqual(layout.selectedSegment, pane.rawValue, "\(step): layout", line: line)
+            XCTAssertEqual(layout.selectedSegment, write ? -1 : pane.rawValue, "\(step): layout (none while Write fills the window)", line: line)
             XCTAssertEqual(mode.selectedSegment, pane == .source ? -1 : write ? 1 : 0, "\(step): mode shows what is on screen (none for source alone)", line: line)
             XCTAssertEqual(source.window != nil, pane != .preview, "\(step): source shown", line: line)
             let writer = textView("Write", in: window)
@@ -620,8 +620,7 @@ final class MarkdownWriteTests: XCTestCase {
     func testExternalChangeReloadsCleanWriteAndWarnsInPreviewOnly() async throws {
         let (document, window) = try await open("external.md", "# One\n")
         let url = try XCTUnwrap(document.fileURL)
-        try setWrite(true, in: window)
-        try show(.preview, in: window)
+        try setWrite(true, in: window) // fills the window, like Preview Only
         try "# Two\n".write(to: url, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: url.path)
         var reloaded = false
