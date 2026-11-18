@@ -78,6 +78,9 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
             let n = min(chunk, shorter - prefix)
             a.getCharacters(&x, range: NSRange(location: prefix, length: n))
             b.getCharacters(&y, range: NSRange(location: prefix, length: n))
+            // memcmp skips equal chunks: the per-unit loop below runs only on the chunk that differs (it cost
+            // ~50 ms per 1 MiB scan unoptimized, which Debug test runs time).
+            if memcmp(x, y, n * MemoryLayout<unichar>.size) == 0 { prefix += n; continue }
             for i in 0..<n where x[i] != y[i] { prefix += i; break scan }
             prefix += n
         }
@@ -86,6 +89,7 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
             let n = min(chunk, shorter - prefix - suffix)
             a.getCharacters(&x, range: NSRange(location: a.length - suffix - n, length: n))
             b.getCharacters(&y, range: NSRange(location: b.length - suffix - n, length: n))
+            if memcmp(x, y, n * MemoryLayout<unichar>.size) == 0 { suffix += n; continue }
             for i in stride(from: n - 1, through: 0, by: -1) where x[i] != y[i] { suffix += n - 1 - i; break scan }
             suffix += n
         }
@@ -148,7 +152,18 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
         while index < caret {
             let n = min(buffer.count, caret - index)
             text.getCharacters(&buffer, range: NSRange(location: index, length: n))
-            for i in 0..<n where buffer[i] == 10 { line += 1; lineStart = index + i + 1 }
+            // memchr finds each newline's 0x0A byte (UTF-16 little-endian: low byte first, high byte zero), so
+            // the Swift loop runs per newline, not per unit; a per-unit loop cost ~25 ms at 1 MiB unoptimized.
+            buffer.withUnsafeBytes { bytes in
+                let base = bytes.baseAddress!
+                var offset = 0
+                while let hit = memchr(base + offset, 0x0A, 2 * n - offset) {
+                    let at = base.distance(to: hit)
+                    offset = at + 1
+                    guard at % 2 == 0, bytes[at + 1] == 0 else { continue }
+                    line += 1; lineStart = index + at / 2 + 1
+                }
+            }
             index += n
         }
         onCursor?(line, text.substring(with: NSRange(location: lineStart, length: caret - lineStart)).count + 1)

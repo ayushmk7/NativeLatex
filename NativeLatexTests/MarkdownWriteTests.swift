@@ -1447,6 +1447,24 @@ final class MarkdownWriteTests: XCTestCase {
         XCTAssertEqual(ends(long + "A" + long, long + "BC" + long), [(long as NSString).length, (long as NSString).length])
     }
 
+    /// The caret's line and column count only real newlines: not U+0A0A / U+0A00 (0x0A bytes in UTF-16), across
+    /// the 4096-unit chunks.
+    func testCaretLineAndColumnCountOnlyNewlines() {
+        let handle = TextViewHandle()
+        let text = String(repeating: "a\u{0A0A}\u{0A00}👋\n", count: 2000)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.contentView = handle.scrollView(text: text, label: "Source")
+        var cursor = (0, 0)
+        handle.onCursor = { cursor = ($0, $1) }
+        for line in [1, 2, 820, 1200, 2001] { // 6 units a line: 820 and 1200 straddle chunk boundaries
+            handle.view!.setSelectedRange(NSRange(location: (line - 1) * 6 + (line > 2000 ? 0 : 3), length: 0))
+            XCTAssertEqual(cursor.0, line)
+            XCTAssertEqual(cursor.1, line > 2000 ? 1 : 4)
+        }
+    }
+
     /// One keystroke on a 1 MiB document with both panes open: the typing pane, the binding and the other
     /// pane's sync, restyle and layout. Was ~130 ms mean (~420 ms worst) in Source and ~90 ms in Write.
     func testOneMiBKeystrokeWithBothPanesOpen() {
