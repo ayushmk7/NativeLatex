@@ -1,4 +1,4 @@
-# AppIcon renditions in a built app with the Virgule slash icon (xcodebuild Release, PRODUCT_NAME still LibreWeave on this branch; Xcode 27.2, macOS 27.3, 2026-11-18)
+# AppIcon renditions in installed Virgule.app build 3 (xcodebuild Release archive; Xcode 27.2, macOS 27.3, 2026-11-18)
 # assetutil --info Contents/Resources/Assets.car | AppIcon entries: AssetType, Appearance, PixelWidth
 Icon Image	(any)	32
 Icon Image	(any)	64
@@ -12,6 +12,9 @@ IconImageStack	NSAppearanceNameAqua	0
 IconImageStack	NSAppearanceNameDarkAqua	0
 MultiSized Image	(any)	0
 # Info.plist
+  "CFBundleDisplayName" => "Virgule"
+  "CFBundleName" => "Virgule"
+  "CFBundleVersion" => "3"
   "CFBundleIconFile" => "AppIcon"
   "CFBundleIconName" => "AppIcon"
 # IconServices render of the built app (art/tools/appearance-check.m): sheet and slash RGB 0-255 (#2563EB = 37 99 235)
