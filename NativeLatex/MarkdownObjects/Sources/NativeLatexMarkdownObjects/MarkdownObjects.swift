@@ -110,6 +110,8 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
 
     public nonisolated func textStorage(_ storage: NSTextStorage, willProcessEditing mask: NSTextStorageEditActions,
                                         range: NSRange, changeInLength delta: Int) {
+        // TextKit calls this on the main thread, and assumeIsolated traps otherwise, so the storage never leaves it.
+        nonisolated(unsafe) let storage = storage
         MainActor.assumeIsolated {
             // Character edits are followed by the Write view's restyle (an attribute edit); objects follow that.
             guard !ownEdit, !mask.contains(.editedCharacters) else { return }
@@ -328,11 +330,12 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         inFlight.formUnion(images.keys)
         peakInFlight = max(peakInFlight, inFlight.count)
         Task.detached(priority: .userInitiated) {
-            var results: [String: MarkdownRendered?] = [:]
-            for (key, url) in images { results[key] = autoreleasepool { MarkdownSyntax.loadImage(url, maxPixels: maxPixels) } }
+            // Only Sendable values leave this task (CGImage + size); NSImages are made on the main actor.
+            var results: [String: MarkdownSyntax.Decoded?] = [:]
+            for (key, url) in images { results[key] = autoreleasepool { MarkdownSyntax.decodeImage(url, maxPixels: maxPixels) } }
             let done = results
             await MainActor.run { [weak self] in
-                self?.finish(done)
+                self?.finish(done.mapValues { $0?.rendered })
                 if self?.queuedImages.isEmpty == false { self?.scheduleFlush() }
             }
         }
