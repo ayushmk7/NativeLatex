@@ -1,5 +1,7 @@
 # Brag plan: Virgule candidate (README and demo media)
 
+**Update 2026-11-18:** implemented after the owner authorized the rebrand (see `docs/prompts/virgule-implementation.md`), with one change from this plan: media files keep their `libreweave-*` names for URL continuity instead of being renamed. Current state and checks: `README.md` in this folder.
+
 **Status:** planning only. Virgule is a candidate name, not an approved rebrand. Nothing in this plan renames, re-records, publishes or deploys anything. Facts below were read from `main` at `840319f` plus this branch's unmerged `e16830c` (light demo cut).
 
 ## Name gate (blocks every public step)
