@@ -245,17 +245,17 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         guard total <= availableWidth else { return } // too wide: stays literal
         let bounds = [starts[0] - pad] + (1..<n).map { starts[$0] - pad } + [starts[n - 1] + widths[n - 1] + pad]
         func frame(_ index: Int) -> TableRow {
-            TableRow(bounds: bounds, shaded: index < 2, top: index != 1, bottom: index == table.rows.count - 1)
+            TableRow(bounds: bounds, shaded: index == 0, top: index != 1, bottom: index == table.rows.count - 1)
         }
         for (index, row) in table.rows.enumerated() {
             if index == 1 {
                 guard !revealed(row.line) else { continue }
                 storage.addAttribute(.markdownObject, value: MarkdownObjectBox(.rule(total, row: frame(index))), range: NSRange(location: row.line.location, length: 1))
                 if row.line.length > 1 { storage.addAttribute(.markdownObjectHidden, value: true, range: NSRange(location: row.line.location + 1, length: row.line.length - 1)) }
-                let style = NSMutableParagraphStyle(); style.minimumLineHeight = 5; style.maximumLineHeight = 5
-                storage.addAttribute(.paragraphStyle, value: style, range: row.line)
+                storage.addAttribute(.paragraphStyle, value: Self.delimiterStyle, range: row.line)
                 continue
             }
+            storage.addAttribute(.paragraphStyle, value: cellStyle(storage, row.line, header: index == 0), range: row.line)
             for gap in row.padding where gap.length > 0 { storage.addAttribute(.markdownObjectHidden, value: true, range: gap) }
             for (k, pipe) in row.pipes.enumerated() {
                 let cell = k + (row.leading ? 0 : 1) // the cell that follows this pipe
@@ -271,6 +271,29 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         }
     }
 
+    /// Read's `th, td { padding: 6px 12px }`: the row is the font's line height plus 6 pt above and below. TextKit 1
+    /// puts a fixed line height's extra above the text and `lineSpacing` below it.
+    static let cellVerticalPad: CGFloat = 6
+    /// The delimiter row: a 1 pt line, the header's bottom border.
+    static let delimiterStyle: NSParagraphStyle = {
+        let style = NSMutableParagraphStyle(); style.minimumLineHeight = 1; style.maximumLineHeight = 1
+        return style
+    }()
+    private static var lineHeights: [NSFont: CGFloat] = [:]
+
+    private func cellStyle(_ storage: NSTextStorage, _ line: NSRange, header: Bool) -> NSParagraphStyle {
+        let font = header ? NSFontManager.shared.convert(bodyFont, toHaveTrait: .boldFontMask) : bodyFont
+        let natural = Self.lineHeights[font] ?? NSLayoutManager().defaultLineHeight(for: font)
+        Self.lineHeights[font] = natural
+        let style = (storage.attribute(.paragraphStyle, at: line.location, effectiveRange: nil) as? NSParagraphStyle ?? .default).mutableCopy() as! NSMutableParagraphStyle
+        style.minimumLineHeight = natural + Self.cellVerticalPad
+        style.maximumLineHeight = natural + Self.cellVerticalPad
+        style.lineSpacing = Self.cellVerticalPad
+        style.paragraphSpacing = 0
+        style.paragraphSpacingBefore = 0
+        return style
+    }
+
     /// Width of `range` as drawn: hidden markup excluded.
     static func visibleWidth(_ storage: NSTextStorage, _ range: NSRange) -> CGFloat {
         let shown = NSMutableAttributedString()
@@ -278,7 +301,8 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
             if attrs[writerHiddenKey] == nil, attrs[.markdownObjectHidden] == nil { shown.append(storage.attributedSubstring(from: sub)) }
         }
         // CTLine: NSAttributedString.size() made a typesetter per cell (~0.2 ms each).
-        return ceil(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(shown), nil, nil, nil))
+        // Exact, not rounded up: rounding put right-aligned cells up to 1 pt apart.
+        return CTLineGetTypographicBounds(CTLineCreateWithAttributedString(shown), nil, nil, nil)
     }
 
     // MARK: Rendering queue

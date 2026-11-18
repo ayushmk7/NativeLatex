@@ -214,13 +214,13 @@ final class MarkdownObjectsTests: XCTestCase {
         XCTAssertEqual(x(view, start("Name")), x(view, start("fig")), accuracy: 0.5)
         // Right column: cells end together.
         let qtyEnd = x(view, start("Qty") + 3), threeEnd = x(view, start("3 |") + 1), bigEnd = x(view, start("1200") + 4)
-        XCTAssertEqual(threeEnd, bigEnd, accuracy: 0.5)
-        XCTAssertEqual(qtyEnd, bigEnd, accuracy: 0.5)
+        XCTAssertEqual(threeEnd, bigEnd, accuracy: 0.05)
+        XCTAssertEqual(qtyEnd, bigEnd, accuracy: 0.05, "exact widths: right-aligned cells end at the same x")
         XCTAssertGreaterThan(x(view, start("Qty")), x(view, start("apple pie") + 9))
         // Delimiter row collapses to a rule.
         let lm = view.layoutManager!
         let delimiter = lm.lineFragmentRect(forGlyphAt: lm.glyphIndexForCharacter(at: start("|:-")), effectiveRange: nil)
-        XCTAssertLessThanOrEqual(delimiter.height, 6)
+        XCTAssertLessThanOrEqual(delimiter.height, 1.01)
         if case .rule = box(view, at: start("|:-"))?.content {} else { XCTFail("delimiter row is not a rule") }
     }
 
@@ -275,6 +275,30 @@ final class MarkdownObjectsTests: XCTestCase {
             XCTAssertLessThan(gray(pixel(inside + 20, y.rounded() + 0.25)), 0.93, "horizontal line at \(s)")
         }
         XCTAssertGreaterThan(gray(pixel(inside + 20, line("| fig").maxY.rounded() + 3)), 0.99, "nothing below the table")
+        XCTAssertEqual(view.string, source)
+    }
+
+    /// Read pads cells 6 px above and below; each row's text line box sits 6 pt from the row's top and bottom.
+    func testTableCellsHaveEvenVerticalPadding() {
+        let source = "before\n\n| Name | Qty |\n|:-----|----:|\n| apple pie | 3 |\n| fig | 1200 |\n"
+        let (view, _) = make(source)
+        let lm = view.layoutManager!, storage = view.textStorage!, text = source as NSString
+        lm.ensureLayout(for: view.textContainer!)
+        func pads(_ s: String) -> (top: CGFloat, bottom: CGFloat) {
+            let i = text.range(of: s).location + 2
+            let g = lm.glyphIndexForCharacter(at: i)
+            let fragment = lm.lineFragmentRect(forGlyphAt: g, effectiveRange: nil)
+            let font = storage.attribute(.font, at: i, effectiveRange: nil) as! NSFont
+            let baseline = fragment.minY + lm.location(forGlyphAt: g).y
+            return (baseline - font.ascender - fragment.minY, fragment.maxY - (baseline - font.descender))
+        }
+        for row in ["| Name", "| apple", "| fig"] {
+            let p = pads(row)
+            XCTAssertEqual(p.top, MarkdownObjects.cellVerticalPad, accuracy: 1, "\(row) top \(p)")
+            XCTAssertEqual(p.bottom, MarkdownObjects.cellVerticalPad, accuracy: 1, "\(row) bottom \(p)")
+        }
+        let delimiter = lm.lineFragmentRect(forGlyphAt: lm.glyphIndexForCharacter(at: text.range(of: "|:--").location), effectiveRange: nil)
+        XCTAssertLessThanOrEqual(delimiter.height, 1.01, "delimiter row is just the header's bottom border")
         XCTAssertEqual(view.string, source)
     }
 
