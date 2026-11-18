@@ -101,6 +101,7 @@ public final class MarkdownObjects: NSObject, NSTextStorageDelegate {
         storage.delegate = objects
         // The storage's delegate is weak and callers (the Write view's `.task`) drop the result: the storage keeps it.
         objc_setAssociatedObject(storage, &ownerKey, objects, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        objects.installRotors(on: view)
         objects.reprocess(nil)
         return objects
     }
@@ -458,6 +459,68 @@ extension NSLayoutManager {
                 image.draw(in: NSRect(x: cell.minX, y: baseline - size.height, width: size.width, height: size.height),
                            from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
             }
+        }
+    }
+}
+
+// MARK: VoiceOver
+
+/// The Write view's accessible text stays the Markdown source, so VoiceOver edits, selects and reads exactly what
+/// is saved. Objects drawn over that source are announced through two rotors instead: Images (alt text, or the
+/// file name when there is none) and Tables (size and header cells). Choosing an item selects its source span.
+/// The rotors hold this object weakly; the text storage keeps it alive.
+extension MarkdownObjects: NSAccessibilityCustomRotorItemSearchDelegate {
+    static let imagesRotor = "Images", tablesRotor = "Tables"
+
+    func installRotors(on view: NSTextView) {
+        let mine = [Self.imagesRotor, Self.tablesRotor]
+        let others = view.accessibilityCustomRotors().filter { !mine.contains($0.label) }
+        view.setAccessibilityCustomRotors(others + mine.map { NSAccessibilityCustomRotor(label: $0, itemSearchDelegate: self) })
+    }
+
+    /// A rotor's items in document order, skipping code (where nothing is drawn as an object).
+    func rotorItems(_ rotor: String) -> [(range: NSRange, label: String)] {
+        guard let storage = view?.textStorage, storage.length > 0 else { return [] }
+        let text = storage.mutableString, all = NSRange(location: 0, length: storage.length)
+        if rotor == Self.imagesRotor {
+            return MarkdownSyntax.images(in: text, range: all).filter { !isCode(storage, $0.range) }.map { ($0.range, Self.imageLabel(text, $0)) }
+        }
+        return MarkdownSyntax.tables(in: text, range: all).filter { !isCode(storage, $0.rows[0].line) }.map { ($0.range, Self.tableLabel(text, $0)) }
+    }
+
+    static func imageLabel(_ text: NSString, _ image: MarkdownSyntax.Image) -> String {
+        let span = text.substring(with: image.range) as NSString
+        let close = span.range(of: "](") // alt text can't contain "]"
+        let alt = close.location == NSNotFound ? "" : span.substring(with: NSRange(location: 2, length: close.location - 2)).trimmingCharacters(in: .whitespaces)
+        if !alt.isEmpty { return "Image, \(alt)" }
+        var source = image.source.trimmingCharacters(in: .whitespaces)
+        if source.hasPrefix("<"), let end = source.firstIndex(of: ">") { source = String(source[source.index(after: source.startIndex)..<end]) }
+        else { source = String(source.prefix { !$0.isWhitespace }) }
+        let name = (source as NSString).lastPathComponent
+        return "Image, no description, \(name.removingPercentEncoding ?? name)"
+    }
+
+    static func tableLabel(_ text: NSString, _ table: MarkdownSyntax.Table) -> String {
+        let header = table.rows[0].cells.map { text.substring(with: $0) }.joined(separator: ", ")
+        let rows = table.rows.count - 2
+        return "Table, \(table.alignments.count) columns, \(rows) \(rows == 1 ? "row" : "rows"): \(header)"
+    }
+
+    public nonisolated func rotor(_ rotor: NSAccessibilityCustomRotor,
+                                  resultFor search: NSAccessibilityCustomRotor.SearchParameters) -> NSAccessibilityCustomRotor.ItemResult? {
+        MainActor.assumeIsolated {
+            guard let view else { return nil }
+            var items = rotorItems(rotor.label)
+            if !search.filterString.isEmpty { items = items.filter { $0.label.localizedCaseInsensitiveContains(search.filterString) } }
+            let current = search.currentItem?.targetRange.location
+            let item = search.searchDirection == .previous
+                ? (current.map { c in items.last { $0.range.location < c } } ?? items.last)
+                : (current.map { c in items.first { $0.range.location > c } } ?? items.first)
+            guard let item else { return nil }
+            let result = NSAccessibilityCustomRotor.ItemResult(targetElement: view)
+            result.targetRange = item.range
+            result.customLabel = item.label
+            return result
         }
     }
 }
