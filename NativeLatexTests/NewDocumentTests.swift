@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import XCTest
 @testable import LibreWeave
 
@@ -187,7 +188,7 @@ final class NewDocumentTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         // The factory itself, invoked the way SwiftUI does while reading off the main thread.
-        let offMain = await Task.detached { (Thread.isMainThread, NewDocument.makeDocument()) }.value
+        let offMain = await Task.detached { (pthread_main_np() != 0, NewDocument.makeDocument()) }.value
         XCTAssertFalse(offMain.0)
         XCTAssertEqual(offMain.1.contentType, .plainText, "off-main placeholder; the file read replaces it")
 
