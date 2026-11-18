@@ -17,7 +17,13 @@ plutil -insert CFBundleIdentifier -string app.libreweave.review "$B/Info.plist"
 plutil -insert CFBundleIconName -string AppIcon "$B/Info.plist"
 plutil -insert CFBundleIconFile -string AppIcon "$B/Info.plist"
 clang -fobjc-arc -framework AppKit art/tools/appearance-check.m -o "$W/check"
-"$W/check" "$W/LibreWeave.app" "$W/m"
+render=$("$W/check" "$W/LibreWeave.app" "$W/m")
+printf '%s\n' "$render"
+printf '%s\n' "$render" | awk '
+  $1 == "light" && $2 == "256px" { light = $4; seenLight = 1 }
+  $1 == "dark" && $2 == "256px" { dark = $4; seenDark = 1 }
+  END { if (!seenLight || !seenDark || light < .85 || dark > .15) { print "wrong light/dark icon mapping" > "/dev/stderr"; exit 1 } }
+'
 IC="$(xcode-select -p)/../Applications/Icon Composer.app/Contents/Executables/ictool"
 for r in TintedLight:tinted-light TintedDark:tinted-dark; do
   for px in 16 32 256; do

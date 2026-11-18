@@ -2,13 +2,13 @@
 
 The mark: "lines of text" (wefts) woven over and under two blue threads
 (warps) on a single macOS icon silhouette. No frame, no inner box: the
-silhouette itself is the sheet. Black sheet in light appearance, white sheet
-in dark appearance.
+silhouette itself is the sheet. The app icon uses a white sheet in Light and
+a black sheet in Dark; the favicon reverses this for contrast on the page.
 Run: python3 -I art/tools/gen.py   (build.sh runs it)
 """
 import os
 
-# The one brand blue, in every appearance. Clear/Tinted derive from these layers (no Mono override).
+# The one brand blue, in every appearance. The .icon adds a Mono override for Clear/Tinted.
 BLUE = "#2563EB"
 INK, PAPER = "#0A0A0A", "#FFFFFF"
 SHEETS = {"black": (INK, PAPER, BLUE), "white": (PAPER, INK, BLUE)}  # sheet, lines, threads
