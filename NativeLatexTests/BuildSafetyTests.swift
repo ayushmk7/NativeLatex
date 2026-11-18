@@ -126,17 +126,19 @@ final class BuildSafetyTests: XCTestCase {
     /// A reset token (defaults wiped, folder copied from another Mac) must not block the folder
     /// forever: it gets a fresh folder, the old output stays, and forged markers are still refused.
     func testLostOwnerTokenGetsFreshFolderAndKeepsOldOutput() throws {
-        let defaults = UserDefaults.standard, key = "buildOwnerToken"
-        let saved = defaults.string(forKey: key)
-        defer { if let saved { defaults.set(saved, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        // Never touch the real token: a crash before restoring it would orphan the user's build
+        // folders. The folder a lost token left behind is laid out by hand instead.
         let root = try write("paper.tex", "x")
-        let old = try BuildService.prepareOutputDirectory(for: root)
+        let lost = UUID().uuidString
+        let old = folder.appendingPathComponent(".libreleaf-build/paper-\(lost.prefix(8))")
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try lost.write(to: old.appendingPathComponent(".libreleaf-owner"), atomically: true, encoding: .utf8)
         try "OLD".write(to: old.appendingPathComponent("paper.pdf"), atomically: true, encoding: .utf8)
 
-        defaults.set(UUID().uuidString, forKey: key)
         let fresh = try BuildService.prepareOutputDirectory(for: root)
         XCTAssertNotEqual(fresh, old)
         XCTAssertEqual(try String(contentsOf: old.appendingPathComponent("paper.pdf"), encoding: .utf8), "OLD")
+        XCTAssertEqual(try String(contentsOf: old.appendingPathComponent(".libreleaf-owner"), encoding: .utf8), lost)
         XCTAssertTrue(BuildService.arguments(engine: "latexmk", root: root).contains("-outdir=.libreleaf-build/\(fresh.lastPathComponent)"))
 
         // Someone who guesses the new folder name still can't forge the full token.
@@ -176,20 +178,18 @@ final class BuildSafetyTests: XCTestCase {
 
     /// With the migrated token, a folder built by the old app is reused as-is and its output kept.
     func testMigratedTokenKeepsExistingBuildFolderOwned() throws {
-        let defaults = UserDefaults.standard, key = "buildOwnerToken"
-        let saved = defaults.string(forKey: key)
-        defer { if let saved { defaults.set(saved, forKey: key) } else { defaults.removeObject(forKey: key) } }
         let root = try write("paper.tex", "x")
         let built = try BuildService.prepareOutputDirectory(for: root) // "old app" builds
         try "OLD".write(to: built.appendingPathComponent("paper.pdf"), atomically: true, encoding: .utf8)
-        let token = try XCTUnwrap(defaults.string(forKey: key))
+        let token = BuildService.ownerToken
 
-        let legacyName = "libreweave.test.\(UUID().uuidString)"
+        // Scratch domains stand in for both bundle IDs; the real preferences are only read.
+        let (currentName, legacyName) = ("libreweave.test.\(UUID().uuidString)", "libreweave.test.\(UUID().uuidString)")
+        let current = try XCTUnwrap(UserDefaults(suiteName: currentName)) // new bundle ID: empty preferences
         let legacy = try XCTUnwrap(UserDefaults(suiteName: legacyName))
-        defer { legacy.removePersistentDomain(forName: legacyName) }
-        legacy.set(token, forKey: key)
-        defaults.removeObject(forKey: key) // new bundle ID: empty preferences
-        XCTAssertEqual(BuildService.ownerToken(in: defaults, legacy: legacy), token)
+        defer { current.removePersistentDomain(forName: currentName); legacy.removePersistentDomain(forName: legacyName) }
+        legacy.set(token, forKey: "buildOwnerToken")
+        XCTAssertEqual(BuildService.ownerToken(in: current, legacy: legacy), token)
         XCTAssertEqual(try BuildService.prepareOutputDirectory(for: root), built)
         XCTAssertEqual(try String(contentsOf: built.appendingPathComponent("paper.pdf"), encoding: .utf8), "OLD")
     }
