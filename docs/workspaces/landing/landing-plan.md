@@ -1,6 +1,6 @@
 # Landing workspace plan
 
-Status: the Virgule page is live on GitHub Pages at <https://virgule.ayushmadhav.com/>, served from the pushed `main` over enforced HTTPS (`landing` branch changes appear after merge and push) · revised 2026-11-18. The old host <https://libreweave.ayushmadhav.com/> returns a 301 to the same path and query on the new host through the Vercel project `libreweave-redirect`. Cutover record: [Virgule landing plan](virgule-plan.md).
+Status: the Virgule page is live on GitHub Pages at <https://virgule.ayushmadhav.com/>, served from the pushed `main` over enforced HTTPS (`landing` branch changes appear after merge and push) · revised 2026-11-18. The old host `libreweave.ayushmadhav.com` was retired on 2026-11-18 at the owner's request (Vercel project `libreweave-redirect` and its DNS record deleted). Cutover record: [Virgule landing plan](virgule-plan.md).
 
 The landing page is a single static page in [`landing/`](../../../landing/README.md), deployed to GitHub Pages by `.github/workflows/pages.yml`. Vercel holds only the domain's DNS record; Vercel hosting remains an unused alternative with that directory as the project root. It uses no framework, build service, account, analytics, or form. While no signed Mac release exists, its single Explore action links to the GitHub project and offers no download. The window graphic is labeled as a concept preview.
 
