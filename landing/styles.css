@@ -25,7 +25,7 @@ html[data-theme="dark"] {
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; background: var(--bg); }
+html { scroll-snap-type: y proximity; /* scrolling near the demo settles on its full screen */ scroll-behavior: smooth; background: var(--bg); }
 body { overflow-x: clip; /* .demo breaks out of the column to full width */ margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--font); -webkit-font-smoothing: antialiased; }
 h1, h2, h3, p, dl, dd, ol, figure { margin: 0; }
 a { color: inherit; text-decoration: none; }
@@ -59,6 +59,7 @@ html[data-theme="dark"] .site-nav a:hover, html[data-theme="dark"] .site-footer 
   0%, 100% { transform: translateY(0); animation-timing-function: cubic-bezier(.8, 0, 1, 1); }
   50% { transform: translateY(-10px); animation-timing-function: cubic-bezier(0, 0, .2, 1); }
 }
+.hero, .demo { scroll-snap-align: start; }
 /* second screen: only the video, sized to fit the viewport in both directions (16:9 plus the stage padding) */
 .demo { --gap: var(--s5); --pad: clamp(8px, 1.6vw, 20px); display: flex; align-items: center; justify-content: center; min-height: 100svh; padding: var(--gap); margin-inline: calc(50% - 50vw); }
 .demo .preview { width: min(100%, calc((100svh - 2 * var(--gap) - 2 * var(--pad)) * 16 / 9 + 2 * var(--pad))); }
