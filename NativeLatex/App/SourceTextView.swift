@@ -17,9 +17,26 @@ class TextViewHandle: NSObject, ObservableObject, NSTextViewDelegate {
     /// True while `sync` rewrites the view; edits and selection changes then come from the other pane, not the user.
     private(set) var isUpdating = false
 
+    /// A focus request made while the pane was off-screen (SwiftUI attaches it a few run-loop turns after a
+    /// mode switch); `attached(to:)` fulfils it.
+    private var focusPending = false
+
     func focus() {
         guard let view else { return }
+        focusPending = view.window == nil
         view.window?.makeFirstResponder(view)
+    }
+
+    /// The pane just appeared in `window`. A pending focus request wins only if nothing holds focus there
+    /// now, so a view the user (or a later mode switch) focused meanwhile keeps it.
+    fileprivate func attached(to window: NSWindow) {
+        self.window = window
+        guard focusPending else { return }
+        focusPending = false
+        DispatchQueue.main.async { [weak self] in // subviews' windows are set once this attach finishes
+            guard let view = self?.view, view.window === window, MarkdownPreview.hasFocusGap(window) else { return }
+            window.makeFirstResponder(view)
+        }
     }
 
     /// Selects what `other` has selected and scrolls to it. Both panes hold the buffer's text, so the
@@ -195,12 +212,12 @@ struct HandleTextView: NSViewRepresentable {
     }
 }
 
-/// Records its handle's window when shown.
+/// Records its handle's window when shown, and fulfils a focus request made before it was.
 final class PaneContainer: NSView {
     weak var handle: TextViewHandle?
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if let window { handle?.window = window }
+        if let window { handle?.attached(to: window) }
     }
 }
 

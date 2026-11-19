@@ -1465,6 +1465,29 @@ final class MarkdownWriteTests: XCTestCase {
         }
     }
 
+    /// Focus asked for before SwiftUI attaches the pane (a quick Read → Write) lands once it attaches, unless
+    /// something else took focus meanwhile.
+    func testFocusRequestedBeforeAttachLandsUnlessFocusMovedMeanwhile() async {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let other = NSTextView(frame: NSRect(x: 0, y: 0, width: 50, height: 50))
+        window.contentView!.addSubview(other)
+        for userFocusedOther in [false, true] {
+            let handle = TextViewHandle()
+            let container = PaneContainer(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+            container.handle = handle
+            container.addSubview(handle.scrollView(text: "x", label: "Write"))
+            window.makeFirstResponder(nil)
+            handle.focus() // not in a window yet
+            if userFocusedOther { window.makeFirstResponder(other) }
+            window.contentView!.addSubview(container)
+            try? await Task.sleep(for: .seconds(0.05))
+            XCTAssertIdentical(window.firstResponder, userFocusedOther ? other : handle.view, "user focused other: \(userFocusedOther)")
+            container.removeFromSuperview()
+        }
+    }
+
     /// One keystroke on a 1 MiB document with both panes open: the typing pane, the binding and the other
     /// pane's sync, restyle and layout. Was ~130 ms mean (~420 ms worst) in Source and ~90 ms in Write.
     func testOneMiBKeystrokeWithBothPanesOpen() {
